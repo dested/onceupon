@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-20 — transcript no longer stops one word early
+Sal: drawing frequently lags one word. Cause: tracker rules written for Chrome (hold back the last interim word, need 5+ words) applied to the OpenAI live model, whose deltas are append-only and whose finals need sentence punctuation. Now each recognizer configures the tracker: live = release everything after 600ms of quiet.
+Touched: src/speech/recognition.ts, src/story/session.ts
+
 ## 2026-09-20 — ears cost, replay narration, kid-safety, subtitle states
 Sal: include transcription cost; replay must show what we heard; filter inappropriate content contextually ("they can't go to the bathroom together"); unclear which words are drawn/waiting. Done: audio-ms metering priced at an editable per-minute rate (chip + debug + Settings); replay caption per heard chunk; `skip` verb the model answers for not-for-kids meaning (words scrubbed from record/transcript, marker left, note shown) plus a word masker; three-state subtitle (ink / yellow drawing / grey waiting) and clearer mic status; stamp-in-obj page-coordinate tolerance; play-again moved above the subtitle.
 Touched: src/story/clean.ts (new), src/llm/prompt.ts, src/llm/director.ts, src/engine/{types,dsl,scene}.ts, src/speech/{recognition,openai-realtime}.ts, src/story/{store,session,replay}.ts, src/ui/{Subtitles,SpendChip,SettingsPanel,DebugPanel,ReplayScreen,StoryScreen}.tsx
