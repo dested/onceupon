@@ -63,6 +63,8 @@ export interface StageStats {
   pendingStrokes: number
   pendingLength: number
   revealSpeed: number
+  /** Crayons drawing at once (1..3), grows with the backlog. */
+  lanes: number
   drawing: boolean
 }
 
@@ -70,6 +72,9 @@ const OUTLINE_SPEED = 70
 const FILL_SPEED = 110
 const MAX_SPEED = 1600
 const CATCHUP_SECONDS = 2.2
+/** Pending work (world units of stroke) past which a second and third crayon join in. */
+const LANE2_AT = 600
+const LANE3_AT = 1200
 const REST: Vec = { x: 152, y: 94 }
 
 function easeInOut(t: number): number {
@@ -92,6 +97,8 @@ export class Stage {
   private paper: HTMLCanvasElement | null = null
   private views = new Map<string, ObjView>()
   private queue: QueueItem[] = []
+  /** Reveal speed committed for the current backlog (see advanceReveal). */
+  private speedHold = 0
   private bubbles: Bubble[] = []
   private raf = 0
   private last = 0
@@ -107,7 +114,7 @@ export class Stage {
   private instant = false
   private drawingNow = false
   private audio: CrayonAudio | null
-  stats: StageStats = { pendingStrokes: 0, pendingLength: 0, revealSpeed: 0, drawing: false }
+  stats: StageStats = { pendingStrokes: 0, pendingLength: 0, revealSpeed: 0, lanes: 1, drawing: false }
   onPageSnapshot: ((dataUrl: string, pageIndex: number) => void) | null = null
   onIdle: (() => void) | null = null
   private wasBusy = false
@@ -370,22 +377,60 @@ export class Stage {
   }
 
   private advanceReveal(dt: number, now: number): Vec | null {
-    if (this.queue.length === 0) return null
+    if (this.queue.length === 0) {
+      this.speedHold = 0
+      this.stats.revealSpeed = 0
+      this.stats.lanes = 1
+      return null
+    }
     const pending = this.pendingLength()
-    const base = OUTLINE_SPEED
-    const speed = this.instant ? Infinity : Math.min(MAX_SPEED, Math.max(base, pending / CATCHUP_SECONDS))
+    // Catch-up speed is set by the backlog and HELD until the queue drains; recomputing it every
+    // frame from what is left made the tail crawl (speed fell with the remaining work).
+    this.speedHold = Math.max(this.speedHold, Math.min(MAX_SPEED, Math.max(OUTLINE_SPEED, pending / CATCHUP_SECONDS)))
+    const speed = this.instant ? Infinity : this.speedHold
     this.stats.revealSpeed = speed
-    let budget = this.instant ? Infinity : speed * dt
+    // A big backlog gets more crayons: each lane draws a different object at full speed.
+    const lanes = this.instant ? 1 : pending > LANE3_AT ? 3 : pending > LANE2_AT ? 2 : 1
+    this.stats.lanes = lanes
     let head: Vec | null = null
+    const taken = new Set<string>()
+    for (let lane = 0; lane < lanes; lane++) {
+      const h = this.revealLane(this.instant ? Infinity : speed * dt, now, taken)
+      if (h === undefined) break
+      if (lane === 0) head = h
+    }
+    return head
+  }
+
+  /**
+   * Spend one lane's budget: pick the first queued object no other lane holds this frame and draw
+   * its strokes in order, rolling on to the next free object if budget remains.
+   * Returns the crayon position, null if nothing was drawn, undefined if there was nothing to take.
+   */
+  private revealLane(budget: number, now: number, taken: Set<string>): Vec | null | undefined {
+    let head: Vec | null | undefined = undefined
+    let laneId: string | null = null
     while (budget > 0 && this.queue.length > 0) {
-      const q = this.queue[0]
+      const want = laneId
+      let qi: number = want === null ? this.queue.findIndex((e) => !taken.has(e.id)) : this.queue.findIndex((e) => e.id === want)
+      if (qi < 0 && laneId !== null) {
+        laneId = null
+        qi = this.queue.findIndex((e) => !taken.has(e.id))
+      }
+      if (qi < 0) break
+      const q: QueueItem | undefined = this.queue[qi]
       if (!q) break
       const v = this.views.get(q.id)
       const st = v?.strokes[q.stroke]
       if (!v || !st || v.dying) {
-        this.queue.shift()
+        this.queue.splice(qi, 1)
         continue
       }
+      if (laneId === null) {
+        laneId = q.id
+        taken.add(q.id)
+      }
+      if (head === undefined) head = null
       if (v.head !== q.stroke) {
         v.head = q.stroke
         v.progress = 0
@@ -409,7 +454,7 @@ export class Stage {
       const p = pointAt(st, v.progress)
       if (p) head = this.toWorld(v, p, now)
       if (v.progress >= st.length - 1e-6) {
-        this.queue.shift()
+        this.queue.splice(qi, 1)
         v.head = q.stroke + 1
         v.progress = 0
         v.textChars = 0
@@ -423,8 +468,10 @@ export class Stage {
     const bt = now / 1000 + v.breathPhase * 10
     let dx = 0
     let dy = 0
-    let rot = Math.sin(bt * 0.9) * 0.012
-    let breath = 1 + Math.sin(bt * 1.3) * 0.012
+    // Everything alive breathes a little; scenery half as much, the sky/ground not at all.
+    const life = v.id === BG_ID ? 0 : v.z < 0 ? 0.5 : 1
+    let rot = Math.sin(bt * 0.9) * 0.006 * life
+    let breath = 1 + Math.sin(bt * 1.3) * 0.006 * life
     switch (v.anim) {
       case 'bob':
         dy = Math.sin(t * 2.6) * 1.6

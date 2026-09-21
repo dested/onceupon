@@ -101,10 +101,10 @@ plans/                     dated working docs
 
 ## The loop
 
-1. `LiveSession.startListening` → OpenAI Realtime transcription when an OpenAI key is set (Settings → Ears), else `webkitSpeechRecognition`. Both emit the same result list. `TranscriptTracker` releases final results at once and interim words by per-recognizer rules (`CHROME_TRACKER`: stable 700ms, 5+ words, last word held back because Chrome rewrites the tail; `LIVE_TRACKER` for gpt-live-transcribe: stable 600ms, any count, nothing held back, since its deltas are append-only and finals only come on sentence punctuation).
+1. `LiveSession.startListening` → OpenAI Realtime transcription when an OpenAI key is set (Settings → Ears), else `webkitSpeechRecognition`. Both emit the same result list. `TranscriptTracker` releases final results at once and interim words by per-recognizer rules (`CHROME_TRACKER`: stable 700ms, 5+ words, last word held back because Chrome rewrites the tail; `LIVE_TRACKER` for gpt-live-transcribe: quiet 1100ms, any count, nothing held back; punctuation is not treated as a final because the model drops a period on any short breath).
 2. `Director.feed(words)` appends to `pending`; if no call is in flight, sends one: cached `SYSTEM_PROMPT` + user message (story tail, `scene.summary()`, NEW WORDS). Words arriving mid-call go out together next.
 3. Streamed text is split on newlines; each line → `parseLine` → `scene.apply` → `SceneEvent[]` → `stage.handle`. Nothing waits for the call to finish.
-4. `Stage` converts shapes to strokes (outline, then hachure fill), queues them, and reveals along arc length each frame. Reveal speed rises with backlog so it never falls far behind speech. The crayon cursor rides the stroke head; audio intensity follows.
+4. `Stage` converts shapes to strokes (outline, then hachure fill), queues them, and reveals along arc length each frame. Reveal speed rises with backlog, and past ~1s / ~2s of work at top speed a second / third lane draws another object at the same time (`LANE2_AT`, `LANE3_AT`; `stats.lanes`). The crayon cursor rides the stroke head; audio intensity follows.
 5. Every emitted `words` chunk and every OK `cmd` line is recorded with a timestamp into the `StoryRecord`, autosaved 1.5s after the last event.
 6. If the model answers `skip` (words not fit for a picture book, judged by meaning), the Director aborts the call, drops the words from its story tail, and the session pulls them out of the record and transcript, leaving a `(the crayon skipped a part)` marker. Nothing is drawn.
 7. The subtitle shows three states: drawn words in ink, the in-flight call's words on a yellow highlight (`drawingWords`), words heard but not yet sent in grey (`queuedWords` + interim).
@@ -120,6 +120,7 @@ plans/                     dated working docs
 
 - **World is 160x100, ground at y=80.** Shapes inside an `obj` are relative to its anchor; negative y is up. The prompt and the engine must agree.
 - **`page` wipes objects.** Characters from the previous page are kept in `Scene.carried`; a verb that references one recreates it on the new page (so `mv dragon` after `page` works even if the model forgot to redraw).
+- **Base breathing is tiny on purpose.** Every object gets a 0.6% breath/rotation; scenery (negative layer) half that; the sky/ground rect none. Sal asked for the background to move less.
 - **`s <fx-name>`** is accepted as an effect (models do this). A stamp as the first shape inside an `obj` whose relative position is off-page but whose absolute position fits is read as page coordinates (models write `obj house 40 80` / `s house 40 68`).
 - **Determinism:** every stroke's wobble is seeded from `storySeed:objectId:strokeIndex` so replay looks identical. Do not use `Math.random()` in engine code.
 - **Object bounds:** `contentBounds` is the unpadded union of shapes; `layerBounds` is the padded canvas. Never derive UI placement from `layerBounds`. Bubbles use `uprightBounds` (no rotation; the sweep circle for spin) and wait until the character is fully drawn.
