@@ -2,7 +2,7 @@ import { parseLine } from '~/engine/dsl'
 import type { Scene } from '~/engine/scene'
 import type { Stage } from '~/engine/stage'
 import type { LlmProvider } from './providers'
-import { buildUserMessage, SYSTEM_PROMPT } from './prompt'
+import { buildUserMessage, SYSTEM_PROMPT, SYSTEM_PROMPT_UNMODERATED } from './prompt'
 import { estimateCost, type Usage } from './models'
 
 export interface CallStat {
@@ -33,6 +33,8 @@ export type DirectorEvent =
 export interface DirectorDeps {
   scene: Scene
   stage: Stage
+  /** Kid-safety section in the system prompt (Settings → moderation). */
+  moderation: boolean
   getProvider: () => LlmProvider | null
   onEvent: (e: DirectorEvent) => void
 }
@@ -149,7 +151,12 @@ export class Director {
     this.abort = new AbortController()
     let buf = ''
     try {
-      for await (const chunk of provider.stream({ system: SYSTEM_PROMPT, user, maxTokens: MAX_TOKENS, signal: this.abort.signal })) {
+      for await (const chunk of provider.stream({
+        system: this.deps.moderation ? SYSTEM_PROMPT : SYSTEM_PROMPT_UNMODERATED,
+        user,
+        maxTokens: MAX_TOKENS,
+        signal: this.abort.signal,
+      })) {
         if (chunk.k === 'usage') {
           stat.usage = chunk.usage
           stat.costUsd = estimateCost(provider.model, chunk.usage)

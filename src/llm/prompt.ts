@@ -87,6 +87,9 @@ say dragon uh oh
 NEW WORDS: and then the dragon pooped on the house
 skip`
 
+/** The same prompt with the kid-safety section removed (Settings → moderation off). */
+export const SYSTEM_PROMPT_UNMODERATED = SYSTEM_PROMPT.replace(/# For a small child\n[^\n]+\n\n/, '')
+
 export interface PromptInput {
   storySoFar: string
   sceneSummary: string

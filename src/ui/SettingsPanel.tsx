@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { listMics } from '~/speech/openai-realtime'
+import { setModeration } from '~/story/clean'
 import { X } from 'lucide-react'
 import { MODEL_OPTIONS, PROVIDERS, isProvider, type Provider } from '~/llm/models'
 import { appStore, persistSettings, STT_MODES, useApp, type Settings, type SttMode } from '~/story/store'
@@ -95,6 +96,21 @@ export function SettingsPanel() {
               </StickerButton>
             ))}
           </div>
+
+          <label className="mb-5 flex items-center gap-3 font-hand text-lg" htmlFor="moderation">
+            <input
+              id="moderation"
+              type="checkbox"
+              className="h-5 w-5 accent-crayon-red"
+              checked={settings.moderation}
+              onChange={(e) => {
+                setModeration(e.target.checked)
+                update((s) => ({ ...s, moderation: e.target.checked }))
+              }}
+            />
+            Kid-safe moderation (skip not-for-kids beats, mask rude words). Prompt change applies to the next new story.
+          </label>
+
 
           <h3 className="mb-2 font-hand text-xl">Ears</h3>
           <div className="mb-5 grid grid-cols-[1fr_11rem] gap-3">

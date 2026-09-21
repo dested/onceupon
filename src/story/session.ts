@@ -9,7 +9,7 @@ import { createOpenAiRealtimeRecognizer, isLiveModel, warmMic } from '~/speech/o
 import { getStory, listStories, newStoryId, saveStory, titleFromWords, type StoryEvent, type StoryRecord } from './storage'
 import { Replayer } from './replay'
 import { exposeDebugHandle } from '~/debug-handle'
-import { cleanText } from './clean'
+import { cleanText, setModeration } from './clean'
 
 let lineCounter = 0
 let traceCounter = 0
@@ -79,6 +79,7 @@ export class LiveSession {
 
   constructor(canvas: HTMLCanvasElement) {
     const seed = Math.floor(Math.random() * 1e9)
+    setModeration(appStore.get().settings.moderation)
     this.story = { id: newStoryId(), title: '', createdAt: Date.now(), updatedAt: Date.now(), seed, cover: null, events: [] }
     this.stage = new Stage(canvas, { seed, audio: this.audio })
     this.stage.onPageSnapshot = (thumb, pageIndex) => {
@@ -89,6 +90,7 @@ export class LiveSession {
     this.director = new Director({
       scene: this.scene,
       stage: this.stage,
+      moderation: appStore.get().settings.moderation,
       getProvider: currentProvider,
       onEvent: (e) => {
         pushDirectorEvent(e)
@@ -298,6 +300,7 @@ export class ReplaySession {
     const director = new Director({
       scene,
       stage: this.stage,
+      moderation: appStore.get().settings.moderation,
       getProvider: () => null,
       onEvent: () => undefined,
     })

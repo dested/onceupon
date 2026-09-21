@@ -23,6 +23,7 @@ prompt is the spec the model sees).
 - "New story" starts a fresh session (new seed, empty page, new record).
 - Typing a sentence in the bottom-right box behaves exactly like speaking it.
 - The subtitle line shows drawn words in ink, the words of the call in flight on a yellow highlight, and words heard but not yet sent in grey. The mic status names the same thing ("drawing the yellow bit! keep going").
+- Moderation can be switched off in Settings (for testing): no safety section in the prompt for the next story, no word masking.
 - If the model answers `skip`, nothing is drawn, the words are removed from the story and transcript, a `(the crayon skipped a part)` marker takes their place, and "the crayon skipped that part" shows under the mic for 4s. Rude words are masked everywhere they are shown or saved.
 - Replay shows each heard chunk as a caption near the top of the page as it is reached, plus the running subtitle.
 - Replay has a scrubber (event index) and play/pause. Dragging rebuilds the page instantly through that event with a fresh scene, then continues in the same play state; at the end the button becomes "again". Page thumbnails for pages passed during a scrub are not captured.
