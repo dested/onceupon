@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-20 — moderation behind a flag
+Sal: give me a way to disable the moderation. Settings → "Kid-safe moderation" checkbox (default on). Off removes the safety section from both prompts (next new story) and turns the word masker into a pass-through (live).
+Touched: src/story/{clean,store,session}.ts, src/llm/{prompt,json-prompt,dialect,json-dsl}.ts, src/ui/SettingsPanel.tsx
+
 ## 2026-09-20 — faster catch-up, calmer background, better page turns, relaxed pause
 Sal (on v2): too slow with lots queued; doesn't clear when they go inside (table drawn over the house); background moves too much; pause detection too aggressive. Done: reveal lanes (2 or 3 objects drawn at once past ~1s/~2s of backlog); base breathing halved and off for the sky/ground, half again for scenery; both prompts now say every place change (inside, home, bed, school...) is a page turn, with an "inside the house" example in the JSON prompt; live transcriber no longer treats punctuation as done and waits 1100ms of quiet.
 Touched: src/engine/stage.ts, src/llm/json-prompt.ts, src/llm/prompt.ts, src/speech/{openai-realtime,recognition}.ts

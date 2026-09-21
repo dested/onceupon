@@ -4,8 +4,8 @@ import type { Scene } from '~/engine/scene'
 import { BG_ID } from '~/engine/scene'
 import { GROUND_Y, WORLD_W, type AnimKind, type Command, type FxKind, type Shape } from '~/engine/types'
 import { cleanText } from '~/story/clean'
-import type { Dialect, DialectInput, DialectParse } from './dialect'
-import { buildJsonUserMessage, JSON_SYSTEM_PROMPT } from './json-prompt'
+import type { Dialect, DialectInput, DialectOptions, DialectParse } from './dialect'
+import { buildJsonUserMessage, JSON_SYSTEM_PROMPT, JSON_SYSTEM_PROMPT_UNMODERATED } from './json-prompt'
 
 /* ---------- the JSON contract (v1 of the operations doc) ---------- */
 
@@ -157,13 +157,18 @@ const toPaperY = (y: number): number => Math.round((y - OY) / K)
  */
 export class JsonDialect implements Dialect {
   readonly id = 'json' as const
-  readonly system = JSON_SYSTEM_PROMPT
+  readonly system: string
   readonly maxTokens = 2600
   later: ((cmds: Command[]) => void) | null = null
   private ents = new Map<string, EntityMeta>()
   private timers: number[] = []
 
-  constructor(private scene: Scene) {}
+  constructor(
+    private scene: Scene,
+    opts: DialectOptions
+  ) {
+    this.system = opts.moderation ? JSON_SYSTEM_PROMPT : JSON_SYSTEM_PROMPT_UNMODERATED
+  }
 
   buildUser(input: DialectInput): string {
     return buildJsonUserMessage({ storySoFar: input.storySoFar, sceneJson: this.snapshot(), newWords: input.newWords })

@@ -83,6 +83,9 @@ NEW STORY: then the bunny went inside and sat down at the table for dinner
 {"op":"draw","shape":{"id":"legs2","entity":"table","color":"#5b4636","fill":"#8b5a2b","path":[["M",105,-95],["L",130,-95],["L",130,0],["L",105,0],["Z"]]}}
 {"op":"move","id":"bunny","x":480,"y":525,"duration":1.5,"style":"walk"}`
 
+/** The same prompt with the kid-safety section removed (Settings → moderation off). */
+export const JSON_SYSTEM_PROMPT_UNMODERATED = JSON_SYSTEM_PROMPT.replace(/# For a small child\n[^\n]+\n\n/, '').replace('{"op":"skip"}\n  See below.\n', '')
+
 export interface JsonPromptInput {
   storySoFar: string
   sceneJson: string

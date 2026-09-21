@@ -18,6 +18,8 @@ export interface Settings {
   dialect: DialectId
   keys: ApiKeys
   sound: boolean
+  /** Kid-safe moderation: safety section in the prompt + bad-word masking. Off for testing. */
+  moderation: boolean
   /** auto = OpenAI Realtime when an OpenAI key exists, else Chrome's recognizer. */
   stt: SttMode
   sttModel: string
@@ -132,6 +134,7 @@ const settingsSchema = z.object({
   dialect: z.string().optional(),
   keys: z.object({ anthropic: z.string(), openrouter: z.string(), openai: z.string() }),
   sound: z.boolean(),
+  moderation: z.boolean().optional(),
   stt: z.string().optional(),
   sttModel: z.string().optional(),
   sttRatePerMin: z.number().optional(),
@@ -153,6 +156,7 @@ function loadSettings(): Settings {
     dialect: 'lines',
     keys: envKeys,
     sound: true,
+    moderation: true,
     stt: 'auto',
     sttModel: DEFAULT_STT_MODEL,
     sttRatePerMin: DEFAULT_STT_RATE,
@@ -174,6 +178,7 @@ function loadSettings(): Settings {
         openai: d.keys.openai || envKeys.openai,
       },
       sound: d.sound,
+      moderation: d.moderation ?? true,
       stt: d.stt === 'browser' || d.stt === 'openai' ? d.stt : 'auto',
       sttModel: d.sttModel && d.sttModel !== 'gpt-4o-transcribe' ? d.sttModel : DEFAULT_STT_MODEL,
       sttRatePerMin: d.sttRatePerMin ?? DEFAULT_STT_RATE,

@@ -46,7 +46,15 @@ const BAD = [
 
 const RE = new RegExp(`\\b(${BAD.join('|')})\\b`, 'gi')
 
+let enabled = true
+
+/** Settings → "kid-safe moderation". Off = words pass through untouched. */
+export function setModeration(on: boolean): void {
+  enabled = on
+}
+
 export function cleanText(text: string): string {
+  if (!enabled) return text
   return text.replace(RE, (m) => (m[0] ?? '*') + '*'.repeat(Math.max(1, m.length - 1)))
 }
 

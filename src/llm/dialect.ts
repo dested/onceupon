@@ -1,7 +1,7 @@
 import { parseLine } from '~/engine/dsl'
 import type { Scene } from '~/engine/scene'
 import type { Command } from '~/engine/types'
-import { buildUserMessage, SYSTEM_PROMPT } from './prompt'
+import { buildUserMessage, SYSTEM_PROMPT, SYSTEM_PROMPT_UNMODERATED } from './prompt'
 import { JsonDialect } from './json-dsl'
 
 export const DIALECT_IDS = ['lines', 'json'] as const
@@ -37,18 +37,28 @@ export interface Dialect {
   reset(): void
 }
 
-export function makeDialect(id: DialectId, scene: Scene): Dialect {
-  return id === 'json' ? new JsonDialect(scene) : new LinesDialect(scene)
+export interface DialectOptions {
+  /** Kid-safety section in the prompt (the model answers `skip` for not-for-kids meaning). */
+  moderation: boolean
+}
+
+export function makeDialect(id: DialectId, scene: Scene, opts: DialectOptions): Dialect {
+  return id === 'json' ? new JsonDialect(scene, opts) : new LinesDialect(scene, opts)
 }
 
 /** The original one-command-per-line crayon DSL. */
 export class LinesDialect implements Dialect {
   readonly id = 'lines' as const
-  readonly system = SYSTEM_PROMPT
+  readonly system: string
   readonly maxTokens = 1200
   later: ((cmds: Command[]) => void) | null = null
 
-  constructor(private scene: Scene) {}
+  constructor(
+    private scene: Scene,
+    opts: DialectOptions
+  ) {
+    this.system = opts.moderation ? SYSTEM_PROMPT : SYSTEM_PROMPT_UNMODERATED
+  }
 
   buildUser(input: DialectInput): string {
     return buildUserMessage({ storySoFar: input.storySoFar, sceneSummary: this.scene.summary(), newWords: input.newWords })
