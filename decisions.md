@@ -29,6 +29,10 @@
 **Why:** stamping textured dabs along arc length gives wax grain and incremental reveal for free; per-object layers let objects move/scale/flip cheaply; seeding makes replay pixel-identical.
 **Rejected:** rough.js (pen-sketch look, no progressive reveal), SVG (too many nodes).
 
+## 2026-09-20 — Grow the system prompts past Haiku's 4096-token cache minimum with real content
+**Why:** measured: Haiku 4.5 caches nothing below 4096 prefix tokens (our prompts were 1920 / 3238), so every call paid full input price. A cookbook of shapes and story-beat recipes makes the prompts genuinely better and crosses the bar; reads then cost 10%.
+**Rejected:** junk padding (works, but the tokens buy nothing), Sonnet/Opus by default (their minimums are lower but they are slower and dearer per token).
+
 ## 2026-09-20 — The drawing model is the content filter (`skip`), no separate classifier
 **Why:** Sal: "it has to be contextual, they can't go to the bathroom together". Only a model can judge meaning, and the drawing model already sees every chunk with the story context. Teaching it to answer `skip` costs no extra call and no latency; a word masker (`story/clean.ts`) stays as a blunt second layer for on-screen text.
 **Rejected:** a parallel Haiku judge per chunk (adds 300-500ms before the first stroke or races the drawing call), a client-side phrase list (cannot judge meaning).

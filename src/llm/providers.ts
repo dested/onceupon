@@ -2,11 +2,22 @@ import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import type { Provider, Usage } from './models'
 
+/** One text block of the user message. `cache: true` marks a prompt-cache breakpoint (Anthropic). */
+export interface PromptBlock {
+  text: string
+  cache?: boolean
+}
+
 export interface LlmRequest {
   system: string
-  user: string
+  /** In order; the static prefix first (cached), the per-call tail last. */
+  user: PromptBlock[]
   maxTokens: number
   signal: AbortSignal
+}
+
+export function blocksToText(blocks: PromptBlock[]): string {
+  return blocks.map((b) => b.text).join('\n')
 }
 
 export type LlmChunk = { k: 'text'; text: string } | { k: 'usage'; usage: Usage }
@@ -43,7 +54,12 @@ class AnthropicProvider implements LlmProvider {
         model: this.model,
         max_tokens: req.maxTokens,
         system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
-        messages: [{ role: 'user', content: req.user }],
+        messages: [
+          {
+            role: 'user',
+            content: req.user.map((b) => (b.cache ? { type: 'text', text: b.text, cache_control: { type: 'ephemeral' } } : { type: 'text', text: b.text })),
+          },
+        ],
         ...(thinkingOff ? { thinking: { type: 'disabled' } } : {}),
       },
       { signal: req.signal }
@@ -111,7 +127,7 @@ class OpenAiCompatProvider implements LlmProvider {
       stream: true,
       messages: [
         { role: 'system', content: req.system },
-        { role: 'user', content: req.user },
+        { role: 'user', content: blocksToText(req.user) },
       ],
     }
     if (this.kind === 'openrouter') {

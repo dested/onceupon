@@ -2,7 +2,7 @@ import { parseLine } from '~/engine/dsl'
 import type { Scene } from '~/engine/scene'
 import type { Stage } from '~/engine/stage'
 import type { LlmProvider } from './providers'
-import { buildUserMessage, SYSTEM_PROMPT, SYSTEM_PROMPT_UNMODERATED } from './prompt'
+import { buildUserBlocks, SYSTEM_PROMPT, SYSTEM_PROMPT_UNMODERATED } from './prompt'
 import { estimateCost, type Usage } from './models'
 
 export interface CallStat {
@@ -59,7 +59,8 @@ export class Director {
   private linesThisCall = 0
   private restarts = 0
   private restarting = false
-  private storySoFar = ''
+  /** Every chunk sent so far, in order; the prompt caches them as a prefix. */
+  private storyChunks: string[] = []
   private callId = 0
   private abort: AbortController | null = null
   private stopped = false
@@ -67,7 +68,11 @@ export class Director {
   constructor(private deps: DirectorDeps) {}
 
   get story(): string {
-    return this.storySoFar
+    return this.storyChunks.join(' ')
+  }
+
+  private dropLastChunk(words: string): void {
+    if (this.storyChunks[this.storyChunks.length - 1] === words) this.storyChunks.pop()
   }
 
   /**
@@ -81,7 +86,7 @@ export class Director {
     if (this.inFlight && this.abort && this.linesThisCall < RESTART_MAX_LINES && this.restarts < RESTART_MAX) {
       this.restarts++
       this.restarting = true
-      if (this.storySoFar.endsWith(this.current)) this.storySoFar = this.storySoFar.slice(0, -this.current.length).trimEnd()
+      this.dropLastChunk(this.current)
       this.pending = [this.current, this.pending, w].filter(Boolean).join(' ')
       this.deps.onEvent({ k: 'restart', words: this.pending })
       this.abort.abort()
@@ -116,7 +121,7 @@ export class Director {
   /** A `skip` line ends the call: the words leave the story and the session hears about it. */
   private isSkip(line: string, words: string): boolean {
     if (!/^skip\b/i.test(line.trim())) return false
-    if (this.storySoFar.endsWith(words)) this.storySoFar = this.storySoFar.slice(0, -words.length).trimEnd()
+    this.dropLastChunk(words)
     this.deps.onEvent({ k: 'line', line: 'skip', ok: true, error: null })
     this.deps.onEvent({ k: 'skip', words })
     this.abort?.abort()
@@ -128,7 +133,7 @@ export class Director {
     this.abort = null
     this.pending = ''
     this.current = ''
-    this.storySoFar = ''
+    this.storyChunks = []
     this.inFlight = false
     this.restarts = 0
     this.restarting = false
@@ -170,12 +175,12 @@ export class Director {
     }
     this.emitStatus('thinking')
     this.deps.onEvent({ k: 'call', stat: { ...stat } })
-    const user = buildUserMessage({
-      storySoFar: this.storySoFar,
+    const user = buildUserBlocks({
+      storyChunks: this.storyChunks,
       sceneSummary: this.deps.scene.summary(),
       newWords: words,
     })
-    this.storySoFar = this.storySoFar ? `${this.storySoFar} ${words}` : words
+    this.storyChunks.push(words)
     this.abort = new AbortController()
     let buf = ''
     try {
