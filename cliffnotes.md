@@ -101,8 +101,8 @@ plans/                     dated working docs
 | Screen | Component      | Notes                                                   |
 | ------ | -------------- | ------------------------------------------------------- |
 | story  | `StoryScreen`  | default; remounts on "New story" (storyNonce)            |
-| shelf  | `Bookshelf`    | opens from the book icon                                |
-| replay | `ReplayScreen` | keyed by story id; autoplays; play/pause + scrubber (`ReplaySession.seek` rebuilds the page instantly through event i, `Stage.settle()`) |
+| shelf  | `Bookshelf`    | opens from the book icon; per-card two-tap trash; "clear N empty" removes 0-word stories |
+| replay | `ReplayScreen` | keyed by story id; autoplays; trash = two-tap delete back to the shelf; play/pause + scrubber (`ReplaySession.seek` rebuilds the page instantly through event i, `Stage.settle()`) |
 
 ## The loop
 

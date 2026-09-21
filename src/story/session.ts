@@ -154,7 +154,8 @@ export class LiveSession {
   }
 
   save(): void {
-    if (this.story.events.length === 0) return
+    // A story nobody told (debug-driven lines, no words) is not worth a shelf slot.
+    if (!this.story.events.some((e) => e.k === 'words')) return
     const words = this.story.events
       .filter((e) => e.k === 'words')
       .map((e) => (e.k === 'words' ? e.text : ''))

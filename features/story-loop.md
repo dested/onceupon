@@ -20,7 +20,7 @@ prompt is the spec the model sees).
 - Unknown lines are logged in the debug panel and skipped; the story continues.
 - `page` snapshots the current page into the filmstrip, slides it away, and starts a fresh page. Characters referenced afterwards are recreated from the previous page automatically.
 - Every words chunk and every executed line is recorded with a timestamp; the story autosaves to localStorage 1.5s after the last event and when leaving the screen.
-- "New story" starts a fresh session (new seed, empty page, new record).
+- "New story" starts a fresh session (new seed, empty page, new record). A story is only saved once it has words; stories can be deleted from the shelf (per card, or all empty ones at once) and from inside a replay, always with a second tap to confirm.
 - Typing a sentence in the bottom-right box behaves exactly like speaking it.
 - The subtitle line shows drawn words in ink, the words of the call in flight on a yellow highlight, and words heard but not yet sent in grey. The mic status names the same thing ("drawing the yellow bit! keep going").
 - Moderation can be switched off in Settings (for testing): no safety section in the prompt for the next story, no word masking.

@@ -7,6 +7,8 @@ import { IconButton, StickerButton } from './bits'
 export function Bookshelf() {
   const stories = useApp((s) => s.stories)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [confirmEmpty, setConfirmEmpty] = useState(false)
+  const empty = stories.filter((s) => s.words === 0)
 
   useEffect(() => {
     appStore.set({ stories: listStories() })
@@ -23,6 +25,15 @@ export function Bookshelf() {
     setConfirmId(null)
     appStore.set({ stories: listStories() })
   }
+  const clearEmpty = (): void => {
+    if (!confirmEmpty) {
+      setConfirmEmpty(true)
+      return
+    }
+    for (const s of empty) deleteStory(s.id)
+    setConfirmEmpty(false)
+    appStore.set({ stories: listStories() })
+  }
 
   return (
     <div className="h-full w-full overflow-y-auto p-6" data-testid="shelf">
@@ -31,6 +42,17 @@ export function Bookshelf() {
           <ArrowLeft size={24} strokeWidth={3} />
         </IconButton>
         <h1 className="font-scrawl text-4xl">Our stories</h1>
+        {empty.length > 0 && (
+          <StickerButton
+            tilt={0}
+            tone={confirmEmpty ? 'red' : 'paper'}
+            className="ml-auto !text-base"
+            onClick={clearEmpty}
+            onBlur={() => setConfirmEmpty(false)}
+            data-testid="clear-empty">
+            <Trash2 size={18} strokeWidth={2.5} /> {confirmEmpty ? `delete ${empty.length} empty ${empty.length === 1 ? 'story' : 'stories'}?` : `clear ${empty.length} empty`}
+          </StickerButton>
+        )}
       </div>
       {stories.length === 0 && (
         <p className="font-hand text-2xl text-ink-soft">No stories yet. Go back and tell one!</p>

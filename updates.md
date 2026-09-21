@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-20 — delete stories
+Sal: give me a way to delete a story. The shelf already had a per-card two-tap trash; added a trash on the replay screen (two-tap, returns to the shelf), a "clear N empty" button on the shelf for 0-word stories, and stories with no words are no longer autosaved.
+Touched: src/ui/{ReplayScreen,Bookshelf}.tsx, src/story/session.ts
+
 ## 2026-09-20 — moderation behind a flag
 Sal: give me a way to disable the moderation. Settings → "Kid-safe moderation" checkbox (default on). Off removes the safety section from both prompts (next new story) and turns the word masker into a pass-through (live).
 Touched: src/story/{clean,store,session}.ts, src/llm/{prompt,json-prompt,dialect,json-dsl}.ts, src/ui/SettingsPanel.tsx

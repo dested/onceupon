@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
-import { ArrowLeft, Pause, Play, RotateCcw } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowLeft, Pause, Play, RotateCcw, Trash2 } from 'lucide-react'
 import { ReplaySession } from '~/story/session'
 import { appStore, useApp } from '~/story/store'
+import { deleteStory, listStories } from '~/story/storage'
 import { IconButton, StickerButton } from './bits'
 import { Subtitles } from './Subtitles'
 import { Filmstrip } from './Filmstrip'
@@ -13,6 +14,7 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
   const caption = useApp((s) => s.replayCaption)
   const pos = useApp((s) => s.replayPos)
   const len = useApp((s) => s.replayLen)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -36,12 +38,30 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
     s.seek(0)
   }
   const ended = len > 0 && pos >= len
+  const remove = (): void => {
+    if (!confirmDelete) {
+      setConfirmDelete(true)
+      return
+    }
+    sessionRef.current?.pause()
+    deleteStory(storyId)
+    appStore.set({ screen: 'shelf', replayId: null, stories: listStories() })
+  }
 
   return (
     <div className="relative h-full w-full select-none" data-testid="replay">
       <canvas ref={canvasRef} className="block h-full w-full" />
       <Filmstrip />
-      <div className="absolute top-4 right-4 flex gap-3">
+      <div className="absolute top-4 right-4 flex items-center gap-3">
+        {confirmDelete ? (
+          <StickerButton tilt={0} tone="red" className="!text-base" onClick={remove} onBlur={() => setConfirmDelete(false)} data-testid="delete-story">
+            <Trash2 size={18} strokeWidth={2.5} /> delete this story?
+          </StickerButton>
+        ) : (
+          <IconButton label="Delete this story" onClick={remove} data-testid="delete-story">
+            <Trash2 size={22} strokeWidth={2.5} />
+          </IconButton>
+        )}
         <IconButton label="Back to bookshelf" onClick={() => appStore.set({ screen: 'shelf', replayId: null })}>
           <ArrowLeft size={24} strokeWidth={3} />
         </IconButton>
