@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-21 — merged json-dsl into master (for Drydock deploy)
+Sal: merge json-dsl into main and push. Branches had diverged — master carried faithful "(ported from json-dsl)" commits, so json-dsl was a strict superset (all of master's features plus the switchable JSON ops dialect). Resolved the merge to json-dsl's tree; conflicts were only ports-vs-originals of the same lines. Verified moderation is not regressed (json-dsl moved the moderated/unmoderated prompt choice into `makeDialect`/the dialects, still threaded from `settings.moderation`). typecheck green. master → 448407d, pushed.
+Touched: merge only (no new code); resolved src/llm/director.ts, src/story/session.ts, src/story/store.ts, src/ui/SettingsPanel.tsx, docs.
+
 ## 2026-09-20 — tighter quiet window now that restarts are cheap
 Sal: tighten the quiet-time requirement. Live transcriber quiet window 1100ms → 700ms; restart cap 2 → 3 per beat. See decisions.md.
 Touched: src/speech/recognition.ts, src/llm/director.ts
