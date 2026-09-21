@@ -9,6 +9,7 @@ import { createOpenAiRealtimeRecognizer, warmMic } from '~/speech/openai-realtim
 import { getStory, listStories, newStoryId, saveStory, titleFromWords, type StoryEvent, type StoryRecord } from './storage'
 import { Replayer } from './replay'
 import { exposeDebugHandle } from '~/debug-handle'
+import { isDialectId, makeDialect } from '~/llm/dialect'
 import { cleanText } from './clean'
 
 let lineCounter = 0
@@ -77,7 +78,8 @@ export class LiveSession {
 
   constructor(canvas: HTMLCanvasElement) {
     const seed = Math.floor(Math.random() * 1e9)
-    this.story = { id: newStoryId(), title: '', createdAt: Date.now(), updatedAt: Date.now(), seed, cover: null, events: [] }
+    const dialect = appStore.get().settings.dialect
+    this.story = { id: newStoryId(), title: '', createdAt: Date.now(), updatedAt: Date.now(), seed, cover: null, dialect, events: [] }
     this.stage = new Stage(canvas, { seed, audio: this.audio })
     this.stage.onPageSnapshot = (thumb, pageIndex) => {
       const title = this.scene.pages[pageIndex - 1]?.title ?? ''
@@ -87,6 +89,7 @@ export class LiveSession {
     this.director = new Director({
       scene: this.scene,
       stage: this.stage,
+      dialect: makeDialect(dialect, this.scene),
       getProvider: currentProvider,
       onEvent: (e) => {
         pushDirectorEvent(e)
@@ -278,9 +281,11 @@ export class ReplaySession {
     const seed = this.record?.seed ?? 1
     this.stage = new Stage(canvas, { seed, audio: null })
     const scene = new Scene()
+    const dialectId = this.record?.dialect
     this.director = new Director({
       scene,
       stage: this.stage,
+      dialect: makeDialect(dialectId && isDialectId(dialectId) ? dialectId : 'lines', scene),
       getProvider: () => null,
       onEvent: () => undefined,
     })

@@ -14,6 +14,8 @@ export interface SceneObject {
   flipped: boolean
   anim: AnimKind
   colors: string[]
+  /** Composite order; lower is further back. */
+  layer: number
 }
 
 export interface ScenePage {
@@ -26,6 +28,9 @@ export interface ScenePage {
 export type SceneEvent =
   | { k: 'objectCreated'; obj: SceneObject }
   | { k: 'shapesAdded'; id: string; shapes: Shape[] }
+  /** Replace an object's shapes; the first `keep` shapes are unchanged and stay drawn. */
+  | { k: 'shapesReset'; id: string; shapes: Shape[]; keep: number }
+  | { k: 'layer'; id: string; z: number }
   | { k: 'move'; id: string; x: number; y: number; secs: number }
   | { k: 'scale'; id: string; factor: number; secs: number }
   | { k: 'flip'; id: string }
@@ -38,6 +43,10 @@ export type SceneEvent =
   | { k: 'warn'; message: string }
 
 export const BG_ID = '__bg'
+
+function sameShape(a: Shape | undefined, b: Shape | undefined): boolean {
+  return a !== undefined && b !== undefined && JSON.stringify(a) === JSON.stringify(b)
+}
 
 /** Pure model of what is on the page. Emits events the Stage renders. Serializes itself for the model prompt. */
 export class Scene {
@@ -60,8 +69,8 @@ export class Scene {
     return `${base}${n}`
   }
 
-  private create(id: string, x: number, y: number): SceneObject {
-    const obj: SceneObject = { id, x, y, shapes: [], bounds: null, scale: 1, flipped: false, anim: 'none', colors: [] }
+  private create(id: string, x: number, y: number, layer = 0): SceneObject {
+    const obj: SceneObject = { id, x, y, shapes: [], bounds: null, scale: 1, flipped: false, anim: 'none', colors: [], layer }
     this.objects.set(id, obj)
     return obj
   }
@@ -83,7 +92,7 @@ export class Scene {
       const prev = this.carried.get(id)
       if (prev) {
         // Bring the character onto the new page as it was, then let the verb act on it.
-        const obj = this.create(id, prev.x, prev.y)
+        const obj = this.create(id, prev.x, prev.y, prev.layer)
         obj.scale = prev.scale
         obj.flipped = prev.flipped
         obj.anim = prev.anim
@@ -99,6 +108,33 @@ export class Scene {
 
     switch (cmd.k) {
       case 'skip':
+        break
+      case 'layer': {
+        const obj = need(cmd.id)
+        if (!obj) break
+        obj.layer = cmd.z
+        out.push({ k: 'layer', id: cmd.id, z: cmd.z })
+        break
+      }
+      case 'reset': {
+        this.openId = null
+        const obj = need(cmd.id)
+        if (!obj) break
+        let keep = 0
+        while (keep < obj.shapes.length && keep < cmd.shapes.length && sameShape(obj.shapes[keep], cmd.shapes[keep])) keep++
+        obj.shapes = []
+        obj.bounds = null
+        obj.colors = []
+        this.addShapes(obj, cmd.shapes)
+        out.push({ k: 'shapesReset', id: cmd.id, shapes: cmd.shapes, keep })
+        break
+      }
+      case 'recall':
+        this.openId = null
+        if (this.carried.has(cmd.id) || this.objects.has(cmd.id)) need(cmd.id)
+        break
+      case 'title':
+        this.page.title = cmd.title
         break
       case 'obj': {
         const existing = this.objects.get(cmd.id)

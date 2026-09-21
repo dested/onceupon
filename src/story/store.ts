@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import { DEFAULT_MODEL, isProvider, type Provider } from '~/llm/models'
+import { isDialectId, type DialectId } from '~/llm/dialect'
 import type { ApiKeys } from '~/llm/providers'
 import type { CallStat, DirectorStatus } from '~/llm/director'
 import type { StoryMeta } from './storage'
@@ -11,6 +12,8 @@ export type SttMode = (typeof STT_MODES)[number]
 export interface Settings {
   provider: Provider
   model: string
+  /** Which drawing language the model speaks; fixed per story. */
+  dialect: DialectId
   keys: ApiKeys
   sound: boolean
   /** auto = OpenAI Realtime when an OpenAI key exists, else Chrome's recognizer. */
@@ -106,6 +109,7 @@ const envSchema = z.object({
 const settingsSchema = z.object({
   provider: z.string(),
   model: z.string(),
+  dialect: z.string().optional(),
   keys: z.object({ anthropic: z.string(), openrouter: z.string(), openai: z.string() }),
   sound: z.boolean(),
   stt: z.string().optional(),
@@ -125,6 +129,7 @@ function loadSettings(): Settings {
   const base: Settings = {
     provider: DEFAULT_MODEL.provider,
     model: DEFAULT_MODEL.id,
+    dialect: 'lines',
     keys: envKeys,
     sound: true,
     stt: 'auto',
@@ -140,6 +145,7 @@ function loadSettings(): Settings {
     return {
       provider: isProvider(d.provider) ? d.provider : base.provider,
       model: d.model || base.model,
+      dialect: d.dialect && isDialectId(d.dialect) ? d.dialect : 'lines',
       keys: {
         anthropic: d.keys.anthropic || envKeys.anthropic,
         openrouter: d.keys.openrouter || envKeys.openrouter,

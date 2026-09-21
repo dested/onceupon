@@ -43,6 +43,11 @@ export type Command =
   | { k: 'page'; title: string }
   /** The model judged the new words not fit for the book: draw nothing, forget them. */
   | { k: 'skip' }
+  /** Engine-level commands the JSON dialect emits (not part of the line DSL). */
+  | { k: 'layer'; id: string; z: number }
+  | { k: 'reset'; id: string; shapes: Shape[] }
+  | { k: 'recall'; id: string }
+  | { k: 'title'; title: string }
 
 export type ParseResult =
   | { ok: true; cmd: Command | null }

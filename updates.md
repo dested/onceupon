@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-20 — JSON ops dialect (branch json-dsl)
+Sal: try a new NDJSON drawing DSL (1200x620 paper, Bezier paths, face helper, poses, recolor, scene keep). Built as a switchable Dialect behind the Director on the existing engine: zod schema + translator + JSON scene snapshot + its own prompt; engine gained layers (z-order), shape reset that keeps the drawn prefix, recall of kept characters after a page turn, face helper. Settings → Drawing language; story records remember their dialect for replay. Verified with Haiku: first token ~500ms both ways, JSON ~5x output tokens per beat.
+Touched: src/llm/{dialect,json-dsl,json-prompt,director}.ts, src/engine/{face,types,scene,stage}.ts, src/story/{store,storage,session}.ts, src/ui/SettingsPanel.tsx
+
 ## 2026-09-20 — ears cost, replay narration, kid-safety, subtitle states
 Sal: include transcription cost; replay must show what we heard; filter inappropriate content contextually ("they can't go to the bathroom together"); unclear which words are drawn/waiting. Done: audio-ms metering priced at an editable per-minute rate (chip + debug + Settings); replay caption per heard chunk; `skip` verb the model answers for not-for-kids meaning (words scrubbed from record/transcript, marker left, note shown) plus a word masker; three-state subtitle (ink / yellow drawing / grey waiting) and clearer mic status; stamp-in-obj page-coordinate tolerance; play-again moved above the subtitle.
 Touched: src/story/clean.ts (new), src/llm/prompt.ts, src/llm/director.ts, src/engine/{types,dsl,scene}.ts, src/speech/{recognition,openai-realtime}.ts, src/story/{store,session,replay}.ts, src/ui/{Subtitles,SpendChip,SettingsPanel,DebugPanel,ReplayScreen,StoryScreen}.tsx

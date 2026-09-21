@@ -1,3 +1,4 @@
+import { DIALECT_IDS, DIALECT_LABELS, isDialectId } from '~/llm/dialect'
 import { X } from 'lucide-react'
 import { MODEL_OPTIONS, PROVIDERS, isProvider, type Provider } from '~/llm/models'
 import { appStore, persistSettings, STT_MODES, useApp, type Settings, type SttMode } from '~/story/store'
@@ -88,6 +89,26 @@ export function SettingsPanel() {
                 {m.label}
               </StickerButton>
             ))}
+          </div>
+
+          <div className="mb-5">
+            <label className={label} htmlFor="dialect">
+              Drawing language (applies to the next new story)
+            </label>
+            <select
+              id="dialect"
+              value={settings.dialect}
+              className={field}
+              onChange={(e) => {
+                const v = e.target.value
+                if (isDialectId(v)) update((s) => ({ ...s, dialect: v }))
+              }}>
+              {DIALECT_IDS.map((d) => (
+                <option key={d} value={d}>
+                  {DIALECT_LABELS[d]}
+                </option>
+              ))}
+            </select>
           </div>
 
           <h3 className="mb-2 font-hand text-xl">Ears</h3>
