@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-20 — restart an early call when the sentence continues
+Sal: a pause mid-sentence splits the beat and the rest waits for the next call. Now words arriving while a call has drawn fewer than 3 lines abort it and re-send with the whole text (max twice per beat); aborted calls are marked "restarted" in the debug panel and not counted as spend; a "hold on... drawing all of that" note tells the kid to wait.
+Touched: src/llm/director.ts, src/story/session.ts
+
 ## 2026-09-20 — delete stories
 Sal: give me a way to delete a story. The shelf already had a per-card two-tap trash; added a trash on the replay screen (two-tap, returns to the shelf), a "clear N empty" button on the shelf for 0-word stories, and stories with no words are no longer autosaved.
 Touched: src/ui/{ReplayScreen,Bookshelf}.tsx, src/story/session.ts

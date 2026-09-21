@@ -32,8 +32,9 @@ function pushDirectorEvent(e: DirectorEvent): void {
         const others = s.calls.filter((c) => c.id !== e.stat.id)
         const st = e.stat
         // The completion event is the one with doneMs set; count spend once, there.
+        // A restarted call (aborted early, no usage) is not a call worth counting.
         const spend =
-          st.doneMs === null
+          st.doneMs === null || (st.error !== null && st.usage === null)
             ? s.spend
             : {
                 calls: s.spend.calls + 1,
@@ -51,6 +52,10 @@ function pushDirectorEvent(e: DirectorEvent): void {
       break
     case 'warn':
       appStore.set((s) => ({ warnings: [...s.warnings.slice(-9), e.message] }))
+      break
+    case 'restart':
+      // words = the combined text being re-sent; empty = that re-sent call finished.
+      appStore.set({ note: e.words ? 'hold on... drawing all of that' : '' })
       break
   }
 }

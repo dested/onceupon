@@ -29,6 +29,12 @@ export type DirectorEvent =
   | { k: 'warn'; message: string }
   /** The model declined the new words as not okay for a small child. */
   | { k: 'skip'; words: string }
+  /** More words arrived early in a call: it was thrown away and re-sent with the whole text. */
+  | { k: 'restart'; words: string }
+
+/** A call is cheap to throw away until it has drawn this many lines, at most this many times per beat. */
+const RESTART_MAX_LINES = 3
+const RESTART_MAX = 2
 
 export interface DirectorDeps {
   scene: Scene
@@ -49,6 +55,10 @@ export class Director {
   private pending = ''
   private current = ''
   private inFlight = false
+  /** Lines the in-flight call has executed; a restart is only cheap while this is small. */
+  private linesThisCall = 0
+  private restarts = 0
+  private restarting = false
   private storySoFar = ''
   private callId = 0
   private abort: AbortController | null = null
@@ -60,10 +70,23 @@ export class Director {
     return this.storySoFar
   }
 
-  /** New finalized words from speech or typing. */
+  /**
+   * New finalized words from speech or typing. If a call is in flight but has barely started
+   * (the child paused mid-sentence and went on), throw it away and re-send with the whole text so
+   * the beat is drawn once, from the full sentence. Deep into a drawing, the words just queue.
+   */
   feed(words: string): void {
     const w = words.trim()
     if (!w) return
+    if (this.inFlight && this.abort && this.linesThisCall < RESTART_MAX_LINES && this.restarts < RESTART_MAX) {
+      this.restarts++
+      this.restarting = true
+      if (this.storySoFar.endsWith(this.current)) this.storySoFar = this.storySoFar.slice(0, -this.current.length).trimEnd()
+      this.pending = [this.current, this.pending, w].filter(Boolean).join(' ')
+      this.deps.onEvent({ k: 'restart', words: this.pending })
+      this.abort.abort()
+      return
+    }
     this.pending = this.pending ? `${this.pending} ${w}` : w
     if (this.inFlight) this.emitStatus('drawing')
     void this.kick()
@@ -107,6 +130,8 @@ export class Director {
     this.current = ''
     this.storySoFar = ''
     this.inFlight = false
+    this.restarts = 0
+    this.restarting = false
     this.stopped = false
     this.emitStatus('idle')
   }
@@ -127,6 +152,9 @@ export class Director {
     this.pending = ''
     this.current = words
     this.inFlight = true
+    this.linesThisCall = 0
+    const wasRestart = this.restarting
+    this.restarting = false
     const stat: CallStat = {
       id: ++this.callId,
       model: provider.label,
@@ -176,6 +204,7 @@ export class Director {
           nl = buf.indexOf('\n')
           if (line.trim()) {
             stat.lines++
+            this.linesThisCall++
             if (this.isSkip(line, words)) break
             this.execute(line)
           }
@@ -186,13 +215,17 @@ export class Director {
         this.execute(buf)
       }
     } catch (e: unknown) {
-      if (!(e instanceof DOMException && e.name === 'AbortError')) {
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        if (this.restarting) stat.error = 'restarted: more words came in'
+      } else {
         stat.error = e instanceof Error ? e.message : String(e)
         this.deps.onEvent({ k: 'warn', message: stat.error })
       }
     } finally {
       stat.doneMs = performance.now() - stat.sentAt
       this.deps.onEvent({ k: 'call', stat: { ...stat } })
+      if (!this.restarting && stat.error === null) this.restarts = 0
+      if (wasRestart && stat.error === null) this.deps.onEvent({ k: 'restart', words: '' })
       this.inFlight = false
       this.current = ''
       this.abort = null
