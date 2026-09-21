@@ -3,9 +3,9 @@ import { Scene } from '~/engine/scene'
 import { Stage } from '~/engine/stage'
 import { Director, type DirectorEvent } from '~/llm/director'
 import { makeProvider, type LlmProvider } from '~/llm/providers'
-import { createRecognizer, speechSupported, TranscriptTracker, type Recognizer, type RecResult } from '~/speech/recognition'
+import { CHROME_TRACKER, createRecognizer, LIVE_TRACKER, PHRASE_TRACKER, speechSupported, TranscriptTracker, type Recognizer, type RecResult } from '~/speech/recognition'
 import { appStore, resolveStt } from './store'
-import { createOpenAiRealtimeRecognizer, warmMic } from '~/speech/openai-realtime'
+import { createOpenAiRealtimeRecognizer, isLiveModel, warmMic } from '~/speech/openai-realtime'
 import { getStory, listStories, newStoryId, saveStory, titleFromWords, type StoryEvent, type StoryRecord } from './storage'
 import { Replayer } from './replay'
 import { exposeDebugHandle } from '~/debug-handle'
@@ -97,7 +97,7 @@ export class LiveSession {
         if (e.k === 'skip') this.skip(e.words)
       },
     })
-    this.tracker = new TranscriptTracker((words) => this.feed(words), { stableMs: 700, minWords: 5, maxWords: 12 })
+    this.tracker = new TranscriptTracker((words) => this.feed(words), CHROME_TRACKER)
     appStore.set({ micSupported: speechSupported() || resolveStt(appStore.get().settings) === 'openai', status: 'idle', transcriptFinal: '', transcriptInterim: '', pages: [], warnings: [] })
     this.stage.start()
     this.audio.setEnabled(appStore.get().settings.sound)
@@ -227,6 +227,7 @@ export class LiveSession {
               maxTurnMs: 2500,
             })
           : createRecognizer(handlers)
+      this.tracker.configure(kind === 'openai' ? (isLiveModel(settings.sttModel) ? LIVE_TRACKER : PHRASE_TRACKER) : CHROME_TRACKER)
       this.sttKind = kind
     }
     if (!this.recognizer) {

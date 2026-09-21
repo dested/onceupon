@@ -105,7 +105,7 @@ plans/                     dated working docs
 
 ## The loop
 
-1. `LiveSession.startListening` → OpenAI Realtime transcription when an OpenAI key is set (Settings → Ears), else `webkitSpeechRecognition`. Both emit the same result list. `TranscriptTracker` releases final results at once and interim words after ~900ms of stability with 6+ new words (holds back the last word).
+1. `LiveSession.startListening` → OpenAI Realtime transcription when an OpenAI key is set (Settings → Ears), else `webkitSpeechRecognition`. Both emit the same result list. `TranscriptTracker` releases final results at once and interim words by per-recognizer rules (`CHROME_TRACKER`: stable 700ms, 5+ words, last word held back because Chrome rewrites the tail; `LIVE_TRACKER` for gpt-live-transcribe: stable 600ms, any count, nothing held back, since its deltas are append-only and finals only come on sentence punctuation).
 2. `Director.feed(words)` appends to `pending`; if no call is in flight, sends one: cached `SYSTEM_PROMPT` + user message (story tail, `scene.summary()`, NEW WORDS). Words arriving mid-call go out together next.
 3. Streamed text is split on newlines; each line → `parseLine` → `scene.apply` → `SceneEvent[]` → `stage.handle`. Nothing waits for the call to finish.
 4. `Stage` converts shapes to strokes (outline, then hachure fill), queues them, and reveals along arc length each frame. Reveal speed rises with backlog so it never falls far behind speech. The crayon cursor rides the stroke head; audio intensity follows.

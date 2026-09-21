@@ -106,6 +106,27 @@ export function createRecognizer(handlers: RecognizerHandlers, lang = 'en-US'): 
  * goes out early once it has sat still for a moment and has enough words, holding back the last
  * word or two because the recognizer keeps revising the tail.
  */
+export interface TrackerOptions {
+  /** Interim text unchanged for this long counts as settled. */
+  stableMs: number
+  /** Settled words needed before an early release. */
+  minWords: number
+  /** Release regardless of stability once this many pile up. */
+  maxWords: number
+  /** Trailing words to keep back on an early release, in case the recognizer still rewrites them. */
+  holdBack: number
+}
+
+/** Chrome rewrites the tail of an interim result as it hears more, so keep the last word back. */
+export const CHROME_TRACKER: TrackerOptions = { stableMs: 700, minWords: 5, maxWords: 12, holdBack: 1 }
+/**
+ * OpenAI's live model appends words and never rewrites them, and only marks a result final on
+ * sentence punctuation a child rarely produces. Release everything after a short pause.
+ */
+export const LIVE_TRACKER: TrackerOptions = { stableMs: 600, minWords: 1, maxWords: 12, holdBack: 0 }
+/** Pause-gated OpenAI models return whole phrases as finals; interim is rare, so be quick with it. */
+export const PHRASE_TRACKER: TrackerOptions = { stableMs: 500, minWords: 1, maxWords: 12, holdBack: 0 }
+
 export class TranscriptTracker {
   private consumed = new Map<number, number>()
   private lastChange = new Map<number, { text: string; at: number }>()
@@ -114,8 +135,13 @@ export class TranscriptTracker {
 
   constructor(
     private emit: (words: string) => void,
-    private opts: { stableMs: number; minWords: number; maxWords: number } = { stableMs: 900, minWords: 6, maxWords: 14 }
+    private opts: TrackerOptions = CHROME_TRACKER
   ) {}
+
+  /** Swap the release rules (the recognizer decides them). */
+  configure(opts: TrackerOptions): void {
+    this.opts = opts
+  }
 
   /** Call whenever the recognizer restarts: result indexes start over. */
   reset(): void {
@@ -171,8 +197,8 @@ export class TranscriptTracker {
       const change = this.lastChange.get(i)
       const stable = change ? now - change.at >= this.opts.stableMs : false
       let take = 0
-      if (stable && unconsumed >= this.opts.minWords) take = words.length - 1
-      else if (unconsumed >= this.opts.maxWords) take = words.length - 2
+      if (stable && unconsumed >= this.opts.minWords) take = words.length - this.opts.holdBack
+      else if (unconsumed >= this.opts.maxWords) take = words.length - this.opts.holdBack - 1
       if (take > c) {
         const chunk = words.slice(c, take).join(' ')
         this.finalText = this.finalText ? `${this.finalText} ${chunk}` : chunk

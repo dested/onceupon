@@ -13,7 +13,7 @@ prompt is the spec the model sees).
 
 - When the mic button is tapped, audio starts (crayon scratch sound), speech recognition starts, and the status reads "listening...".
 - When the recognizer finalizes a phrase, those words are sent to the model immediately.
-- When interim words have been stable for ~900ms and there are 6 or more of them, all but the last word are sent early. If 14 or more pile up they go regardless.
+- Interim words are released early by rules that match the recognizer. Chrome: stable for 700ms with 5 or more words, all but the last word go (Chrome rewrites the tail). OpenAI live model: stable for 600ms, every word goes, because it appends and never rewrites and only marks finals on sentence punctuation. If 12 or more pile up they go regardless.
 - While a model call is in flight, new words accumulate and are sent as one chunk when it finishes. Never two calls at once.
 - Each streamed DSL line executes as soon as its newline arrives. The first stroke appears at first-token time, not at call end.
 - Reveal speed rises with the stroke backlog so drawing catches up within ~2 seconds of speech.
