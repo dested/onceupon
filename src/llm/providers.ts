@@ -48,7 +48,7 @@ class AnthropicProvider implements LlmProvider {
 
   async *stream(req: LlmRequest): AsyncGenerator<LlmChunk, void, void> {
     // Sonnet 5 and Opus 5 run adaptive thinking by default; we want first tokens fast, so switch it off.
-    const thinkingOff = /sonnet-5|opus-5|opus-4-8|opus-4-7|sonnet-4-6|opus-4-6/.test(this.model)
+    const thinkingOff = /fable-5|mythos-5|sonnet-5|opus-5|opus-4-8|opus-4-7|sonnet-4-6|opus-4-6/.test(this.model)
     const stream = this.client.messages.stream(
       {
         model: this.model,
