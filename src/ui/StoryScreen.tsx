@@ -22,6 +22,7 @@ export function StoryScreen() {
   const debug = useApp((s) => s.debug)
   const warnings = useApp((s) => s.warnings)
   const note = useApp((s) => s.note)
+  const micLevel = useApp((s) => s.micLevel)
   const [typed, setTyped] = useState('')
 
   useEffect(() => {
@@ -126,6 +127,11 @@ export function StoryScreen() {
                   : 'listening... keep talking'
               : 'tap to tell a story'}
         </div>
+        {listening && (
+          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-ink/15" data-testid="mic-level">
+            <div className="h-full rounded-full bg-crayon-green transition-[width] duration-75" style={{ width: `${Math.round(micLevel * 100)}%` }} />
+          </div>
+        )}
       </div>
 
       <form

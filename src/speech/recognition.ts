@@ -16,7 +16,13 @@ export interface RecognizerHandlers {
   onReady: () => void
   /** Milliseconds of audio actually sent to a paid transcriber (Chrome's is free and never calls this). */
   onAudio?: (ms: number) => void
+  /** Mic loudness 0..1 per audio chunk (about 10x a second). */
+  onLevel?: (level: number) => void
+  /** What the transcriber said back, for the voice lab log. */
+  onTrace?: (kind: SttTraceKind, text: string) => void
 }
+
+export type SttTraceKind = 'ready' | 'speech' | 'delta' | 'final' | 'commit' | 'error'
 
 export interface Recognizer {
   start: () => void

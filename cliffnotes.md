@@ -51,7 +51,8 @@ src/
     director.ts            Director: words in -> one streaming call at a time -> execute lines as they land
   speech/
     recognition.ts         typed boundary over webkitSpeechRecognition + TranscriptTracker (when words are "ready")
-    openai-realtime.ts     OpenAI Realtime transcription over a browser WebSocket (PCM16 via AudioWorklet), same Recognizer shape
+    openai-realtime.ts     OpenAI Realtime transcription over a browser WebSocket (PCM16 via AudioWorklet), same Recognizer shape; mic device pick, 30s clip ring, level + trace callbacks
+    clip-lab.ts            voice lab: run a saved clip through gpt-live-transcribe (socket), gpt-4o-transcribe and whisper-1 (REST) side by side
   story/
     store.ts               app state (useSyncExternalStore), settings load/persist, env keys via zod
     storage.ts             StoryRecord zod schema, localStorage list/get/save/delete
@@ -63,7 +64,7 @@ src/
     SpendChip.tsx          running $ / calls / time-to-first-stroke under the toolbar
     Filmstrip.tsx          thumbnails of earlier pages, top-left
     SettingsPanel.tsx      provider/model picker + API key
-    DebugPanel.tsx         latency stats + raw DSL stream (backtick key)
+    DebugPanel.tsx         latency stats + raw DSL stream (backtick key) + voice lab (level meter, save clip, compare models, transcriber trace)
     Bookshelf.tsx          saved stories grid, play, two-tap delete
     ReplayScreen.tsx       replay canvas + play again
     bits.tsx               StickerButton, IconButton, PaperCard
@@ -125,6 +126,7 @@ plans/                     dated working docs
 - **Content filter is two layers.** The word masker (`story/clean.ts`) runs on the transcript before display/storage/model and on the model's `say`/`t` text. Contextual judgement (clean words, bad idea: "they went to the bathroom together") is the drawing model's job via `skip`; there is no separate classifier call, so it costs nothing extra. The kid's raw words are on screen for the ~0.5s before the model answers.
 - **Transcription cost is an estimate.** Audio ms actually sent over the socket are metered in `send()` (`onAudio`), priced at `settings.sttRatePerMin` (default $0.006). OpenAI does not report transcription usage on the Realtime socket.
 - **Never put story words in the transcription prompt.** Transcription models emit their prompt text during quiet/unclear audio; a vocabulary hint with "dragon, castle, exploded" produced phantom dragons in every session. The prompt is empty now. Mid-speech commits every 2.5s (`maxTurnMs`) keep words flowing while a child talks without pausing.
+- **Voice lab first when ears feel wrong.** Debug panel: the green bar is mic level (if it barely moves, it is the device or the OS, not the model: pick another mic in Settings → Ears). "compare models on clip" runs the last 30s through three models; if whisper-1 and gpt-4o-transcribe get it right and the live one does not, it is the model. The trace under it shows every delta/final with ms since the click.
 - **Mic startup:** socket and mic open in parallel; audio captured before `session.updated` is queued and flushed, so the first words after the click are never lost. `listening` in the store flips only on the recognizer's `onReady`; before that the button shows "one sec...". `warmMic()` pre-opens the mic on the story screen when permission is already granted.
 - **STT model matters more than anything:** `gpt-live-transcribe` streams word by word (~1s behind the voice, no turn detection allowed, only delta events on one item; sentence punctuation is our "final"). `gpt-transcribe` / `gpt-4o-transcribe` only return after a pause. Default is the live model; the others remain selectable.
 - **OpenAI Realtime:** the beta shape (`OpenAI-Beta` header, `transcription_session.update`, `openai-beta.realtime-v1` subprotocol) is retired and errors. Transcripts arrive as word deltas ~0.3s after the speaker pauses (server VAD, 450ms), not mid-sentence.

@@ -3,7 +3,7 @@ import { Scene } from '~/engine/scene'
 import { Stage } from '~/engine/stage'
 import { Director, type DirectorEvent } from '~/llm/director'
 import { makeProvider, type LlmProvider } from '~/llm/providers'
-import { CHROME_TRACKER, createRecognizer, LIVE_TRACKER, PHRASE_TRACKER, speechSupported, TranscriptTracker, type Recognizer, type RecResult } from '~/speech/recognition'
+import { CHROME_TRACKER, createRecognizer, LIVE_TRACKER, PHRASE_TRACKER, speechSupported, TranscriptTracker, type Recognizer, type RecResult, type SttTraceKind } from '~/speech/recognition'
 import { appStore, resolveStt } from './store'
 import { createOpenAiRealtimeRecognizer, isLiveModel, warmMic } from '~/speech/openai-realtime'
 import { getStory, listStories, newStoryId, saveStory, titleFromWords, type StoryEvent, type StoryRecord } from './storage'
@@ -12,6 +12,7 @@ import { exposeDebugHandle } from '~/debug-handle'
 import { cleanText } from './clean'
 
 let lineCounter = 0
+let traceCounter = 0
 
 /** Stands in for words the model skipped, so a replay is honest about the gap. */
 export const SKIPPED_MARK = '(the crayon skipped a part)'
@@ -70,6 +71,7 @@ export class LiveSession {
   private tickTimer = 0
   private saveTimer = 0
   private noteTimer = 0
+  private listenT0 = 0
   private wantListening = false
   private story: StoryRecord
   private t0 = performance.now()
@@ -99,7 +101,7 @@ export class LiveSession {
     this.stage.start()
     this.audio.setEnabled(appStore.get().settings.sound)
     exposeDebugHandle({ scene: this.scene, stage: this.stage, director: this.director })
-    if (resolveStt(appStore.get().settings) === 'openai') void warmMic()
+    if (resolveStt(appStore.get().settings) === 'openai') void warmMic(appStore.get().settings.micDeviceId)
   }
 
   private now(): number {
@@ -197,13 +199,18 @@ export class LiveSession {
             window.setTimeout(() => {
               if (this.wantListening) this.safeStart()
             }, kind === 'openai' ? 800 : 120)
-          } else appStore.set({ listening: false, micStarting: false })
+          } else appStore.set({ listening: false, micStarting: false, micLevel: 0 })
         },
         onReady: () => {
           if (this.wantListening) appStore.set({ listening: true, micStarting: false })
         },
         onAudio: (ms: number) => {
           appStore.set((s) => ({ spend: { ...s.spend, audioMs: s.spend.audioMs + ms } }))
+        },
+        onLevel: (level: number) => appStore.set({ micLevel: level }),
+        onTrace: (kind: SttTraceKind, text: string) => {
+          const t = Math.round(performance.now() - this.listenT0)
+          appStore.set((s) => ({ sttLog: [...s.sttLog.slice(-59), { id: ++traceCounter, t, kind, text }] }))
         },
         onError: (err: string) => {
           if (err === 'not-allowed' || err === 'service-not-allowed' || /permission|NotAllowed/i.test(err)) {
@@ -222,6 +229,7 @@ export class LiveSession {
               prompt: '',
               silenceMs: 350,
               maxTurnMs: 2500,
+              deviceId: settings.micDeviceId,
             })
           : createRecognizer(handlers)
       this.tracker.configure(kind === 'openai' ? (isLiveModel(settings.sttModel) ? LIVE_TRACKER : PHRASE_TRACKER) : CHROME_TRACKER)
@@ -233,7 +241,8 @@ export class LiveSession {
     }
     this.wantListening = true
     this.tracker.reset()
-    appStore.set({ micStarting: true })
+    this.listenT0 = performance.now()
+    appStore.set({ micStarting: true, sttLog: [], micLevel: 0 })
     this.safeStart()
     clearInterval(this.tickTimer)
     this.tickTimer = window.setInterval(() => {

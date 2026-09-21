@@ -45,6 +45,12 @@ and go out together.
 
 Listen for a minute with OpenAI ears. The spend chip grows an `ears ~$0.006 (1.0 min)` part; the debug panel shows minutes sent. Settings → "Transcription price" changes the rate live.
 
+## Voice lab [medium, needs a mic, ~$0.02]
+
+Listen, say a sentence, stop. Debug panel → voice lab: the level bar moved while talking; the trace lists `ready`, `delta` words with timestamps, `final` on punctuation. "save clip (last 30s)" downloads a WAV of exactly what was sent (open it: is it loud and clean?). "compare models on clip" fills a table with gpt-live-transcribe / gpt-4o-transcribe / whisper-1 text and latency for that same audio. Settings → Ears → Microphone lists input devices; pick one and listen again.
+
+Without a mic (bx): `import('/src/speech/clip-lab.ts')` in the page, feed it PCM16 24k from the OpenAI TTS endpoint (`response_format: 'pcm'`), and call `compareClip(pcm, key)`.
+
 ## Other providers [medium]
 
 Settings → provider openrouter or openai, paste a key, pick a preset, repeat the typed path. Watch

@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import { DEFAULT_MODEL, isProvider, type Provider } from '~/llm/models'
+import type { SttTraceKind } from '~/speech/recognition'
+import type { ClipResult } from '~/speech/clip-lab'
 import type { ApiKeys } from '~/llm/providers'
 import type { CallStat, DirectorStatus } from '~/llm/director'
 import type { StoryMeta } from './storage'
@@ -18,6 +20,8 @@ export interface Settings {
   sttModel: string
   /** USD per minute of audio sent to the transcriber; an estimate the user can edit. */
   sttRatePerMin: number
+  /** Microphone device id (OpenAI ears only; Chrome's recognizer always uses the default). */
+  micDeviceId: string
 }
 
 export const DEFAULT_STT_MODEL = 'gpt-live-transcribe'
@@ -73,6 +77,19 @@ export interface AppState {
   /** Scrubber: next event index and total events of the story being replayed. */
   replayPos: number
   replayLen: number
+  /** Voice lab: mic loudness 0..1, the transcriber's recent events, and clip comparison results. */
+  micLevel: number
+  sttLog: SttTrace[]
+  clipResults: ClipResult[]
+  clipBusy: boolean
+}
+
+export interface SttTrace {
+  id: number
+  /** ms since listening started */
+  t: number
+  kind: SttTraceKind
+  text: string
 }
 
 export interface Spend {
@@ -114,6 +131,7 @@ const settingsSchema = z.object({
   stt: z.string().optional(),
   sttModel: z.string().optional(),
   sttRatePerMin: z.number().optional(),
+  micDeviceId: z.string().optional(),
 })
 
 const SETTINGS_KEY = 'onceupon.settings'
@@ -133,6 +151,7 @@ function loadSettings(): Settings {
     stt: 'auto',
     sttModel: DEFAULT_STT_MODEL,
     sttRatePerMin: DEFAULT_STT_RATE,
+    micDeviceId: '',
   }
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
@@ -152,6 +171,7 @@ function loadSettings(): Settings {
       stt: d.stt === 'browser' || d.stt === 'openai' ? d.stt : 'auto',
       sttModel: d.sttModel && d.sttModel !== 'gpt-4o-transcribe' ? d.sttModel : DEFAULT_STT_MODEL,
       sttRatePerMin: d.sttRatePerMin ?? DEFAULT_STT_RATE,
+      micDeviceId: d.micDeviceId ?? '',
     }
   } catch {
     return base
@@ -207,6 +227,10 @@ export const appStore = new Store<AppState>({
   replayCaption: '',
   replayPos: 0,
   replayLen: 0,
+  micLevel: 0,
+  sttLog: [],
+  clipResults: [],
+  clipBusy: false,
 })
 
 export function useApp<S>(selector: (s: AppState) => S): S {

@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { listMics } from '~/speech/openai-realtime'
 import { X } from 'lucide-react'
 import { MODEL_OPTIONS, PROVIDERS, isProvider, type Provider } from '~/llm/models'
 import { appStore, persistSettings, STT_MODES, useApp, type Settings, type SttMode } from '~/story/store'
@@ -20,6 +22,10 @@ const STT_LABELS: Record<SttMode, string> = {
 }
 
 export function SettingsPanel() {
+  const [mics, setMics] = useState<{ id: string; label: string }[]>([])
+  useEffect(() => {
+    void listMics().then(setMics)
+  }, [])
   const settings = useApp((s) => s.settings)
   const close = (): void => appStore.set({ settingsOpen: false })
   const field = 'w-full rounded-xl border-[3px] border-ink bg-white px-3 py-2 font-hand text-lg text-ink outline-none'
@@ -128,6 +134,24 @@ export function SettingsPanel() {
                 <option value="gpt-4o-transcribe">older, phrase at a time</option>
               </datalist>
             </div>
+          </div>
+
+          <div className="mb-5">
+            <label className={label} htmlFor="mic">
+              Microphone (OpenAI ears; Chrome's recognizer always uses the default)
+            </label>
+            <select
+              id="mic"
+              value={settings.micDeviceId}
+              className={field}
+              onChange={(e) => update((s) => ({ ...s, micDeviceId: e.target.value }))}>
+              <option value="">system default</option>
+              {mics.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="mb-5">

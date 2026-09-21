@@ -26,6 +26,7 @@ prompt is the spec the model sees).
 - If the model answers `skip`, nothing is drawn, the words are removed from the story and transcript, a `(the crayon skipped a part)` marker takes their place, and "the crayon skipped that part" shows under the mic for 4s. Rude words are masked everywhere they are shown or saved.
 - Replay shows each heard chunk as a caption near the top of the page as it is reached, plus the running subtitle.
 - Replay has a scrubber (event index) and play/pause. Dragging rebuilds the page instantly through that event with a fresh scene, then continues in the same play state; at the end the button becomes "again". Page thumbnails for pages passed during a scrub are not captured.
+- Voice lab in the debug panel: mic level meter (also a small bar under the mic while listening), a trace of transcriber events with timestamps, save the last 30s of sent audio as WAV, and compare three OpenAI models on that clip. Settings → Ears lets you pick the microphone device (OpenAI ears only).
 - Audio sent to the OpenAI transcriber is metered; the spend chip shows an estimated ears cost at the per-minute rate from Settings.
 
 ## Open questions

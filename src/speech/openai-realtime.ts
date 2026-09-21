@@ -8,7 +8,7 @@ import type { Recognizer, RecognizerHandlers, RecResult } from './recognition'
  * Presents the same Recognizer/RecResult shape as the Chrome recognizer so the tracker is unchanged.
  */
 
-const SAMPLE_RATE = 24000
+export const SAMPLE_RATE = 24000
 
 const eventSchema = z.object({
   type: z.string(),
@@ -73,6 +73,8 @@ export interface RealtimeOptions {
    * models hallucinate prompt text during silence, which is how a phantom dragon showed up.
    */
   prompt: string
+  /** Input device id from listMics(); empty = system default. */
+  deviceId: string
   silenceMs: number
   /** Commit mid-speech after this much continuous audio so words show up before the pause. */
   maxTurnMs: number
@@ -111,29 +113,49 @@ export function isLiveModel(model: string): boolean {
 }
 
 let warmStream: Promise<MediaStream> | null = null
-const MIC_CONSTRAINTS: MediaStreamConstraints = {
-  audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+function micConstraints(deviceId: string): MediaStreamConstraints {
+  return {
+    audio: {
+      channelCount: 1,
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+    },
+  }
 }
+let warmDeviceId = ''
 
 /** Open the mic ahead of time (only if permission was already granted) so the first click has no gap. */
-export async function warmMic(): Promise<void> {
-  if (warmStream) return
+export async function warmMic(deviceId = ''): Promise<void> {
+  if (warmStream && warmDeviceId === deviceId) return
   try {
     const status = await navigator.permissions.query({ name: 'microphone' })
     if (status.state !== 'granted') return
   } catch {
     return
   }
-  warmStream = navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS)
+  warmDeviceId = deviceId
+  warmStream = navigator.mediaDevices.getUserMedia(micConstraints(deviceId))
   warmStream.catch(() => {
     warmStream = null
   })
 }
 
-function takeMic(): Promise<MediaStream> {
-  const p = warmStream ?? navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS)
+function takeMic(deviceId: string): Promise<MediaStream> {
+  const p = warmStream && warmDeviceId === deviceId ? warmStream : navigator.mediaDevices.getUserMedia(micConstraints(deviceId))
   warmStream = null
   return p
+}
+
+/** Audio inputs the browser will let us pick from (labels need a granted permission). */
+export async function listMics(): Promise<{ id: string; label: string }[]> {
+  try {
+    const all = await navigator.mediaDevices.enumerateDevices()
+    return all.filter((d) => d.kind === 'audioinput').map((d, i) => ({ id: d.deviceId, label: d.label || `microphone ${i + 1}` }))
+  } catch {
+    return []
+  }
 }
 
 export function createOpenAiRealtimeRecognizer(handlers: RecognizerHandlers, opts: RealtimeOptions): Recognizer {
@@ -184,12 +206,15 @@ export function createOpenAiRealtimeRecognizer(handlers: RecognizerHandlers, opt
     switch (e.type) {
       case 'input_audio_buffer.speech_started':
         speaking = true
+        handlers.onTrace?.('speech', 'started')
         break
       case 'input_audio_buffer.speech_stopped':
         speaking = false
+        handlers.onTrace?.('speech', 'stopped')
         break
       case 'input_audio_buffer.committed':
         msSinceCommit = 0
+        handlers.onTrace?.('commit', '')
         break
       case 'conversation.item.input_audio_transcription.delta': {
         if (live) {
@@ -201,6 +226,7 @@ export function createOpenAiRealtimeRecognizer(handlers: RecognizerHandlers, opt
           }
           cur.transcript = (cur.transcript + (e.delta ?? '')).replace(/^\s+/, '')
           if (/[.!?]["')\]]?$/.test(cur.transcript)) cur.isFinal = true
+          handlers.onTrace?.(cur.isFinal ? 'final' : 'delta', e.delta ?? '')
           emit(items.length - 1)
           break
         }
@@ -209,6 +235,7 @@ export function createOpenAiRealtimeRecognizer(handlers: RecognizerHandlers, opt
         const it = items[i]
         if (!it) return
         it.transcript += e.delta ?? ''
+        handlers.onTrace?.('delta', e.delta ?? '')
         emit(i)
         break
       }
@@ -219,6 +246,7 @@ export function createOpenAiRealtimeRecognizer(handlers: RecognizerHandlers, opt
         if (!it) return
         it.transcript = (e.transcript ?? it.transcript).trim()
         it.isFinal = true
+        handlers.onTrace?.('final', it.transcript)
         emit(i)
         break
       }
@@ -226,6 +254,7 @@ export function createOpenAiRealtimeRecognizer(handlers: RecognizerHandlers, opt
         handlers.onError('transcription failed')
         break
       case 'error':
+        handlers.onTrace?.('error', e.error?.message ?? 'realtime error')
         handlers.onError(e.error?.message ?? 'realtime error')
         break
       default:
@@ -250,6 +279,17 @@ export function createOpenAiRealtimeRecognizer(handlers: RecognizerHandlers, opt
     items.length = 0
     let ready = false
     const pending: ArrayBuffer[] = []
+    lastClip = () => {
+      let n = 0
+      for (const p of ring) n += p.length
+      const out = new Int16Array(n)
+      let o = 0
+      for (const p of ring) {
+        out.set(p, o)
+        o += p.length
+      }
+      return out
+    }
 
     // Socket and mic open in parallel; audio captured before the session is ready is queued, not lost.
     // GA endpoint: transcription-only session, auth via subprotocol (no beta header, no session model).
@@ -291,6 +331,7 @@ export function createOpenAiRealtimeRecognizer(handlers: RecognizerHandlers, opt
         ready = true
         for (const buf of pending) send(buf)
         pending.length = 0
+        handlers.onTrace?.('ready', opts.model)
         if (stream) handlers.onReady()
       }
       onMessage(m.data)
@@ -311,6 +352,7 @@ export function createOpenAiRealtimeRecognizer(handlers: RecognizerHandlers, opt
       handlers.onAudio?.(ms)
       // Commit mid-speech only at a quiet moment, so we never cut a word in half; hard cap regardless.
       const level = rms(pcm)
+      handlers.onLevel?.(Math.min(1, level * 6))
       peak = Math.max(level, peak * 0.98)
       const quiet = level < peak * 0.25
       if (!live && speaking && ((msSinceCommit >= opts.maxTurnMs && quiet) || msSinceCommit >= opts.maxTurnMs * 1.8)) {
@@ -319,7 +361,7 @@ export function createOpenAiRealtimeRecognizer(handlers: RecognizerHandlers, opt
       }
     }
 
-    const mic = await takeMic()
+    const mic = await takeMic(opts.deviceId)
     if (stopped) {
       mic.getTracks().forEach((t) => t.stop())
       return teardown()
