@@ -43,3 +43,8 @@
 ## 2026-09-20 — OpenAI Realtime transcription as the primary ears (supersedes the Web Speech decision above)
 **Why:** Sal's live test: Chrome's recognizer is "terrible" with a child's voice. OpenAI Realtime streams partial words over a WebSocket straight from the browser (subprotocol auth), no server, and handles kid speech far better. Chrome stays as the free fallback when no OpenAI key is set.
 **Rejected:** Deepgram (excellent, but another vendor/key), in-browser Whisper (too slow to be live).
+
+## 2026-09-20 — Quiet window 700ms for the live transcriber, now that restarts are cheap
+**Why:** the early restart (a call with fewer than 3 lines drawn is thrown away and re-sent with the whole sentence) makes a false "done talking" nearly free, so the window that decides it can be quick. 1100ms felt sluggish; 700ms starts the crayon sooner and a continued sentence just restarts the call.
+**Rejected:** staying at 1100ms (safe but slow); dropping below ~600ms (the model's own ~1s lag plus breath gaps would restart nearly every beat). Restart cap raised 2 → 3 per beat to cover a long sentence with two breaths.
+

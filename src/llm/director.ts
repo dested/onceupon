@@ -34,7 +34,7 @@ export type DirectorEvent =
 
 /** A call is cheap to throw away until it has drawn this many lines, at most this many times per beat. */
 const RESTART_MAX_LINES = 3
-const RESTART_MAX = 2
+const RESTART_MAX = 3
 
 export interface DirectorDeps {
   scene: Scene

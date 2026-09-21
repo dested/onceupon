@@ -128,9 +128,11 @@ export const CHROME_TRACKER: TrackerOptions = { stableMs: 700, minWords: 5, maxW
 /**
  * OpenAI's live model appends words and never rewrites them, so nothing is held back. It never
  * produces finals here (punctuation lands on any short breath), so the quiet window is the only
- * "done talking" signal: ~1.1s without a new word, on top of the model's own ~1s lag.
+ * "done talking" signal: ~0.7s without a new word, on top of the model's own ~1s lag. Guessing
+ * wrong is cheap now: a call that has barely started is thrown away and re-sent with the rest of
+ * the sentence (Director restart), so the window leans quick rather than sure.
  */
-export const LIVE_TRACKER: TrackerOptions = { stableMs: 1100, minWords: 1, maxWords: 14, holdBack: 0 }
+export const LIVE_TRACKER: TrackerOptions = { stableMs: 700, minWords: 1, maxWords: 14, holdBack: 0 }
 /** Pause-gated OpenAI models return whole phrases as finals; interim is rare, so be quick with it. */
 export const PHRASE_TRACKER: TrackerOptions = { stableMs: 500, minWords: 1, maxWords: 12, holdBack: 0 }
 

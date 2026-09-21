@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-20 — tighter quiet window now that restarts are cheap
+Sal: tighten the quiet-time requirement. Live transcriber quiet window 1100ms → 700ms; restart cap 2 → 3 per beat. See decisions.md.
+Touched: src/speech/recognition.ts, src/llm/director.ts
+
 ## 2026-09-20 — no error boxes on the story screen; our own aborts are not errors
 Sal: "request was aborted" showed as an error; stop showing errors outside debug. The director now treats any abort it asked for as a non-error (the SDK throws its own type, so it checks the signal). The red warning box is gone; a red dot on the bug icon says the debug panel has something.
 Touched: src/llm/director.ts, src/ui/StoryScreen.tsx
