@@ -54,6 +54,10 @@ export class FxSystem {
     return this.particles.length > 0
   }
 
+  clear(): void {
+    this.particles = []
+  }
+
   spawn(kind: FxKind, x: number, y: number, size: number, now: number): void {
     const r = this.rng
     const add = (p: Omit<Particle, 'born' | 'seed'>): void => {

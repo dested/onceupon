@@ -19,14 +19,30 @@ export class Replayer {
     }
   ) {}
 
+  /** Continue from the current position (the start, or wherever seek() put it). */
   play(): void {
     this.stopped = false
+    clearTimeout(this.timer)
     this.step()
   }
 
   stop(): void {
     this.stopped = true
     clearTimeout(this.timer)
+  }
+
+  get position(): number {
+    return this.idx
+  }
+
+  get length(): number {
+    return this.record.events.length
+  }
+
+  /** Set the next event to play. The caller rebuilds the page up to here first. */
+  seek(i: number): void {
+    clearTimeout(this.timer)
+    this.idx = Math.max(0, Math.min(this.record.events.length, i))
   }
 
   private step(): void {

@@ -732,6 +732,32 @@ export class Stage {
     this.queue = []
     this.bubbles = []
     this.pageTurn = null
+    this.fx.clear()
     this.zCounter = 0
+  }
+
+  /**
+   * Finish everything pending right now: reveal every queued stroke, snap tweens to their targets,
+   * drop dying objects, effects, bubbles and the page-turn slide. Used after a replay scrub.
+   */
+  settle(): void {
+    const now = performance.now()
+    const was = this.instant
+    this.instant = true
+    while (this.queue.length > 0) this.advanceReveal(1, now)
+    this.instant = was
+    for (const v of [...this.views.values()]) {
+      if (v.dying) {
+        this.views.delete(v.id)
+        continue
+      }
+      v.tx = null
+      v.ty = null
+      v.ts = null
+      v.moving = false
+    }
+    this.pageTurn = null
+    this.bubbles = []
+    this.fx.clear()
   }
 }

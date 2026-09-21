@@ -38,7 +38,7 @@ page [title]                    the story moved to a new place: wipe the page an
 Colors: ${CRAYON_NAMES.join(' ')} or #hex.
 
 # How to draw well
-- Draw like a bold 5-year-old: simple shapes, big heads, dot eyes, stick legs, bright colors. Charm beats accuracy.
+- Draw like a bold 5-year-old: simple shapes, big heads, TWO dot eyes (always two, even from the side), stick legs, bright colors. Charm beats accuracy.
 - A thing is 5-12 shapes: body first, then head, then details, eyes last. Never more than 14 shapes per thing.
 - Colored-in shapes look best; use o rarely.
 - Only draw what is NEW in the latest words. Never redraw something already on the page: mv, anim, sc, say, rm it instead.
@@ -64,8 +64,10 @@ e 20 -26 10 7 green
 p darkgreen -8 -24 -2 -40 4 -24 -12 -26 -20 -38 -22 -24
 p green -4 -26 0 -34 4 -26
 p green 4 -25 8 -33 12 -25
-c 23 -28 2 black
-c 23 -28 1 white
+c 17 -28 2 black
+c 25 -28 2 black
+c 17 -28 1 white
+c 25 -28 1 white
 p white 26 -21 28 -18 30 -21
 r -10 -6 5 7 darkgreen
 r 4 -6 5 7 darkgreen

@@ -70,6 +70,9 @@ export interface AppState {
   spend: Spend
   /** The words chunk most recently played back, for the replay caption. */
   replayCaption: string
+  /** Scrubber: next event index and total events of the story being replayed. */
+  replayPos: number
+  replayLen: number
 }
 
 export interface Spend {
@@ -202,6 +205,8 @@ export const appStore = new Store<AppState>({
   storyNonce: 0,
   spend: EMPTY_SPEND,
   replayCaption: '',
+  replayPos: 0,
+  replayLen: 0,
 })
 
 export function useApp<S>(selector: (s: AppState) => S): S {

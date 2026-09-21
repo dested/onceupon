@@ -32,7 +32,7 @@ Type two sentences quickly. The first sentence sits on a yellow highlight while 
 ## Replay and bookshelf [cheap]
 
 1. Book icon → a card for the story above with a cover.
-2. Play → drawing replays; each heard chunk appears as a paper caption near the top (`[data-testid=narration]`) as it is reached; "play again" appears above the subtitle at the end.
+2. Play → drawing replays; each heard chunk appears as a paper caption near the top (`[data-testid=narration]`) as it is reached. Bottom bar: pause/play and a slider (`[data-testid=scrubber]` shows `i/n`). Drag the slider: the page jumps to that point fully drawn and keeps playing; pause holds the position; at the end the button reads "again".
 3. Delete → "sure?" → card gone.
 
 ## Microphone [medium, needs a human]

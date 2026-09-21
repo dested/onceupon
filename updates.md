@@ -1,5 +1,13 @@
 # Updates
 
+## 2026-09-20 — replay scrubber
+Sal: let me scrub around in playback. Added a slider + play/pause on the replay screen. Seek rebuilds the page through event i with a fresh scene/director in instant mode, then `Stage.settle()` finishes strokes, snaps tweens, drops effects; playback continues from there.
+Touched: src/story/session.ts, src/story/replay.ts, src/story/store.ts, src/engine/stage.ts, src/engine/fx.ts, src/ui/ReplayScreen.tsx
+
+## 2026-09-20 — always two eyes
+Sal: characters often get one eye. The line DSL example and rule now say two eyes (the json-dsl branch's face helper draws two as well).
+Touched: src/llm/prompt.ts
+
 ## 2026-09-20 — transcript no longer stops one word early
 Sal: drawing frequently lags one word. Cause: tracker rules written for Chrome (hold back the last interim word, need 5+ words) applied to the OpenAI live model, whose deltas are append-only and whose finals need sentence punctuation. Now each recognizer configures the tracker: live = release everything after 600ms of quiet.
 Touched: src/speech/recognition.ts, src/story/session.ts

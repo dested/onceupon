@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { ArrowLeft, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Pause, Play, RotateCcw } from 'lucide-react'
 import { ReplaySession } from '~/story/session'
 import { appStore, useApp } from '~/story/store'
 import { IconButton, StickerButton } from './bits'
@@ -11,6 +11,8 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
   const sessionRef = useRef<ReplaySession | null>(null)
   const playing = useApp((s) => s.replayPlaying)
   const caption = useApp((s) => s.replayCaption)
+  const pos = useApp((s) => s.replayPos)
+  const len = useApp((s) => s.replayLen)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -28,10 +30,12 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
   }, [storyId])
 
   const again = (): void => {
-    appStore.set((s) => ({ replayId: null, storyNonce: s.storyNonce }))
-    // Remount with the same id on the next tick so the canvas starts clean.
-    window.setTimeout(() => appStore.set({ replayId: storyId }), 0)
+    const s = sessionRef.current
+    if (!s) return
+    appStore.set({ replayPlaying: true })
+    s.seek(0)
   }
+  const ended = len > 0 && pos >= len
 
   return (
     <div className="relative h-full w-full select-none" data-testid="replay">
@@ -51,14 +55,34 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
           </p>
         </div>
       )}
-      <Subtitles className="bottom-7 left-6 right-6 h-11" />
-      <div className="absolute bottom-24 left-1/2 -translate-x-1/2">
-        {!playing && (
-          <StickerButton tone="yellow" onClick={again}>
-            <RotateCcw size={22} strokeWidth={3} /> play again
+      <Subtitles className="bottom-24 left-6 right-6 h-11" />
+      <div className="absolute right-6 bottom-6 left-6 flex items-center gap-4" data-testid="scrubber">
+        {ended ? (
+          <StickerButton tone="yellow" tilt={0} onClick={again} className="shrink-0">
+            <RotateCcw size={22} strokeWidth={3} /> again
           </StickerButton>
+        ) : (
+          <IconButton
+            label={playing ? 'Pause' : 'Play'}
+            active={playing}
+            className="shrink-0"
+            onClick={() => (playing ? sessionRef.current?.pause() : sessionRef.current?.resume())}>
+            {playing ? <Pause size={22} strokeWidth={3} /> : <Play size={22} strokeWidth={3} />}
+          </IconButton>
         )}
-        {playing && <div className="font-hand text-xl text-ink-soft">once upon a time...</div>}
+        <input
+          type="range"
+          aria-label="Story position"
+          min={0}
+          max={Math.max(1, len)}
+          step={1}
+          value={Math.min(pos, len)}
+          onChange={(e) => sessionRef.current?.seek(Number(e.target.value))}
+          className="h-3 w-full cursor-pointer accent-crayon-red"
+        />
+        <span className="w-16 shrink-0 text-right font-hand text-base text-ink-soft">
+          {Math.min(pos, len)}/{len}
+        </span>
       </div>
     </div>
   )

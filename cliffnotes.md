@@ -55,7 +55,7 @@ src/
   story/
     store.ts               app state (useSyncExternalStore), settings load/persist, env keys via zod
     storage.ts             StoryRecord zod schema, localStorage list/get/save/delete
-    replay.ts              Replayer: plays a StoryRecord through a Director with gaps capped
+    replay.ts              Replayer: plays a StoryRecord through a Director with gaps capped; seek()/position for the scrubber
     session.ts             LiveSession (mic + director + stage + autosave) and ReplaySession
   ui/
     StoryScreen.tsx        canvas, mic button, toolbar, typed-input fallback, warnings, panels
@@ -96,7 +96,7 @@ plans/                     dated working docs
 | ------ | -------------- | ------------------------------------------------------- |
 | story  | `StoryScreen`  | default; remounts on "New story" (storyNonce)            |
 | shelf  | `Bookshelf`    | opens from the book icon                                |
-| replay | `ReplayScreen` | keyed by story id; autoplays                            |
+| replay | `ReplayScreen` | keyed by story id; autoplays; play/pause + scrubber (`ReplaySession.seek` rebuilds the page instantly through event i, `Stage.settle()`) |
 
 ## The loop
 
