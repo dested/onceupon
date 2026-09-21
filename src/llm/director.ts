@@ -220,7 +220,8 @@ export class Director {
         this.execute(buf)
       }
     } catch (e: unknown) {
-      if (e instanceof DOMException && e.name === 'AbortError') {
+      // Our own abort (skip, restart, stop): the SDK throws its own error type, so ask the signal.
+      if (this.abort?.signal.aborted || (e instanceof DOMException && e.name === 'AbortError')) {
         if (this.restarting) stat.error = 'restarted: more words came in'
       } else {
         stat.error = e instanceof Error ? e.message : String(e)

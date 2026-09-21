@@ -59,7 +59,7 @@ src/
     replay.ts              Replayer: plays a StoryRecord through a Director with gaps capped; seek()/position for the scrubber
     session.ts             LiveSession (mic + director + stage + autosave) and ReplaySession
   ui/
-    StoryScreen.tsx        canvas, mic button, toolbar, typed-input fallback, warnings, panels
+    StoryScreen.tsx        canvas, mic button, toolbar, typed-input fallback, panels (warnings only as a red dot on the bug icon; text lives in the debug panel)
     Subtitles.tsx          one clipped line along the bottom; newest words stay visible (float-right trick)
     SpendChip.tsx          running $ / calls / time-to-first-stroke under the toolbar
     Filmstrip.tsx          thumbnails of earlier pages, top-left
