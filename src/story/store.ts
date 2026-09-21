@@ -64,6 +64,8 @@ export interface AppState {
   transcriptInterim: string
   settings: Settings
   settingsOpen: boolean
+  /** The "bring your own key" gate was satisfied or skipped this session; don't nag again. */
+  keyGateDismissed: boolean
   debug: boolean
   calls: CallStat[]
   lines: LineLog[]
@@ -153,7 +155,7 @@ function loadSettings(): Settings {
   const base: Settings = {
     provider: DEFAULT_MODEL.provider,
     model: DEFAULT_MODEL.id,
-    dialect: 'lines',
+    dialect: 'json',
     keys: envKeys,
     sound: true,
     moderation: true,
@@ -171,7 +173,7 @@ function loadSettings(): Settings {
     return {
       provider: isProvider(d.provider) ? d.provider : base.provider,
       model: d.model || base.model,
-      dialect: d.dialect && isDialectId(d.dialect) ? d.dialect : 'lines',
+      dialect: d.dialect && isDialectId(d.dialect) ? d.dialect : 'json',
       keys: {
         anthropic: d.keys.anthropic || envKeys.anthropic,
         openrouter: d.keys.openrouter || envKeys.openrouter,
@@ -224,6 +226,7 @@ export const appStore = new Store<AppState>({
   transcriptInterim: '',
   settings: loadSettings(),
   settingsOpen: false,
+  keyGateDismissed: false,
   debug: false,
   calls: [],
   lines: [],

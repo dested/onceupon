@@ -1,5 +1,17 @@
 # Decisions
 
+## 2026-09-21 — Public deploy defaults: Sonnet 5 + JSON dialect, bring-your-own-key gate
+**Why:** Once Upon is now deployed at onceupon.dested.com as a keyless static build (Drydock) that
+strangers try with their own keys. For a first impression the picture quality matters more than the
+half-second of first-token latency that drove the Haiku default, so the shared build defaults to
+**Sonnet 5** (cleaner two-tone outlines, consistent faces) and the **JSON ops dialect**. A
+`KeyGate` modal (`src/ui/KeyGate.tsx`) blocks on a missing Anthropic key (required to draw) and
+optionally collects an OpenAI key (better voice), stored in localStorage like the Settings panel.
+**Supersedes:** "Haiku 4.5 default" and the `lines` dialect default (both still one click away in
+Settings). On localhost with a personal Haiku key nothing stops you switching back.
+**Rejected:** baking any `VITE_*` key into the build (Vite inlines it into the public bundle = Sal's
+key and bill exposed); keeping Haiku default (Sonnet's picture is the thing worth showing off).
+
 ## 2026-09-20 — Line-based text DSL instead of JSON or tool calls
 **Why:** each line executes the moment it streams in; a dragon is ~120 output tokens; no braces or quotes to waste tokens on; partial output is still valid.
 **Rejected:** JSON arrays (unparseable until complete, 2-3x tokens), tool calls (buffered per call, slower first stroke).

@@ -228,7 +228,7 @@ export function SettingsPanel() {
           </div>
 
           <p className="mt-4 font-hand text-base text-ink-soft">
-            Keys are used straight from the browser. Localhost only. Press the backtick key for the debug panel.
+            Keys are used straight from your browser and stay on this device only. Press the backtick key for the debug panel.
           </p>
         </div>
       </PaperCard>

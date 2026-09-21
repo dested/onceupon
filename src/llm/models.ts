@@ -20,11 +20,11 @@ export const MODEL_OPTIONS: ModelOption[] = [
   { provider: 'openai', id: 'gpt-5-mini', label: 'GPT-5 mini', hint: 'OpenAI direct, minimal reasoning' },
 ]
 
-export const DEFAULT_MODEL: ModelOption = MODEL_OPTIONS[0] ?? {
+export const DEFAULT_MODEL: ModelOption = MODEL_OPTIONS.find((m) => m.id === 'claude-sonnet-5') ?? {
   provider: 'anthropic',
-  id: 'claude-haiku-4-5',
-  label: 'Haiku 4.5',
-  hint: '',
+  id: 'claude-sonnet-5',
+  label: 'Sonnet 5',
+  hint: 'smarter, thinking off',
 }
 
 export function isProvider(s: string): s is Provider {

@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-21 — deployed to onceupon.dested.com + BYO-key defaults
+Sal: deploy via Drydock, keyless, others use their own keys; default to JSON ops + Sonnet, add a paste-your-key modal. Created a Drydock `static` project (no server/DB, dist/, domain onceupon.dested.com, no env vars — keyless). Defaults flipped: DEFAULT_MODEL → Sonnet 5 (`models.ts`), dialect default → json (`store.ts`). New `KeyGate` modal (`src/ui/KeyGate.tsx`) prompts for Anthropic (required) + OpenAI (optional voice) when missing, persisted to localStorage; `keyGateDismissed` in the store stops it nagging. Settings footer no longer says "localhost only". See decisions.md.
+Touched: src/llm/models.ts, src/story/store.ts, src/ui/KeyGate.tsx, src/ui/StoryScreen.tsx, src/ui/SettingsPanel.tsx
+
 ## 2026-09-21 — merged json-dsl into master (for Drydock deploy)
 Sal: merge json-dsl into main and push. Branches had diverged — master carried faithful "(ported from json-dsl)" commits, so json-dsl was a strict superset (all of master's features plus the switchable JSON ops dialect). Resolved the merge to json-dsl's tree; conflicts were only ports-vs-originals of the same lines. Verified moderation is not regressed (json-dsl moved the moderated/unmoderated prompt choice into `makeDialect`/the dialects, still threaded from `settings.moderation`). typecheck green. master → 448407d, pushed.
 Touched: merge only (no new code); resolved src/llm/director.ts, src/story/session.ts, src/story/store.ts, src/ui/SettingsPanel.tsx, docs.

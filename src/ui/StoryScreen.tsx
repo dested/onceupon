@@ -7,6 +7,7 @@ import { IconButton } from './bits'
 import { Subtitles } from './Subtitles'
 import { Filmstrip } from './Filmstrip'
 import { SettingsPanel } from './SettingsPanel'
+import { KeyGate } from './KeyGate'
 import { DebugPanel } from './DebugPanel'
 import { SpendChip } from './SpendChip'
 
@@ -160,6 +161,7 @@ export function StoryScreen() {
 
 
       {settingsOpen && <SettingsPanel />}
+      <KeyGate />
       {debug && <DebugPanel />}
     </div>
   )
