@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-20 — no error boxes on the story screen; our own aborts are not errors
+Sal: "request was aborted" showed as an error; stop showing errors outside debug. The director now treats any abort it asked for as a non-error (the SDK throws its own type, so it checks the signal). The red warning box is gone; a red dot on the bug icon says the debug panel has something.
+Touched: src/llm/director.ts, src/ui/StoryScreen.tsx
+
 ## 2026-09-20 — Anthropic pricing table refreshed
 Sal pasted the current table. PRICING now covers Fable/Mythos 5.1 (cache hits $0.25), Fable/Mythos 5, Opus 5/4.8/4.7/4.6/4.5, Opus 4.1/4, Sonnet 5, Sonnet 4.6/4.5/4, Haiku 4.5, Haiku 3.5; 5-minute write prices (the TTL we use). Fable 5.1 added to the model picker with thinking off.
 Touched: src/llm/models.ts, src/llm/providers.ts

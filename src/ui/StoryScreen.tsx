@@ -95,8 +95,11 @@ export function StoryScreen() {
         <IconButton label="Settings" onClick={() => appStore.set({ settingsOpen: true })}>
           <Settings size={22} strokeWidth={2.5} />
         </IconButton>
-        <IconButton label="Debug" onClick={() => appStore.set((s) => ({ debug: !s.debug }))} active={debug}>
+        <IconButton label="Debug" onClick={() => appStore.set((s) => ({ debug: !s.debug }))} active={debug} className="relative">
           <Bug size={22} strokeWidth={2.5} />
+          {lastWarning && !debug && (
+            <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full border-2 border-paper bg-crayon-red" title={lastWarning} data-testid="warning-dot" />
+          )}
         </IconButton>
       </div>
 
@@ -155,11 +158,6 @@ export function StoryScreen() {
         </div>
       )}
 
-      {lastWarning && (
-        <div className="absolute right-4 bottom-20 max-w-xs rounded-xl border-[3px] border-crayon-red bg-paper px-3 py-2 font-hand text-base text-crayon-red" data-testid="warning">
-          {lastWarning}
-        </div>
-      )}
 
       {settingsOpen && <SettingsPanel />}
       {debug && <DebugPanel />}

@@ -64,7 +64,7 @@ Type two sentences into the app, open the debug panel: call 2's token cell must 
 ## Other providers [medium]
 
 Settings → provider openrouter or openai, paste a key, pick a preset, repeat the typed path. Watch
-the debug panel for HTTP errors from the provider.
+the debug panel for HTTP errors from the provider (the story screen never shows error text, only a red dot on the bug icon).
 
 ## Transcriber smoke test without a mic [cheap, ~$0.01]
 
