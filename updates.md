@@ -14,7 +14,7 @@ Touched: src/llm/models.ts, src/llm/providers.ts
 
 ## 2026-09-20 — get the most out of Anthropic prompt caching
 Sal: make sure we get the most out of caching. Found Haiku 4.5 caches nothing under a 4096-token prefix; both prompts were under. Added a shape cookbook + story-beat recipes to both system prompts (now ~4.2k / ~5.3k tokens), and the user message is now blocks: story chunks as separate blocks with a breakpoint on the last, so the story-so-far reads from cache too. Probed with real calls: system writes once then reads; each story call reads everything but the new chunk.
-Touched: src/llm/{providers,prompt,director}.ts
+Touched: src/llm/{providers,prompt,json-prompt,dialect,json-dsl,director}.ts
 
 ## 2026-09-20 — restart an early call when the sentence continues
 Sal: a pause mid-sentence splits the beat and the rest waits for the next call. Now words arriving while a call has drawn fewer than 3 lines abort it and re-send with the whole text (max twice per beat); aborted calls are marked "restarted" in the debug panel and not counted as spend; a "hold on... drawing all of that" note tells the kid to wait.
@@ -41,12 +41,16 @@ Sal: let me scrub around in playback. Added a slider + play/pause on the replay 
 Touched: src/story/session.ts, src/story/replay.ts, src/story/store.ts, src/engine/stage.ts, src/engine/fx.ts, src/ui/ReplayScreen.tsx
 
 ## 2026-09-20 — always two eyes
-Sal: characters often get one eye. The line DSL example and rule now say two eyes (the json-dsl branch's face helper draws two as well).
-Touched: src/llm/prompt.ts
+Sal: characters often get one eye. The face helper followed the spec's one-eye-in-profile rule and models nearly always face left/right. Now two eyes always, shifted toward the facing side; the line DSL example and rule say two eyes too.
+Touched: src/engine/face.ts, src/llm/json-prompt.ts, src/llm/prompt.ts
 
 ## 2026-09-20 — transcript no longer stops one word early
 Sal: drawing frequently lags one word. Cause: tracker rules written for Chrome (hold back the last interim word, need 5+ words) applied to the OpenAI live model, whose deltas are append-only and whose finals need sentence punctuation. Now each recognizer configures the tracker: live = release everything after 600ms of quiet.
 Touched: src/speech/recognition.ts, src/story/session.ts
+
+## 2026-09-20 — JSON ops dialect (branch json-dsl)
+Sal: try a new NDJSON drawing DSL (1200x620 paper, Bezier paths, face helper, poses, recolor, scene keep). Built as a switchable Dialect behind the Director on the existing engine: zod schema + translator + JSON scene snapshot + its own prompt; engine gained layers (z-order), shape reset that keeps the drawn prefix, recall of kept characters after a page turn, face helper. Settings → Drawing language; story records remember their dialect for replay. Verified with Haiku: first token ~500ms both ways, JSON ~5x output tokens per beat.
+Touched: src/llm/{dialect,json-dsl,json-prompt,director}.ts, src/engine/{face,types,scene,stage}.ts, src/story/{store,storage,session}.ts, src/ui/SettingsPanel.tsx
 
 ## 2026-09-20 — ears cost, replay narration, kid-safety, subtitle states
 Sal: include transcription cost; replay must show what we heard; filter inappropriate content contextually ("they can't go to the bathroom together"); unclear which words are drawn/waiting. Done: audio-ms metering priced at an editable per-minute rate (chip + debug + Settings); replay caption per heard chunk; `skip` verb the model answers for not-for-kids meaning (words scrubbed from record/transcript, marker left, note shown) plus a word masker; three-state subtitle (ink / yellow drawing / grey waiting) and clearer mic status; stamp-in-obj page-coordinate tolerance; play-again moved above the subtitle.

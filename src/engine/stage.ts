@@ -36,6 +36,8 @@ interface ObjView {
   contentBounds: Bounds | null
   strokes: Stroke[]
   seeds: number[]
+  /** How many strokes each shape produced, in shape order. */
+  shapeStrokes: number[]
   /** index of the first stroke not fully revealed */
   head: number
   /** arc length revealed within strokes[head] (or chars drawn for text) */
@@ -68,6 +70,8 @@ export interface StageStats {
   drawing: boolean
 }
 
+/** Views sort by z; a layer is worth this many insertions. */
+const LAYER_STRIDE = 100000
 const OUTLINE_SPEED = 70
 const FILL_SPEED = 110
 const MAX_SPEED = 1600
@@ -197,6 +201,7 @@ export class Stage {
       contentBounds: null,
       strokes: [],
       seeds: [],
+      shapeStrokes: [],
       head: 0,
       progress: 0,
       textChars: 0,
@@ -211,9 +216,40 @@ export class Stage {
   handle(ev: SceneEvent): void {
     const now = performance.now()
     switch (ev.k) {
-      case 'objectCreated':
-        this.newView(ev.obj.id, ev.obj.x, ev.obj.y)
+      case 'objectCreated': {
+        const v = this.newView(ev.obj.id, ev.obj.x, ev.obj.y)
+        v.z += ev.obj.layer * LAYER_STRIDE
         break
+      }
+      case 'layer': {
+        const v = this.view(ev.id)
+        if (v) v.z = ev.z * LAYER_STRIDE + this.zCounter++
+        break
+      }
+      case 'shapesReset': {
+        const v = this.view(ev.id)
+        if (!v) return
+        const keep = Math.min(ev.keep, v.shapeStrokes.length)
+        let keepStrokes = 0
+        for (let i = 0; i < keep; i++) keepStrokes += v.shapeStrokes[i] ?? 0
+        this.queue = this.queue.filter((q) => q.id !== ev.id || q.stroke < keepStrokes)
+        v.strokes = v.strokes.slice(0, keepStrokes)
+        v.seeds = v.seeds.slice(0, keepStrokes)
+        v.shapeStrokes = v.shapeStrokes.slice(0, keep)
+        if (v.head >= keepStrokes) {
+          v.head = keepStrokes
+          v.progress = 0
+          v.textChars = 0
+        }
+        v.layer = null
+        v.lctx = null
+        v.layerBounds = null
+        v.contentBounds = null
+        for (const s of ev.shapes.slice(0, keep)) v.contentBounds = unionBounds(v.contentBounds, shapeBounds(s))
+        this.rebuildLayer(v)
+        this.addShapes(v, ev.shapes.slice(keep), {})
+        break
+      }
       case 'shapesAdded': {
         const v = this.view(ev.id) ?? this.newView(ev.id, 0, 0)
         this.addShapes(v, ev.shapes, {})
@@ -278,7 +314,7 @@ export class Stage {
           this.queue = this.queue.filter((q) => q.id !== BG_ID)
         }
         const v = this.newView(BG_ID, 0, 0)
-        v.z = -1
+        v.z = -1e9
         const shapes: Shape[] = [{ k: 'rect', x: -2, y: -2, w: WORLD_W + 4, h: GROUND_Y + 2, color: ev.sky, fill: true }]
         if (ev.ground) shapes.push({ k: 'rect', x: -2, y: GROUND_Y, w: WORLD_W + 4, h: WORLD_H - GROUND_Y + 2, color: ev.ground, fill: true })
         this.addShapes(v, shapes, { speedMul: 9, wobbleAmp: 0.6, background: true })
@@ -316,6 +352,7 @@ export class Stage {
         v.seeds.push(seed + idx)
         this.queue.push({ id: v.id, stroke: idx })
       }
+      v.shapeStrokes.push(strokes.length)
     }
   }
 

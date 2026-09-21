@@ -43,12 +43,16 @@ src/
     scene.ts               Scene model: objects, pages, apply(Command) -> SceneEvent[], summary() for the prompt
     stage.ts               Stage renderer: per-object layers, reveal queue, tweens, idle motion, bubbles, page turn, crayon cursor
     fx.ts                  particle effects (explode, sparkle, hearts, rain, fire, smoke, stars, poof, scribble-out)
+    face.ts                faceShapes(): eyes + mouth anchored to a head contour (json dialect's face op)
     audio.ts               synthesized crayon scratch + page flip (Web Audio)
   llm/
     models.ts              provider + preset model list, per-MTok pricing, estimateCost()
     providers.ts           LlmProvider: Anthropic SDK (browser-direct) and OpenAI-compatible SSE (OpenRouter, OpenAI)
     prompt.ts              SYSTEM_PROMPT (DSL spec, cookbook, story beats, example) and buildUserBlocks()/storyBlocks() (cached story chunks)
-    director.ts            Director: words in -> one streaming call at a time -> execute lines as they land
+    director.ts            Director: words in -> one streaming call at a time -> execute lines as they land (through a Dialect)
+    dialect.ts             Dialect interface, LinesDialect (v1 wrapper over dsl.ts), makeDialect()
+    json-dsl.ts            JsonDialect: zod schema for the NDJSON ops contract + translation to engine Commands + JSON scene snapshot
+    json-prompt.ts         JSON_SYSTEM_PROMPT and buildJsonUserMessage()
   speech/
     recognition.ts         typed boundary over webkitSpeechRecognition + TranscriptTracker (when words are "ready")
     openai-realtime.ts     OpenAI Realtime transcription over a browser WebSocket (PCM16 via AudioWorklet), same Recognizer shape; mic device pick, 30s clip ring, level + trace callbacks
@@ -78,6 +82,7 @@ plans/                     dated working docs
 | ------------------------------------ | -------------------------------------------------- |
 | what the model is told / DSL wording | `src/llm/prompt.ts`                                |
 | a DSL verb's syntax                  | `src/engine/dsl.ts` + `types.ts` + prompt          |
+| the JSON ops dialect (v2)            | `src/llm/json-dsl.ts` (schema + translate), `json-prompt.ts`; pick it in Settings → Drawing language |
 | how strokes look (width, wobble)     | `src/engine/geometry.ts` consts, `brush.ts` dabs   |
 | reveal speed / catch-up              | `src/engine/stage.ts` `OUTLINE_SPEED` etc          |
 | idle motion / anim kinds             | `stage.ts` `objectTransform`                       |
@@ -111,7 +116,8 @@ plans/                     dated working docs
 
 ## Key types
 
-- `Command` (`engine/types.ts`): obj, shape, stamp, end, mv, sc, flip, rm, anim, fx, say, bg, page, skip.
+- `Command` (`engine/types.ts`): obj, shape, stamp, end, mv, sc, flip, rm, anim, fx, say, bg, page, skip; engine-only (json dialect): layer, reset, recall, title.
+- `Dialect` (`llm/dialect.ts`): system prompt + user message + `parse(line) -> Command[]`; a story record remembers its dialect so replay parses the same way.
 - `SceneEvent` (`engine/scene.ts`): what the renderer consumes.
 - `Stroke` (`engine/geometry.ts`): pts + cumulative lengths + clip polys; the unit of reveal.
 - `StoryRecord` (`story/storage.ts`): `{ id, title, seed, cover, events: ({words}|{cmd})[] }`.
@@ -120,11 +126,13 @@ plans/                     dated working docs
 
 - **World is 160x100, ground at y=80.** Shapes inside an `obj` are relative to its anchor; negative y is up. The prompt and the engine must agree.
 - **`page` wipes objects.** Characters from the previous page are kept in `Scene.carried`; a verb that references one recreates it on the new page (so `mv dragon` after `page` works even if the model forgot to redraw).
+- **Two dialects, one engine.** `lines` (v1) is the terse line DSL; `json` (v2) is NDJSON operations on a 1200x620 paper (ground y=525) with Bezier paths only, a `face` helper, poses, recolor, `scene` clear/keep. The JSON dialect maps paper -> world with a uniform scale (x2/15) and a vertical offset that lands its ground on ours, keeps a side table of entity names and shape ids (shape replace by id, recolor), and describes the scene back as JSON. Part motion/pivot and `width` are accepted and ignored. `say` and `skip` are our extensions to that contract.
 - **Base breathing is tiny on purpose.** Every object gets a 0.6% breath/rotation; scenery (negative layer) half that; the sky/ground rect none. Sal asked for the background to move less.
+- **`reset` keeps the drawn prefix.** Replacing a shape re-issues the whole shape list, but the stage keeps strokes of the leading unchanged shapes (per-shape stroke counts), so a face change or recolor only redraws the changed tail.
 - **`s <fx-name>`** is accepted as an effect (models do this). A stamp as the first shape inside an `obj` whose relative position is off-page but whose absolute position fits is read as page coordinates (models write `obj house 40 80` / `s house 40 68`).
 - **Determinism:** every stroke's wobble is seeded from `storySeed:objectId:strokeIndex` so replay looks identical. Do not use `Math.random()` in engine code.
 - **Object bounds:** `contentBounds` is the unpadded union of shapes; `layerBounds` is the padded canvas. Never derive UI placement from `layerBounds`. Bubbles use `uprightBounds` (no rotation; the sweep circle for spin) and wait until the character is fully drawn.
-- **Moderation is a flag.** Settings → "Kid-safe moderation" (`settings.moderation`, default on). Off: the prompt loses the "For a small child" section (`SYSTEM_PROMPT_UNMODERATED`, picked in `Director`) and `cleanText` passes text through (`setModeration`). Prompt side applies to the next new story; masking flips live.
+- **Moderation is a flag.** Settings → "Kid-safe moderation" (`settings.moderation`, default on). Off: prompts lose the "For a small child" section (`*_UNMODERATED` constants) and `cleanText` passes text through (`setModeration`). Prompt side applies to the next new story; masking flips live.
 - **Content filter is two layers.** The word masker (`story/clean.ts`) runs on the transcript before display/storage/model and on the model's `say`/`t` text. Contextual judgement (clean words, bad idea: "they went to the bathroom together") is the drawing model's job via `skip`; there is no separate classifier call, so it costs nothing extra. The kid's raw words are on screen for the ~0.5s before the model answers.
 - **Transcription cost is an estimate.** Audio ms actually sent over the socket are metered in `send()` (`onAudio`), priced at `settings.sttRatePerMin` (default $0.006). OpenAI does not report transcription usage on the Realtime socket.
 - **Never put story words in the transcription prompt.** Transcription models emit their prompt text during quiet/unclear audio; a vocabulary hint with "dragon, castle, exploded" produced phantom dragons in every session. The prompt is empty now. Mid-speech commits every 2.5s (`maxTurnMs`) keep words flowing while a child talks without pausing.
@@ -142,6 +150,7 @@ plans/                     dated working docs
 
 ## Status
 
+- Experiment (branch json-dsl): JSON ops dialect selectable in Settings. First measurement on Haiku 4.5, same opening sentence: first token ~500ms either way; JSON call 1116 output tokens / 6.5s / $0.008 vs lines ~200 tokens / ~2.5s / ~$0.002. Picture: cleaner two-tone outlines and a consistent face; more tokens per beat.
 - Done: DSL, renderer, effects, audio, speech intake, director, providers, settings, subtitles (three-state), filmstrip, bookshelf, replay with narration captions, kid-safety (`skip` + masker), per-call usage + cost + estimated ears cost (Anthropic from stream usage; OpenRouter reports cost; OpenAI priced only if added to PRICING). Typed-input path verified end to end on Haiku 4.5 (first token 0.6 to 1.1s).
 - OpenAI Realtime transcription verified from a script with synthesized speech (GA endpoint `?intent=transcription`, `session.update` with `type: transcription`, subprotocol auth). Live mic on it not yet confirmed by a human. OpenRouter/OpenAI LLM providers still unverified.
 - Ideas not built: export replay to video, story summary compaction for very long stories, per-model prompt variants.

@@ -1,8 +1,8 @@
-import { parseLine } from '~/engine/dsl'
 import type { Scene } from '~/engine/scene'
+import type { Command } from '~/engine/types'
+import type { Dialect } from './dialect'
 import type { Stage } from '~/engine/stage'
 import type { LlmProvider } from './providers'
-import { buildUserBlocks, SYSTEM_PROMPT, SYSTEM_PROMPT_UNMODERATED } from './prompt'
 import { estimateCost, type Usage } from './models'
 
 export interface CallStat {
@@ -39,13 +39,10 @@ const RESTART_MAX = 3
 export interface DirectorDeps {
   scene: Scene
   stage: Stage
-  /** Kid-safety section in the system prompt (Settings → moderation). */
-  moderation: boolean
+  dialect: Dialect
   getProvider: () => LlmProvider | null
   onEvent: (e: DirectorEvent) => void
 }
-
-const MAX_TOKENS = 1200
 
 /**
  * Turns words into drawing. One model call in flight at a time; words that arrive during a call
@@ -65,7 +62,23 @@ export class Director {
   private abort: AbortController | null = null
   private stopped = false
 
-  constructor(private deps: DirectorDeps) {}
+  constructor(private deps: DirectorDeps) {
+    deps.dialect.later = (cmds) => {
+      if (this.stopped) return
+      for (const c of cmds) this.applyCmd(c)
+    }
+  }
+
+  get dialect(): Dialect {
+    return this.deps.dialect
+  }
+
+  private applyCmd(cmd: Command): void {
+    for (const ev of this.deps.scene.apply(cmd)) {
+      if (ev.k === 'warn') this.deps.onEvent({ k: 'warn', message: ev.message })
+      this.deps.stage.handle(ev)
+    }
+  }
 
   get story(): string {
     return this.storyChunks.join(' ')
@@ -103,24 +116,19 @@ export class Director {
 
   /** Execute a DSL line directly (replay, or tests). Returns whether it parsed. */
   execute(line: string): boolean {
-    const res = parseLine(line)
+    const res = this.deps.dialect.parse(line)
     if (!res.ok) {
       this.deps.onEvent({ k: 'line', line, ok: false, error: res.error })
       return false
     }
-    if (res.cmd) {
-      for (const ev of this.deps.scene.apply(res.cmd)) {
-        if (ev.k === 'warn') this.deps.onEvent({ k: 'warn', message: ev.message })
-        this.deps.stage.handle(ev)
-      }
-    }
+    for (const cmd of res.cmds) this.applyCmd(cmd)
     this.deps.onEvent({ k: 'line', line, ok: true, error: null })
     return true
   }
 
   /** A `skip` line ends the call: the words leave the story and the session hears about it. */
   private isSkip(line: string, words: string): boolean {
-    if (!/^skip\b/i.test(line.trim())) return false
+    if (!this.deps.dialect.isSkip(line)) return false
     this.dropLastChunk(words)
     this.deps.onEvent({ k: 'line', line: 'skip', ok: true, error: null })
     this.deps.onEvent({ k: 'skip', words })
@@ -138,6 +146,7 @@ export class Director {
     this.restarts = 0
     this.restarting = false
     this.stopped = false
+    this.deps.dialect.reset()
     this.emitStatus('idle')
   }
 
@@ -175,21 +184,13 @@ export class Director {
     }
     this.emitStatus('thinking')
     this.deps.onEvent({ k: 'call', stat: { ...stat } })
-    const user = buildUserBlocks({
-      storyChunks: this.storyChunks,
-      sceneSummary: this.deps.scene.summary(),
-      newWords: words,
-    })
+    const dialect = this.deps.dialect
+    const user = dialect.buildUser({ storyChunks: this.storyChunks, newWords: words })
     this.storyChunks.push(words)
     this.abort = new AbortController()
     let buf = ''
     try {
-      for await (const chunk of provider.stream({
-        system: this.deps.moderation ? SYSTEM_PROMPT : SYSTEM_PROMPT_UNMODERATED,
-        user,
-        maxTokens: MAX_TOKENS,
-        signal: this.abort.signal,
-      })) {
+      for await (const chunk of provider.stream({ system: dialect.system, user, maxTokens: dialect.maxTokens, signal: this.abort.signal })) {
         if (chunk.k === 'usage') {
           stat.usage = chunk.usage
           stat.costUsd = estimateCost(provider.model, chunk.usage)

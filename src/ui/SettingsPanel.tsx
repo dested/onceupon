@@ -1,3 +1,4 @@
+import { DIALECT_IDS, DIALECT_LABELS, isDialectId } from '~/llm/dialect'
 import { useEffect, useState } from 'react'
 import { listMics } from '~/speech/openai-realtime'
 import { setModeration } from '~/story/clean'
@@ -111,6 +112,25 @@ export function SettingsPanel() {
             Kid-safe moderation (skip not-for-kids beats, mask rude words). Prompt change applies to the next new story.
           </label>
 
+          <div className="mb-5">
+            <label className={label} htmlFor="dialect">
+              Drawing language (applies to the next new story)
+            </label>
+            <select
+              id="dialect"
+              value={settings.dialect}
+              className={field}
+              onChange={(e) => {
+                const v = e.target.value
+                if (isDialectId(v)) update((s) => ({ ...s, dialect: v }))
+              }}>
+              {DIALECT_IDS.map((d) => (
+                <option key={d} value={d}>
+                  {DIALECT_LABELS[d]}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <h3 className="mb-2 font-hand text-xl">Ears</h3>
           <div className="mb-5 grid grid-cols-[1fr_11rem] gap-3">

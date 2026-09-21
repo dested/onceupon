@@ -33,6 +33,10 @@
 **Why:** measured: Haiku 4.5 caches nothing below 4096 prefix tokens (our prompts were 1920 / 3238), so every call paid full input price. A cookbook of shapes and story-beat recipes makes the prompts genuinely better and crosses the bar; reads then cost 10%.
 **Rejected:** junk padding (works, but the tokens buy nothing), Sonnet/Opus by default (their minimums are lower but they are slower and dearer per token).
 
+## 2026-09-20 — JSON ops dialect as a switchable second language, same engine (experiment)
+**Why:** Sal proposed an NDJSON operations contract (1200x620 paper, Bezier-only paths, face helper, poses, recolor, scene keep). Built as a `Dialect` behind the Director so both languages share the renderer, replay, safety and cost plumbing, and can be A/B'd from Settings. Paper coordinates are mapped into the 160x100 world (uniform scale, ground aligned) instead of making the world size configurable, because stroke widths, dab sizes and wobble are tuned in world units.
+**Rejected:** a second renderer (`CrayonRenderer`) per the proposal (duplicates the crayon look and the replay pipeline); a configurable world size (every brush constant would need rescaling).
+
 ## 2026-09-20 — The drawing model is the content filter (`skip`), no separate classifier
 **Why:** Sal: "it has to be contextual, they can't go to the bathroom together". Only a model can judge meaning, and the drawing model already sees every chunk with the story context. Teaching it to answer `skip` costs no extra call and no latency; a word masker (`story/clean.ts`) stays as a blunt second layer for on-screen text.
 **Rejected:** a parallel Haiku judge per chunk (adds 300-500ms before the first stroke or races the drawing call), a client-side phrase list (cannot judge meaning).

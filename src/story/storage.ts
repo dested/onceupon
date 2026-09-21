@@ -13,6 +13,8 @@ const storyRecordSchema = z.object({
   updatedAt: z.number(),
   seed: z.number(),
   cover: z.string().nullable(),
+  /** Drawing language the cmd lines are written in; missing = lines. */
+  dialect: z.string().optional(),
   events: z.array(storyEventSchema),
 })
 export type StoryRecord = z.infer<typeof storyRecordSchema>

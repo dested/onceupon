@@ -9,6 +9,7 @@ import { createOpenAiRealtimeRecognizer, isLiveModel, warmMic } from '~/speech/o
 import { getStory, listStories, newStoryId, saveStory, titleFromWords, type StoryEvent, type StoryRecord } from './storage'
 import { Replayer } from './replay'
 import { exposeDebugHandle } from '~/debug-handle'
+import { isDialectId, makeDialect } from '~/llm/dialect'
 import { cleanText, setModeration } from './clean'
 
 let lineCounter = 0
@@ -84,8 +85,9 @@ export class LiveSession {
 
   constructor(canvas: HTMLCanvasElement) {
     const seed = Math.floor(Math.random() * 1e9)
+    const dialect = appStore.get().settings.dialect
     setModeration(appStore.get().settings.moderation)
-    this.story = { id: newStoryId(), title: '', createdAt: Date.now(), updatedAt: Date.now(), seed, cover: null, events: [] }
+    this.story = { id: newStoryId(), title: '', createdAt: Date.now(), updatedAt: Date.now(), seed, cover: null, dialect, events: [] }
     this.stage = new Stage(canvas, { seed, audio: this.audio })
     this.stage.onPageSnapshot = (thumb, pageIndex) => {
       const title = this.scene.pages[pageIndex - 1]?.title ?? ''
@@ -95,7 +97,7 @@ export class LiveSession {
     this.director = new Director({
       scene: this.scene,
       stage: this.stage,
-      moderation: appStore.get().settings.moderation,
+      dialect: makeDialect(dialect, this.scene, { moderation: appStore.get().settings.moderation }),
       getProvider: currentProvider,
       onEvent: (e) => {
         pushDirectorEvent(e)
@@ -300,13 +302,14 @@ export class ReplaySession {
     appStore.set({ transcriptFinal: '', transcriptInterim: '', pages: [], replayCaption: '', replayPos: 0, replayLen: this.record?.events.length ?? 0 })
   }
 
-  /** A clean scene + director; the stage's page snapshots follow it. */
+  /** A clean scene + director for this record's dialect; the stage's page snapshots follow it. */
   private freshDirector(): Director {
     const scene = new Scene()
+    const dialectId = this.record?.dialect
     const director = new Director({
       scene,
       stage: this.stage,
-      moderation: appStore.get().settings.moderation,
+      dialect: makeDialect(dialectId && isDialectId(dialectId) ? dialectId : 'lines', scene, { moderation: appStore.get().settings.moderation }),
       getProvider: () => null,
       onEvent: () => undefined,
     })
