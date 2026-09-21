@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-20 — Anthropic pricing table refreshed
+Sal pasted the current table. PRICING now covers Fable/Mythos 5.1 (cache hits $0.25), Fable/Mythos 5, Opus 5/4.8/4.7/4.6/4.5, Opus 4.1/4, Sonnet 5, Sonnet 4.6/4.5/4, Haiku 4.5, Haiku 3.5; 5-minute write prices (the TTL we use). Fable 5.1 added to the model picker with thinking off.
+Touched: src/llm/models.ts, src/llm/providers.ts
+
 ## 2026-09-20 — get the most out of Anthropic prompt caching
 Sal: make sure we get the most out of caching. Found Haiku 4.5 caches nothing under a 4096-token prefix; both prompts were under. Added a shape cookbook + story-beat recipes to both system prompts (now ~4.2k / ~5.3k tokens), and the user message is now blocks: story chunks as separate blocks with a breakpoint on the last, so the story-so-far reads from cache too. Probed with real calls: system writes once then reads; each story call reads everything but the new chunk.
 Touched: src/llm/{providers,prompt,director}.ts
