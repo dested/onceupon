@@ -126,10 +126,11 @@ export interface TrackerOptions {
 /** Chrome rewrites the tail of an interim result as it hears more, so keep the last word back. */
 export const CHROME_TRACKER: TrackerOptions = { stableMs: 700, minWords: 5, maxWords: 12, holdBack: 1 }
 /**
- * OpenAI's live model appends words and never rewrites them, and only marks a result final on
- * sentence punctuation a child rarely produces. Release everything after a short pause.
+ * OpenAI's live model appends words and never rewrites them, so nothing is held back. It never
+ * produces finals here (punctuation lands on any short breath), so the quiet window is the only
+ * "done talking" signal: ~1.1s without a new word, on top of the model's own ~1s lag.
  */
-export const LIVE_TRACKER: TrackerOptions = { stableMs: 600, minWords: 1, maxWords: 12, holdBack: 0 }
+export const LIVE_TRACKER: TrackerOptions = { stableMs: 1100, minWords: 1, maxWords: 14, holdBack: 0 }
 /** Pause-gated OpenAI models return whole phrases as finals; interim is rare, so be quick with it. */
 export const PHRASE_TRACKER: TrackerOptions = { stableMs: 500, minWords: 1, maxWords: 12, holdBack: 0 }
 

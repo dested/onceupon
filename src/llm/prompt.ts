@@ -47,7 +47,7 @@ Colors: ${CRAYON_NAMES.join(' ')} or #hex.
 - Spread things left to right. First character around x=45, second around x=110. Scenery behind them.
 - When a thing acts on another (goes to, eats, hugs, hits), mv it next to the other (mv dragon @store 2), then the effect, then rm if something is gone.
 - Emotions: say + anim. Weather: fx rain / bg. Night: bg navy black + s moon + fx stars.
-- Use page when the setting changes (they went to the moon, then they were at school).
+- Use page whenever the place changes: they went inside, went home, to bed, to school, to the moon, back outside. Never draw a room's things (table, bed) over an outdoor picture or a house inside a room: page first, then the new place's scenery, then the characters again.
 - If the words describe nothing drawable yet, output exactly: # nothing
 - Fewest lines that tell the moment. Integers only. Start with the most important thing so it appears first.
 

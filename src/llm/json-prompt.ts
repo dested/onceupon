@@ -37,6 +37,7 @@ export const JSON_SYSTEM_PROMPT = `You are the crayon inside a picture-book app.
 - First character around x=350, second around x=800. Scenery (ground, house, tree, sun) on layer -1. Sun top-right at about (1050,120).
 - When a thing acts on another (goes to, eats, hugs), move it next to the other, then the effect, then remove what is gone.
 - Emotions: say + pose. Night: scene background dark blue + a moon shape. Weather: effect rain.
+- PLACE CHANGES ARE PAGE TURNS. The scene JSON has "title": the place we are drawing now. If the new words put the characters somewhere else (went inside, went home, into the house, upstairs, to bed, to school, to the park, into the cave, back outside, at the store, on the moon), the FIRST line must be scene clear:true with a title for the new place and keep listing the characters who went there. Then draw that place's scenery (a room: floor, wall color, window; outside: ground, sky). Never draw a room's things (table, bed, chair) over an outdoor picture, and never draw a house or tree inside a room: clear first. A new prop or action in the same place is not a page turn.
 - If the words describe nothing drawable yet, output exactly one line: # nothing
 - Fewest operations that tell the moment. Start with the most important thing so it appears first. Integers only.
 
@@ -68,7 +69,19 @@ NEW STORY: and the bunny hopped over to the house and the house exploded
 {"op":"remove","id":"house"}
 {"op":"effect","kind":"smoke","x":850,"y":420,"size":120}
 {"op":"say","id":"bunny","text":"uh oh"}
-{"op":"pose","id":"bunny","action":"shake","duration":1.5}`
+{"op":"pose","id":"bunny","action":"shake","duration":1.5}
+
+NEW STORY: then the bunny went inside and sat down at the table for dinner
+{"op":"scene","background":"#fff1d6","clear":true,"keep":["bunny"],"title":"inside the house"}
+{"op":"entity","id":"floor","name":"wooden floor","x":600,"y":525,"layer":-2}
+{"op":"draw","shape":{"id":"boards","entity":"floor","color":"#7a5230","fill":"#c8955c","path":[["M",-620,0],["L",620,0],["L",620,100],["L",-620,100],["Z"]]}}
+{"op":"entity","id":"window","name":"window","x":950,"y":250,"layer":-1}
+{"op":"draw","shape":{"id":"pane","entity":"window","color":"#5b4636","fill":"#bfe3ff","path":[["M",-70,-70],["L",70,-70],["L",70,70],["L",-70,70],["Z"]]}}
+{"op":"entity","id":"table","name":"dinner table","x":700,"y":525,"layer":-1}
+{"op":"draw","shape":{"id":"top","entity":"table","color":"#5b4636","fill":"#b07a45","path":[["M",-150,-120],["L",150,-120],["L",150,-95],["L",-150,-95],["Z"]]}}
+{"op":"draw","shape":{"id":"legs","entity":"table","color":"#5b4636","fill":"#8b5a2b","path":[["M",-130,-95],["L",-105,-95],["L",-105,0],["L",-130,0],["Z"]]}}
+{"op":"draw","shape":{"id":"legs2","entity":"table","color":"#5b4636","fill":"#8b5a2b","path":[["M",105,-95],["L",130,-95],["L",130,0],["L",105,0],["Z"]]}}
+{"op":"move","id":"bunny","x":480,"y":525,"duration":1.5,"style":"walk"}`
 
 export interface JsonPromptInput {
   storySoFar: string

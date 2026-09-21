@@ -218,15 +218,16 @@ export function createOpenAiRealtimeRecognizer(handlers: RecognizerHandlers, opt
         break
       case 'conversation.item.input_audio_transcription.delta': {
         if (live) {
-          // One growing utterance; a sentence end closes it and opens the next.
+          // One growing utterance for the whole session.
           let cur = items[items.length - 1]
           if (!cur || cur.isFinal) {
             cur = { id: `live-${items.length}`, transcript: '', isFinal: false }
             items.push(cur)
           }
+          // Punctuation is NOT a final: the model drops a period on any short breath. The tracker's
+          // quiet window decides when a thought is over; the item just keeps growing.
           cur.transcript = (cur.transcript + (e.delta ?? '')).replace(/^\s+/, '')
-          if (/[.!?]["')\]]?$/.test(cur.transcript)) cur.isFinal = true
-          handlers.onTrace?.(cur.isFinal ? 'final' : 'delta', e.delta ?? '')
+          handlers.onTrace?.('delta', e.delta ?? '')
           emit(items.length - 1)
           break
         }

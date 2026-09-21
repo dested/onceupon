@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-20 — faster catch-up, calmer background, better page turns, relaxed pause
+Sal (on v2): too slow with lots queued; doesn't clear when they go inside (table drawn over the house); background moves too much; pause detection too aggressive. Done: reveal lanes (2 or 3 objects drawn at once past ~1s/~2s of backlog); base breathing halved and off for the sky/ground, half again for scenery; both prompts now say every place change (inside, home, bed, school...) is a page turn, with an "inside the house" example in the JSON prompt; live transcriber no longer treats punctuation as done and waits 1100ms of quiet.
+Touched: src/engine/stage.ts, src/llm/json-prompt.ts, src/llm/prompt.ts, src/speech/{openai-realtime,recognition}.ts
+
 ## 2026-09-20 — voice lab: clip save fixed, mic picker, level meter, model comparison
 Sal: "save mic clip" did nothing (lastClip was never assigned); the voice still isn't great and he wants to test it. Fixed the clip; added a mic device picker (Settings → Ears), a live level meter (under the mic and in the debug panel), a transcriber trace with timestamps, and "compare models on clip" (gpt-live-transcribe via socket, gpt-4o-transcribe + whisper-1 via REST) on the last 30s of audio.
 Touched: src/speech/{openai-realtime,recognition,clip-lab}.ts, src/story/{store,session}.ts, src/ui/{DebugPanel,SettingsPanel,StoryScreen}.tsx
