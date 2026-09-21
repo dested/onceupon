@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-20 — always two eyes
+Sal: characters often get one eye. The face helper followed the spec's one-eye-in-profile rule and models nearly always face left/right. Now two eyes always, shifted toward the facing side; the line DSL example and rule say two eyes too.
+Touched: src/engine/face.ts, src/llm/json-prompt.ts, src/llm/prompt.ts
+
 ## 2026-09-20 — transcript no longer stops one word early
 Sal: drawing frequently lags one word. Cause: tracker rules written for Chrome (hold back the last interim word, need 5+ words) applied to the OpenAI live model, whose deltas are append-only and whose finals need sentence punctuation. Now each recognizer configures the tracker: live = release everything after 600ms of quiet.
 Touched: src/speech/recognition.ts, src/story/session.ts

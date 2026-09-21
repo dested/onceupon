@@ -12,7 +12,7 @@ export const JSON_SYSTEM_PROMPT = `You are the crayon inside a picture-book app.
 {"op":"draw","shape":{"id":"body","entity":"bunny","color":"#5b4636","fill":"#f3efe6","path":[["M",-60,0],["C",-60,-120,60,-120,60,0],["Z"]]}}
   One crayon path inside an entity. Coordinates are LOCAL to the entity anchor: negative y is UP, negative x is LEFT. color = outline, fill = colored in (omit fill for a line). Path commands: ["M",x,y] ["L",x,y] ["Q",cx,cy,x,y] ["C",c1x,c1y,c2x,c2y,x,y] ["Z"]. 2..80 commands, starts with M. No circle/rect primitives: a circle is two C curves. One simple closed contour per shape, end with Z. Reusing a shape id replaces that shape. Shapes stack in order: draw rear parts first.
 {"op":"face","id":"bunny","head":"head","facing":"right","expression":"happy"}
-  Eyes and a mouth anchored to the head shape. facing front|left|right, expression happy|surprised|sad. Always give a character a separate closed head shape and then a face; never draw eyes yourself.
+  Two eyes and a mouth anchored to the head shape (facing only shifts them). facing front|left|right, expression happy|surprised|sad. Always give a character a separate closed head shape and then a face; never draw eyes yourself.
 {"op":"move","id":"bunny","x":800,"y":525,"duration":2,"style":"walk"}
   Walk/fly to an absolute paper point. style glide|walk|hop. It turns to face the way it goes.
 {"op":"pose","id":"bunny","action":"celebrate","duration":1.5}

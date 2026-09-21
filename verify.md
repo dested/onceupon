@@ -31,7 +31,7 @@ Type two sentences quickly. The first sentence sits on a yellow highlight while 
 
 ## JSON ops dialect [cheap]
 
-Settings → Drawing language → json ops, then New story. Type the dragon sentence. Expect: paper-colored background, grass strip, a two-tone dragon with one eye and a mouth from the face helper, a house, a sun; the debug panel shows `{"op":...}` lines with no errors. Type `then the dragon flew to the house and the house exploded and the dragon was sad`: move, burst, scribble-out, smoke, a sad mouth (face redrawn without redrawing the body), a bubble. Bookshelf → Play replays it identically.
+Settings → Drawing language → json ops, then New story. Type the dragon sentence. Expect: paper-colored background, grass strip, a two-tone dragon with two eyes and a mouth from the face helper, a house, a sun; the debug panel shows `{"op":...}` lines with no errors. Type `then the dragon flew to the house and the house exploded and the dragon was sad`: move, burst, scribble-out, smoke, a sad mouth (face redrawn without redrawing the body), a bubble. Bookshelf → Play replays it identically.
 
 Direct engine check without a model: `window.__onceupon.director.execute('{"op":"entity",...}')` per line; `director.dialect.snapshot()` returns the JSON the model sees.
 
