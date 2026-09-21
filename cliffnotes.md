@@ -48,7 +48,7 @@ src/
   llm/
     models.ts              provider + preset model list, per-MTok pricing, estimateCost()
     providers.ts           LlmProvider: Anthropic SDK (browser-direct) and OpenAI-compatible SSE (OpenRouter, OpenAI)
-    prompt.ts              SYSTEM_PROMPT (the whole DSL spec + example) and buildUserMessage()
+    prompt.ts              SYSTEM_PROMPT (DSL spec, cookbook, story beats, example) and buildUserBlocks()/storyBlocks() (cached story chunks)
     director.ts            Director: words in -> one streaming call at a time -> execute lines as they land (through a Dialect)
     dialect.ts             Dialect interface, LinesDialect (v1 wrapper over dsl.ts), makeDialect()
     json-dsl.ts            JsonDialect: zod schema for the NDJSON ops contract + translation to engine Commands + JSON scene snapshot
@@ -142,6 +142,7 @@ plans/                     dated working docs
 - **OpenAI Realtime:** the beta shape (`OpenAI-Beta` header, `transcription_session.update`, `openai-beta.realtime-v1` subprotocol) is retired and errors. Transcripts arrive as word deltas ~0.3s after the speaker pauses (server VAD, 450ms), not mid-sentence.
 - **bx tabs are throttled** (rAF ~1/s when unfocused): drawing looks 10x slow there and short effects vanish between frames. Use `stage.setInstant(true)` via `window.__onceupon` for screenshots; timing bugs must be judged in a focused tab.
 - **Resize** re-rasterizes all layers (`Stage.rebuildLayer`). Layers are capped at 4096px.
+- **Prompt caching needs a 4096-token prefix on Haiku 4.5** (1024 on Sonnet 5, 512 on Opus 5). Both system prompts carry a cookbook + story-beat section partly to be useful and partly to clear that bar; below it Anthropic silently caches nothing. The user message is blocks: header, one block per story chunk with the breakpoint on the last (`storyBlocks`), then the per-call tail, so each call reads the earlier story from cache and writes only the new chunk (hits are at block boundaries only). Debug panel shows `in/cacheWrite/cacheRead` per call; verify with the recipe in verify.md if it ever reads 0 again.
 - **Thinking is switched off** for Sonnet 5 / Opus 5 in `providers.ts` for first-token speed.
 - The Anthropic call uses `dangerouslyAllowBrowser`. That is the design for now (localhost). See decisions.md.
 - The only `as` cast in the app is the constructor boundary in `speech/recognition.ts`.

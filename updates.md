@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-20 — get the most out of Anthropic prompt caching
+Sal: make sure we get the most out of caching. Found Haiku 4.5 caches nothing under a 4096-token prefix; both prompts were under. Added a shape cookbook + story-beat recipes to both system prompts (now ~4.2k / ~5.3k tokens), and the user message is now blocks: story chunks as separate blocks with a breakpoint on the last, so the story-so-far reads from cache too. Probed with real calls: system writes once then reads; each story call reads everything but the new chunk.
+Touched: src/llm/{providers,prompt,json-prompt,dialect,json-dsl,director}.ts
+
 ## 2026-09-20 — restart an early call when the sentence continues
 Sal: a pause mid-sentence splits the beat and the rest waits for the next call. Now words arriving while a call has drawn fewer than 3 lines abort it and re-send with the whole text (max twice per beat); aborted calls are marked "restarted" in the debug panel and not counted as spend; a "hold on... drawing all of that" note tells the kid to wait.
 Touched: src/llm/director.ts, src/story/session.ts

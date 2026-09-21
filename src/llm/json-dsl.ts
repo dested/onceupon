@@ -5,7 +5,8 @@ import { BG_ID } from '~/engine/scene'
 import { GROUND_Y, WORLD_W, type AnimKind, type Command, type FxKind, type Shape } from '~/engine/types'
 import { cleanText } from '~/story/clean'
 import type { Dialect, DialectInput, DialectOptions, DialectParse } from './dialect'
-import { buildJsonUserMessage, JSON_SYSTEM_PROMPT, JSON_SYSTEM_PROMPT_UNMODERATED } from './json-prompt'
+import { buildJsonUserBlocks, JSON_SYSTEM_PROMPT, JSON_SYSTEM_PROMPT_UNMODERATED } from './json-prompt'
+import type { PromptBlock } from './providers'
 
 /* ---------- the JSON contract (v1 of the operations doc) ---------- */
 
@@ -170,8 +171,8 @@ export class JsonDialect implements Dialect {
     this.system = opts.moderation ? JSON_SYSTEM_PROMPT : JSON_SYSTEM_PROMPT_UNMODERATED
   }
 
-  buildUser(input: DialectInput): string {
-    return buildJsonUserMessage({ storySoFar: input.storySoFar, sceneJson: this.snapshot(), newWords: input.newWords })
+  buildUser(input: DialectInput): PromptBlock[] {
+    return buildJsonUserBlocks({ storyChunks: input.storyChunks, sceneJson: this.snapshot(), newWords: input.newWords })
   }
 
   isSkip(line: string): boolean {

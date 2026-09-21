@@ -57,6 +57,10 @@ Listen, say a sentence, stop. Debug panel → voice lab: the level bar moved whi
 
 Without a mic (bx): `import('/src/speech/clip-lab.ts')` in the page, feed it PCM16 24k from the OpenAI TTS endpoint (`response_format: 'pcm'`), and call `compareClip(pcm, key)`.
 
+## Prompt cache check [cheap, ~$0.02]
+
+Type two sentences into the app, open the debug panel: call 2's token cell must show a large cache-read part (hover shows `input+writeW+readR`). If it reads 0: Haiku needs a 4096-token prefix; measure the prompt with a tiny script (Anthropic SDK, `system: [{text, cache_control}]`, `max_tokens: 5`, call twice, print `usage.cache_creation_input_tokens` / `cache_read_input_tokens`) and grow the cookbook until the first call writes.
+
 ## Other providers [medium]
 
 Settings → provider openrouter or openai, paste a key, pick a preset, repeat the typed path. Watch

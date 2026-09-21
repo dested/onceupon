@@ -29,6 +29,10 @@
 **Why:** stamping textured dabs along arc length gives wax grain and incremental reveal for free; per-object layers let objects move/scale/flip cheaply; seeding makes replay pixel-identical.
 **Rejected:** rough.js (pen-sketch look, no progressive reveal), SVG (too many nodes).
 
+## 2026-09-20 — Grow the system prompts past Haiku's 4096-token cache minimum with real content
+**Why:** measured: Haiku 4.5 caches nothing below 4096 prefix tokens (our prompts were 1920 / 3238), so every call paid full input price. A cookbook of shapes and story-beat recipes makes the prompts genuinely better and crosses the bar; reads then cost 10%.
+**Rejected:** junk padding (works, but the tokens buy nothing), Sonnet/Opus by default (their minimums are lower but they are slower and dearer per token).
+
 ## 2026-09-20 — JSON ops dialect as a switchable second language, same engine (experiment)
 **Why:** Sal proposed an NDJSON operations contract (1200x620 paper, Bezier-only paths, face helper, poses, recolor, scene keep). Built as a `Dialect` behind the Director so both languages share the renderer, replay, safety and cost plumbing, and can be A/B'd from Settings. Paper coordinates are mapped into the 160x100 world (uniform scale, ground aligned) instead of making the world size configurable, because stroke widths, dab sizes and wobble are tuned in world units.
 **Rejected:** a second renderer (`CrayonRenderer`) per the proposal (duplicates the crayon look and the replay pipeline); a configurable world size (every brush constant would need rescaling).

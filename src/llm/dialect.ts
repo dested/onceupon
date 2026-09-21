@@ -1,7 +1,8 @@
 import { parseLine } from '~/engine/dsl'
 import type { Scene } from '~/engine/scene'
 import type { Command } from '~/engine/types'
-import { buildUserMessage, SYSTEM_PROMPT, SYSTEM_PROMPT_UNMODERATED } from './prompt'
+import { buildUserBlocks, SYSTEM_PROMPT, SYSTEM_PROMPT_UNMODERATED } from './prompt'
+import type { PromptBlock } from './providers'
 import { JsonDialect } from './json-dsl'
 
 export const DIALECT_IDS = ['lines', 'json'] as const
@@ -16,7 +17,8 @@ export const DIALECT_LABELS: Record<DialectId, string> = {
 export type DialectParse = { ok: true; cmds: Command[] } | { ok: false; error: string }
 
 export interface DialectInput {
-  storySoFar: string
+  /** Chunks already sent, in order (cached as a prefix). */
+  storyChunks: string[]
   newWords: string
 }
 
@@ -29,7 +31,7 @@ export interface Dialect {
   readonly id: DialectId
   readonly system: string
   readonly maxTokens: number
-  buildUser(input: DialectInput): string
+  buildUser(input: DialectInput): PromptBlock[]
   parse(line: string): DialectParse
   isSkip(line: string): boolean
   /** Commands the dialect wants applied later (a pose ending, a hop settling). Set by the Director. */
@@ -60,8 +62,8 @@ export class LinesDialect implements Dialect {
     this.system = opts.moderation ? SYSTEM_PROMPT : SYSTEM_PROMPT_UNMODERATED
   }
 
-  buildUser(input: DialectInput): string {
-    return buildUserMessage({ storySoFar: input.storySoFar, sceneSummary: this.scene.summary(), newWords: input.newWords })
+  buildUser(input: DialectInput): PromptBlock[] {
+    return buildUserBlocks({ storyChunks: input.storyChunks, sceneSummary: this.scene.summary(), newWords: input.newWords })
   }
 
   parse(line: string): DialectParse {
