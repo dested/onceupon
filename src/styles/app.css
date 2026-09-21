@@ -1,0 +1,30 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-hand: 'Patrick Hand', 'Comic Sans MS', cursive;
+  --font-scrawl: 'Gloria Hallelujah', 'Patrick Hand', cursive;
+  --color-paper: #fbf6ea;
+  --color-paper-deep: #efe6d2;
+  --color-ink: #3b2f2f;
+  --color-ink-soft: #8a7a6a;
+  --color-crayon-red: #ef4444;
+  --color-crayon-blue: #3b82f6;
+  --color-crayon-yellow: #fbbf24;
+  --color-crayon-green: #22c55e;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-hand);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
