@@ -281,33 +281,87 @@ export class ReplaySession {
     this.record = getStory(storyId)
     const seed = this.record?.seed ?? 1
     this.stage = new Stage(canvas, { seed, audio: null })
+    this.director = this.freshDirector()
+    this.stage.start()
+    appStore.set({ transcriptFinal: '', transcriptInterim: '', pages: [], replayCaption: '', replayPos: 0, replayLen: this.record?.events.length ?? 0 })
+  }
+
+  /** A clean scene + director for this record's dialect; the stage's page snapshots follow it. */
+  private freshDirector(): Director {
     const scene = new Scene()
     const dialectId = this.record?.dialect
-    this.director = new Director({
+    const director = new Director({
       scene,
       stage: this.stage,
       dialect: makeDialect(dialectId && isDialectId(dialectId) ? dialectId : 'lines', scene),
       getProvider: () => null,
       onEvent: () => undefined,
     })
-    this.stage.start()
-    appStore.set({ transcriptFinal: '', transcriptInterim: '', pages: [], replayCaption: '' })
     this.stage.onPageSnapshot = (thumb, pageIndex) => {
       const title = scene.pages[pageIndex - 1]?.title ?? ''
       appStore.set((s) => ({ pages: [...s.pages, { index: pageIndex, title, thumb }] }))
     }
+    return director
+  }
+
+  private makeReplayer(record: StoryRecord): Replayer {
+    return new Replayer(record, this.director, {
+      onWords: (final, chunk) => appStore.set({ transcriptFinal: final, replayCaption: chunk }),
+      onProgress: (i) => appStore.set({ replayPos: i }),
+      onDone: () => appStore.set({ replayPlaying: false }),
+    })
   }
 
   play(): void {
     if (!this.record) return
     this.replayer?.stop()
-    this.replayer = new Replayer(this.record, this.director, {
-      onWords: (final, chunk) => appStore.set({ transcriptFinal: final, replayCaption: chunk }),
-      onProgress: () => undefined,
-      onDone: () => appStore.set({ replayPlaying: false }),
-    })
+    this.replayer = this.makeReplayer(this.record)
     appStore.set({ replayPlaying: true })
     this.replayer.play()
+  }
+
+  pause(): void {
+    this.replayer?.stop()
+    appStore.set({ replayPlaying: false })
+  }
+
+  resume(): void {
+    if (!this.record) return
+    if (!this.replayer) this.replayer = this.makeReplayer(this.record)
+    if (this.replayer.position >= this.replayer.length) this.seek(0)
+    appStore.set({ replayPlaying: true })
+    this.replayer.play()
+  }
+
+  /**
+   * Scrub: rebuild the page instantly through event i (fresh scene, every line re-executed with
+   * the stage settling at the end) and continue from there in whatever play state we were in.
+   */
+  seek(i: number): void {
+    if (!this.record) return
+    const playing = appStore.get().replayPlaying
+    this.replayer?.stop()
+    this.director.stop()
+    this.stage.clear()
+    appStore.set({ pages: [] })
+    this.director = this.freshDirector()
+    const events = this.record.events
+    const to = Math.max(0, Math.min(events.length, i))
+    const words: string[] = []
+    this.stage.setInstant(true)
+    for (let k = 0; k < to; k++) {
+      const ev = events[k]
+      if (!ev) break
+      if (ev.k === 'words') words.push(ev.text)
+      else this.director.execute(ev.line)
+    }
+    this.stage.settle()
+    this.stage.setInstant(false)
+    appStore.set({ transcriptFinal: words.join(' '), replayCaption: words[words.length - 1] ?? '', replayPos: to })
+    this.replayer = this.makeReplayer(this.record)
+    this.replayer.seek(to)
+    if (playing && to < events.length) this.replayer.play()
+    else if (to >= events.length) appStore.set({ replayPlaying: false })
   }
 
   resize(): void {

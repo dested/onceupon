@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-20 — replay scrubber
+Sal: let me scrub around in playback. Added a slider + play/pause on the replay screen. Seek rebuilds the page through event i with a fresh scene/director in instant mode, then `Stage.settle()` finishes strokes, snaps tweens, drops effects; playback continues from there.
+Touched: src/story/session.ts, src/story/replay.ts, src/story/store.ts, src/engine/stage.ts, src/engine/fx.ts, src/ui/ReplayScreen.tsx
+
 ## 2026-09-20 — always two eyes
 Sal: characters often get one eye. The face helper followed the spec's one-eye-in-profile rule and models nearly always face left/right. Now two eyes always, shifted toward the facing side; the line DSL example and rule say two eyes too.
 Touched: src/engine/face.ts, src/llm/json-prompt.ts, src/llm/prompt.ts
