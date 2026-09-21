@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-20 — voice lab: clip save fixed, mic picker, level meter, model comparison
+Sal: "save mic clip" did nothing (lastClip was never assigned); the voice still isn't great and he wants to test it. Fixed the clip; added a mic device picker (Settings → Ears), a live level meter (under the mic and in the debug panel), a transcriber trace with timestamps, and "compare models on clip" (gpt-live-transcribe via socket, gpt-4o-transcribe + whisper-1 via REST) on the last 30s of audio.
+Touched: src/speech/{openai-realtime,recognition,clip-lab}.ts, src/story/{store,session}.ts, src/ui/{DebugPanel,SettingsPanel,StoryScreen}.tsx
+
 ## 2026-09-20 — replay scrubber
 Sal: let me scrub around in playback. Added a slider + play/pause on the replay screen. Seek rebuilds the page through event i with a fresh scene/director in instant mode, then `Stage.settle()` finishes strokes, snaps tweens, drops effects; playback continues from there.
 Touched: src/story/session.ts, src/story/replay.ts, src/story/store.ts, src/engine/stage.ts, src/engine/fx.ts, src/ui/ReplayScreen.tsx
