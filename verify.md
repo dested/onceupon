@@ -4,8 +4,19 @@
 
 ```
 bun run typecheck
-bun run dev            # http://localhost:7710
+bun scripts/tracker-check.ts   # tracker dedupe/correction regression; prints a table, exits 1 on mismatch
+bun run dev                    # http://localhost:7710
 ```
+
+## The End finale [cheap]
+
+Type `Once upon a time a dragon lived in a castle. The End`, Enter. Expect: the dragon-and-castle
+scene draws, then a handwritten "The End" title reveals across the upper page with a star/sparkle
+burst; the mic button and typed input are gone; the status reads `the end!`; a closing card
+(`[data-testid=the-end-card]`) shows "play it again" and "new story". "play it again" opens this
+story's replay; the replay ends with the same finale. Bookshelf → Play does the same. In a replay,
+scrub to the end: the finale shows settled. bx: `bx fill typed "Once upon a time a dragon lived in a
+castle. The End"`, `bx press Enter`, `bx wait 6000`, `bx snap`, then `bx exists "[data-testid=the-end-card]"`.
 
 ## Typed story path [cheap]
 
@@ -19,6 +30,10 @@ Needs an Anthropic key in `.env.local` or Settings.
 
 With bx: `bx open http://localhost:7710`, `bx fill typed "<sentence>"`, `bx press Enter`, `bx wait 7000`, `bx snap`.
 
+## Debug report [cheap]
+
+After any beat, debug panel → "copy report" reads "copied" for 2s and the clipboard holds a text report starting `# Once Upon debug report`; the timeline section lists `words`, `call#n sent / first token / done` and one `cmd` row per DSL line with increasing ms. From bx (no clipboard): `bx js "window.__onceupon.report()"`. With a mic session, `ears delta/final` rows interleave with the calls; a beat that started while still talking shows `call#n sent` before the last `ears delta` of that sentence.
+
 ## Kid-safety skip [cheap]
 
 1. Type: `a bunny and a fox went to the bathroom together`, Enter.
@@ -28,6 +43,12 @@ With bx: `bx open http://localhost:7710`, `bx fill typed "<sentence>"`, `bx pres
 ## Subtitle states [cheap]
 
 Type two sentences quickly. The first sentence sits on a yellow highlight while its call streams (`[data-testid=subtitles-drawing]`); the second is grey (`subtitles-waiting`) until its own call starts. Mic status reads "drawing the yellow bit! keep going".
+
+## ops dialect (default) [cheap]
+
+New story (Settings → Drawing language shows `ops`). Type `Once upon a time a big green dragon lived in a castle with a princess`. Expect: grass strip, a green dragon with two mirrored wings and legs and a face, a princess (dress, crown, face), a castle with two mirrored towers and a flag, a sun with rays; debug panel shows `ent`/`draw`/`face` lines, no red ones, ~650 output tokens. Type `then the dragon flew to the beach and ate a giant ice cream`: `scene ... clear keep=dragon`, sand + water, an ice cream, `move` glide, `fx burst`, `rm icecream`, `say`, ~300 output tokens. Bookshelf → Play replays it identically.
+
+Parser harness without a model (Sonnet not needed): a bun script that imports `parseOpsLine`/`OpsDialect` from `src/llm/ops-dsl.ts`, feeds every line of the prompt's `# Example` through `dialect.parse` and applies the commands to a `Scene`; expect 0 failures. Direct engine check in the page: `window.__onceupon.director.execute('ent bunny 350 525 "bunny"')`, then `execute('draw bunny.head brown white circle 0 -170 48')`; `director.dialect.snapshot()` returns the terse page description the model sees.
 
 ## JSON ops dialect [cheap]
 
@@ -47,9 +68,13 @@ With an OpenAI key set, Settings → Ears is auto = OpenAI Realtime (words appea
 interim words lighter; on the pause the drawing starts. Keep talking through a call: words queue
 and go out together.
 
+Deepgram variant: Settings → Ears → Deepgram (key in Settings → Keys or `VITE_DEEPGRAM_API_KEY`; model `nova-3`). Auto resolves to OpenAI when both keys are set, so pick Deepgram explicitly. Click the mic and speak; the mic flips to "listening" on socket open (readiness is the socket `open` event, not `Metadata`, which Deepgram sends at stream end), words stream in like the OpenAI live path. Talk through a whole sentence with natural breaths: the subtitle stays grey (no yellow) until you stop; the voice lab trace shows `delta ... (settled)` lines mid-sentence and one `final ... (speech_final)` (or `(utterance_end)`) when you stop, and the drawing starts then. Hum or keep talking without pausing for 14+ words: it still releases (max-words cap). With no Deepgram key, choosing Deepgram and clicking the mic shows a `speech:` warning (a red dot on the bug icon) and does not crash.
+
+Socket ground-truth without a mic (works headless, no getUserMedia): `bun scripts/probe-deepgram.ts` (Bun loads `.env.local`; reads `DEEPGRAM_API_KEY` or `VITE_DEEPGRAM_API_KEY`). With no WAV argument it synthesizes a sentence via OpenAI TTS (`VITE_OPENAI_API_KEY`, `response_format: 'pcm'`) and streams it; pass a WAV path (e.g. the app's "save clip") to stream real audio. It prints every Results/UtteranceEnd with ms. Last run: interim words from ~1.1s, two `is_final` segments, `Metadata` + `close 1000` at the end. In a headless browser (bx) the socket opens and the `ready` trace fires (~200ms), but `onReady`/"listening" needs a real microphone, so confirm the live mic on a human's machine.
+
 ## Ears cost [cheap, needs a mic]
 
-Listen for a minute with OpenAI ears. The spend chip grows an `ears ~$0.006 (1.0 min)` part; the debug panel shows minutes sent. Settings → "Transcription price" changes the rate live.
+Listen for a minute. The spend chip grows an `ears ~$… (1.0 min)` part at the resolved vendor's rate (`~$0.017` for OpenAI live, `~$0.0077` for Deepgram); the debug panel shows minutes sent. Settings → "Transcription price" overrides the rate live; its "reset" button returns to the vendor default.
 
 ## Voice lab [medium, needs a mic, ~$0.02]
 

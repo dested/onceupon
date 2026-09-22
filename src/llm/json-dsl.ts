@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { faceShapes } from '~/engine/face'
 import type { Scene } from '~/engine/scene'
 import { BG_ID } from '~/engine/scene'
+import { isStampName, stampShapes } from '~/engine/stamps'
 import { GROUND_Y, WORLD_W, type AnimKind, type Command, type FxKind, type Shape } from '~/engine/types'
 import { cleanText } from '~/story/clean'
 import type { Dialect, DialectInput, DialectOptions, DialectParse } from './dialect'
@@ -17,7 +18,7 @@ const PAPER_GROUND = 525
 const K = WORLD_W / PAPER_W
 /** Vertical offset that puts the paper's ground line on the world's. */
 const OY = GROUND_Y - PAPER_GROUND * K
-const DEFAULT_BACKGROUND = '#faf5ec'
+export const DEFAULT_BACKGROUND = '#faf5ec'
 
 const idSchema = z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,47}$/)
 const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/)
@@ -30,23 +31,49 @@ const pathCmdSchema = z.union([
   z.tuple([z.literal('C'), num, num, num, num, num, num]),
   z.tuple([z.literal('Z')]),
 ])
-type PathCmd = z.infer<typeof pathCmdSchema>
+export type PathCmd = z.infer<typeof pathCmdSchema>
 
-const shapeSchema = z.object({
-  id: idSchema,
-  entity: idSchema,
-  color: colorSchema,
-  fill: colorSchema.optional(),
-  width: z.number().min(1).max(24).optional(),
-  path: z.array(pathCmdSchema).min(2).max(80),
-  motion: z.enum(['none', 'flap', 'wag', 'blink', 'sway']).optional(),
-  pivot: z.tuple([num, num]).optional(),
-})
+/**
+ * A shape carries exactly one geometry. `path` is the original contract; the primitives, `poly`
+ * and `stamp` are additive (the ops dialect teaches them, JSON may use them too).
+ */
+const GEOMETRY_KEYS = ['path', 'circle', 'oval', 'rect', 'poly', 'stamp'] as const
+const shapeSchema = z
+  .object({
+    id: idSchema,
+    entity: idSchema,
+    color: colorSchema,
+    fill: colorSchema.optional(),
+    width: z.number().min(1).max(24).optional(),
+    path: z.array(pathCmdSchema).min(2).max(80).optional(),
+    /** cx cy r */
+    circle: z.tuple([num, num, num]).optional(),
+    /** cx cy rx ry */
+    oval: z.tuple([num, num, num, num]).optional(),
+    /** top-left x y, w h */
+    rect: z.tuple([num, num, num, num]).optional(),
+    /** x y pairs, closed */
+    poly: z.array(num).min(6).max(80).optional(),
+    /** prefab scenery from the crayon box, placed inside the entity */
+    stamp: z.object({ name: z.string().refine(isStampName), x: num, y: num, size: z.number().min(2).max(1200) }).optional(),
+    /** also draw the x-mirror (two ears, two legs) */
+    mirror: z.boolean().optional(),
+    motion: z.enum(['none', 'flap', 'wag', 'blink', 'sway']).optional(),
+    pivot: z.tuple([num, num]).optional(),
+  })
+  .refine((s) => GEOMETRY_KEYS.filter((k) => s[k] !== undefined).length === 1, {
+    message: 'shape needs exactly one of path, circle, oval, rect, poly, stamp',
+  })
+export type ShapeOp = z.infer<typeof shapeSchema>
 
 const IDLE = ['none', 'breathe', 'float', 'sway'] as const
 const MOVE_STYLE = ['glide', 'walk', 'hop'] as const
 const POSE = ['shake', 'jump', 'spin', 'celebrate'] as const
-const EFFECT = ['burst', 'smoke', 'sparkles', 'rain'] as const
+const EFFECT = ['burst', 'smoke', 'sparkles', 'rain', 'hearts', 'fire', 'stars', 'poof'] as const
+const FACING = ['front', 'left', 'right'] as const
+const EXPRESSION = ['happy', 'surprised', 'sad'] as const
+/** Word lists shared with the terse ops parser. */
+export const OPS_VOCAB = { idle: IDLE, moveStyle: MOVE_STYLE, pose: POSE, effect: EFFECT, facing: FACING, expression: EXPRESSION }
 
 export const operationSchema = z.discriminatedUnion('op', [
   z.object({
@@ -64,8 +91,8 @@ export const operationSchema = z.discriminatedUnion('op', [
     op: z.literal('face'),
     id: idSchema,
     head: idSchema,
-    facing: z.enum(['front', 'left', 'right']).default('right'),
-    expression: z.enum(['happy', 'surprised', 'sad']).default('happy'),
+    facing: z.enum(FACING).default('right'),
+    expression: z.enum(EXPRESSION).default('happy'),
   }),
   z.object({
     op: z.literal('move'),
@@ -77,7 +104,14 @@ export const operationSchema = z.discriminatedUnion('op', [
   }),
   z.object({ op: z.literal('pose'), id: idSchema, action: z.enum(POSE), duration: z.number().min(0.2).max(8).default(2) }),
   z.object({ op: z.literal('recolor'), id: idSchema, from: colorSchema.optional(), color: colorSchema }),
-  z.object({ op: z.literal('effect'), kind: z.enum(EFFECT), x: num, y: num, color: colorSchema.optional(), size: z.number().min(10).max(250).default(70) }),
+  z.object({
+    op: z.literal('effect'),
+    kind: z.enum(EFFECT),
+    x: num,
+    y: num,
+    color: colorSchema.optional(),
+    size: z.number().min(10).max(250).default(70),
+  }),
   z.object({ op: z.literal('remove'), id: idSchema }),
   z.object({
     op: z.literal('scene'),
@@ -109,9 +143,36 @@ interface EntityMeta {
   shapes: Map<string, ShapeMeta>
 }
 
+/** What the model is told about the page, in paper units. Each dialect renders it its own way. */
+export interface SceneSnapshot {
+  page: number
+  title: string
+  background: string
+  entities: {
+    id: string
+    name: string
+    x: number
+    y: number
+    scale: number
+    idle: (typeof IDLE)[number]
+    layer: number
+    facing: 'left' | 'right'
+    shapes: { id: string; color: string; fill?: string }[]
+  }[]
+}
+
 const IDLE_ANIM: Record<(typeof IDLE)[number], AnimKind> = { none: 'none', breathe: 'bob', float: 'fly', sway: 'wobble' }
 const POSE_ANIM: Record<(typeof POSE)[number], AnimKind> = { shake: 'shake', jump: 'bounce', spin: 'spin', celebrate: 'bounce' }
-const EFFECT_FX: Record<(typeof EFFECT)[number], FxKind> = { burst: 'explode', smoke: 'smoke', sparkles: 'sparkle', rain: 'rain' }
+const EFFECT_FX: Record<(typeof EFFECT)[number], FxKind> = {
+  burst: 'explode',
+  smoke: 'smoke',
+  sparkles: 'sparkle',
+  rain: 'rain',
+  hearts: 'hearts',
+  fire: 'fire',
+  stars: 'stars',
+  poof: 'poof',
+}
 
 const f2 = (n: number): string => (Math.round(n * 100) / 100).toString()
 
@@ -137,6 +198,63 @@ function pathToSvg(path: PathCmd[]): string {
   return parts.join(' ')
 }
 
+function mirrorPath(path: PathCmd[]): PathCmd[] {
+  return path.map((c): PathCmd => {
+    switch (c[0]) {
+      case 'M':
+      case 'L':
+        return [c[0], -c[1], c[2]]
+      case 'Q':
+        return ['Q', -c[1], c[2], -c[3], c[4]]
+      case 'C':
+        return ['C', -c[1], c[2], -c[3], c[4], -c[5], c[6]]
+      case 'Z':
+        return c
+    }
+  })
+}
+
+/** One geometry pass in local world units (fill pass or outline pass). */
+function geometryShape(s: ShapeOp, color: string, fill: boolean, mirrored: boolean): Shape[] {
+  const mx = mirrored ? -1 : 1
+  if (s.path) return [{ k: 'path', d: pathToSvg(mirrored ? mirrorPath(s.path) : s.path), color, fill }]
+  if (s.circle) {
+    const [cx, cy, r] = s.circle
+    return [{ k: 'circle', cx: cx * K * mx, cy: cy * K, r: Math.abs(r) * K, color, fill }]
+  }
+  if (s.oval) {
+    const [cx, cy, rx, ry] = s.oval
+    return [{ k: 'ellipse', cx: cx * K * mx, cy: cy * K, rx: Math.abs(rx) * K, ry: Math.abs(ry) * K, color, fill }]
+  }
+  if (s.rect) {
+    const [x, y, w, h] = s.rect
+    const left = mirrored ? -(x + w) : x
+    return [{ k: 'rect', x: left * K, y: y * K, w: Math.abs(w) * K, h: Math.abs(h) * K, color, fill }]
+  }
+  if (s.poly) {
+    const pts = []
+    for (let i = 0; i + 1 < s.poly.length; i += 2) pts.push({ x: (s.poly[i] ?? 0) * K * mx, y: (s.poly[i + 1] ?? 0) * K })
+    return [{ k: 'poly', pts, color, fill, closed: true }]
+  }
+  if (s.stamp) return stampShapes(s.stamp.name, s.stamp.x * K * mx, s.stamp.y * K, s.stamp.size * K, fill ? color : undefined)
+  return []
+}
+
+/** Engine shapes for a draw op: fill pass then outline pass (and the mirror of both). */
+function shapeToEngine(s: ShapeOp): Shape[] {
+  const out: Shape[] = []
+  const sides = s.mirror ? [false, true] : [false]
+  for (const mirrored of sides) {
+    if (s.stamp) {
+      out.push(...geometryShape(s, s.fill ?? s.color, s.fill !== undefined, mirrored))
+      continue
+    }
+    if (s.fill) out.push(...geometryShape(s, s.fill, true, mirrored))
+    if (!s.fill || s.fill.toLowerCase() !== s.color.toLowerCase()) out.push(...geometryShape(s, s.color, false, mirrored))
+  }
+  return out
+}
+
 function isLight(hex: string): boolean {
   const n = Number.parseInt(hex.slice(1), 16)
   if (!Number.isFinite(n)) return false
@@ -155,6 +273,7 @@ const toPaperY = (y: number): number => Math.round((y - OY) / K)
  * The JSON operations dialect: NDJSON operations with curved paths, a face helper, poses and
  * recolors, mapped onto the same crayon engine. Keeps its own table of entity names and shape
  * ids so shapes can be replaced by id and the scene can be described back as JSON.
+ * The ops dialect composes this class: same operations, terser wire syntax.
  */
 export class JsonDialect implements Dialect {
   readonly id = 'json' as const
@@ -194,18 +313,27 @@ export class JsonDialect implements Dialect {
     } catch {
       return { ok: false, error: `not JSON: ${text.slice(0, 80)}` }
     }
+    return this.applyRaw(raw, text)
+  }
+
+  /** Validate an untyped operation against the contract and run it. */
+  applyRaw(raw: unknown, source: string): DialectParse {
     const res = operationSchema.safeParse(raw)
     if (!res.success) {
       const issue = res.error.issues[0]
-      return { ok: false, error: `${issue ? `${issue.path.join('.')}: ${issue.message}` : 'invalid operation'} in ${text.slice(0, 80)}` }
+      return { ok: false, error: `${issue ? `${issue.path.join('.')}: ${issue.message}` : 'invalid operation'} in ${source.slice(0, 80)}` }
     }
-    return this.translate(res.data)
+    return this.apply(res.data)
   }
 
   /** The scene as JSON for the model: paper coordinates, entity names, shape ids and colors. */
   snapshot(): string {
+    return JSON.stringify(this.snapshotData())
+  }
+
+  snapshotData(): SceneSnapshot {
     const p = this.scene.page
-    const entities: unknown[] = []
+    const entities: SceneSnapshot['entities'] = []
     for (const obj of this.scene.objects.values()) {
       if (obj.id === BG_ID) continue
       const meta = this.ents.get(obj.id)
@@ -221,7 +349,7 @@ export class JsonDialect implements Dialect {
         shapes: meta ? [...meta.shapes.values()].map((s) => (s.fill ? { id: s.id, color: s.color, fill: s.fill } : { id: s.id, color: s.color })) : [],
       })
     }
-    return JSON.stringify({ page: p.index, title: p.title, background: p.sky ?? DEFAULT_BACKGROUND, entities })
+    return { page: p.index, title: p.title, background: p.sky ?? DEFAULT_BACKGROUND, entities }
   }
 
   private schedule(ms: number, cmds: Command[]): void {
@@ -252,7 +380,7 @@ export class JsonDialect implements Dialect {
     return out
   }
 
-  private translate(op: Operation): DialectParse {
+  apply(op: Operation): DialectParse {
     switch (op.op) {
       case 'skip':
         return { ok: true, cmds: [{ k: 'skip' }] }
@@ -271,10 +399,7 @@ export class JsonDialect implements Dialect {
         const s = op.shape
         const meta = this.ents.get(s.entity)
         if (!meta || !this.scene.objects.has(s.entity)) return { ok: false, error: `draw: no entity "${s.entity}" on this page` }
-        const d = pathToSvg(s.path)
-        const shapes: Shape[] = []
-        if (s.fill) shapes.push({ k: 'path', d, color: s.fill, fill: true })
-        if (!s.fill || s.fill.toLowerCase() !== s.color.toLowerCase()) shapes.push({ k: 'path', d, color: s.color, fill: false })
+        const shapes = shapeToEngine(s)
         const replacing = meta.shapes.has(s.id)
         meta.shapes.set(s.id, { id: s.id, color: s.color, fill: s.fill, shapes })
         if (replacing) return { ok: true, cmds: [{ k: 'reset', id: s.entity, shapes: this.allShapes(meta) }] }

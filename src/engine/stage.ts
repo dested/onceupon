@@ -3,7 +3,14 @@ import { CrayonBrush, type LayerXform } from './brush'
 import { FxSystem } from './fx'
 import { makePaper } from './paper'
 import { hashString, mulberry32, noise1 } from './rng'
-import { shapeBounds, shapeToStrokes, pointAt, unionBounds, type Bounds, type Stroke } from './geometry'
+import {
+  shapeBounds,
+  shapeToStrokes,
+  pointAt,
+  unionBounds,
+  type Bounds,
+  type Stroke,
+} from './geometry'
 import { BG_ID, type SceneEvent } from './scene'
 import { darken } from './colors'
 import type { CrayonAudio } from './audio'
@@ -46,6 +53,8 @@ interface ObjView {
   dying: { t0: number; dur: number } | null
   alpha: number
   z: number
+  /** The finale title breathes with nothing (a fixed closing card), unlike living characters. */
+  noLife: boolean
 }
 
 interface Bubble {
@@ -80,6 +89,9 @@ const CATCHUP_SECONDS = 2.2
 const LANE2_AT = 600
 const LANE3_AT = 1200
 const REST: Vec = { x: 152, y: 94 }
+const FINALE_ID = '__finale'
+/** "The End" ink; a crayon-box dark, never a UI token. */
+const FINALE_INK = '#2b2626'
 
 function easeInOut(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2
@@ -117,8 +129,17 @@ export class Stage {
   private seed: number
   private instant = false
   private drawingNow = false
+  /** The closing "The End" title: resolves once its last stroke is revealed, then bursts fire. */
+  private finaleState: { id: string; seed: number; resolve: () => void; done: boolean } | null =
+    null
   private audio: CrayonAudio | null
-  stats: StageStats = { pendingStrokes: 0, pendingLength: 0, revealSpeed: 0, lanes: 1, drawing: false }
+  stats: StageStats = {
+    pendingStrokes: 0,
+    pendingLength: 0,
+    revealSpeed: 0,
+    lanes: 1,
+    drawing: false,
+  }
   onPageSnapshot: ((dataUrl: string, pageIndex: number) => void) | null = null
   onIdle: (() => void) | null = null
   private wasBusy = false
@@ -208,6 +229,7 @@ export class Stage {
       dying: null,
       alpha: 1,
       z: this.zCounter++,
+      noLife: false,
     }
     this.views.set(id, v)
     return v
@@ -245,7 +267,8 @@ export class Stage {
         v.lctx = null
         v.layerBounds = null
         v.contentBounds = null
-        for (const s of ev.shapes.slice(0, keep)) v.contentBounds = unionBounds(v.contentBounds, shapeBounds(s))
+        for (const s of ev.shapes.slice(0, keep))
+          v.contentBounds = unionBounds(v.contentBounds, shapeBounds(s))
         this.rebuildLayer(v)
         this.addShapes(v, ev.shapes.slice(keep), {})
         break
@@ -305,7 +328,13 @@ export class Stage {
         break
       case 'say':
         this.bubbles = this.bubbles.filter((b) => b.id !== ev.id)
-        this.bubbles.push({ id: ev.id, text: ev.text, t0: now, ttl: 3500 + ev.text.length * 60, seed: hashString(ev.text) })
+        this.bubbles.push({
+          id: ev.id,
+          text: ev.text,
+          t0: now,
+          ttl: 3500 + ev.text.length * 60,
+          seed: hashString(ev.text),
+        })
         break
       case 'bg': {
         const old = this.view(BG_ID)
@@ -315,8 +344,19 @@ export class Stage {
         }
         const v = this.newView(BG_ID, 0, 0)
         v.z = -1e9
-        const shapes: Shape[] = [{ k: 'rect', x: -2, y: -2, w: WORLD_W + 4, h: GROUND_Y + 2, color: ev.sky, fill: true }]
-        if (ev.ground) shapes.push({ k: 'rect', x: -2, y: GROUND_Y, w: WORLD_W + 4, h: WORLD_H - GROUND_Y + 2, color: ev.ground, fill: true })
+        const shapes: Shape[] = [
+          { k: 'rect', x: -2, y: -2, w: WORLD_W + 4, h: GROUND_Y + 2, color: ev.sky, fill: true },
+        ]
+        if (ev.ground)
+          shapes.push({
+            k: 'rect',
+            x: -2,
+            y: GROUND_Y,
+            w: WORLD_W + 4,
+            h: WORLD_H - GROUND_Y + 2,
+            color: ev.ground,
+            fill: true,
+          })
         this.addShapes(v, shapes, { speedMul: 9, wobbleAmp: 0.6, background: true })
         break
       }
@@ -338,13 +378,20 @@ export class Stage {
     }
   }
 
-  private addShapes(v: ObjView, shapes: Shape[], opts: { speedMul?: number; wobbleAmp?: number; background?: boolean }): void {
+  private addShapes(
+    v: ObjView,
+    shapes: Shape[],
+    opts: { speedMul?: number; wobbleAmp?: number; background?: boolean }
+  ): void {
     for (const s of shapes) v.contentBounds = unionBounds(v.contentBounds, shapeBounds(s))
     if (v.contentBounds) this.ensureLayer(v, v.contentBounds)
     for (const s of shapes) {
       const seed = hashString(`${this.seed}:${v.id}:${v.strokes.length}`)
       const rng = mulberry32(seed)
-      const strokes = shapeToStrokes(s, rng, { speedMul: opts.speedMul ?? 1, wobbleAmp: opts.wobbleAmp ?? 0.35 })
+      const strokes = shapeToStrokes(s, rng, {
+        speedMul: opts.speedMul ?? 1,
+        wobbleAmp: opts.wobbleAmp ?? 0.35,
+      })
       if (opts.background) for (const st of strokes) st.alpha *= 0.75
       for (const st of strokes) {
         const idx = v.strokes.length
@@ -358,9 +405,22 @@ export class Stage {
 
   private ensureLayer(v: ObjView, bounds: Bounds): void {
     const pad = 3
-    const want: Bounds = { minX: bounds.minX - pad, minY: bounds.minY - pad, maxX: bounds.maxX + pad, maxY: bounds.maxY + pad }
+    const want: Bounds = {
+      minX: bounds.minX - pad,
+      minY: bounds.minY - pad,
+      maxX: bounds.maxX + pad,
+      maxY: bounds.maxY + pad,
+    }
     const cur = v.layerBounds
-    if (v.layer && cur && want.minX >= cur.minX && want.minY >= cur.minY && want.maxX <= cur.maxX && want.maxY <= cur.maxY) return
+    if (
+      v.layer &&
+      cur &&
+      want.minX >= cur.minX &&
+      want.minY >= cur.minY &&
+      want.maxX <= cur.maxX &&
+      want.maxY <= cur.maxY
+    )
+      return
     const nb = cur ? unionBounds(cur, want) : want
     const maxUnits = 4096 / this.S
     const w = Math.min(maxUnits, nb.maxX - nb.minX)
@@ -370,7 +430,8 @@ export class Stage {
     layer.height = Math.max(1, Math.ceil(h * this.S))
     const lctx = layer.getContext('2d')
     if (!lctx) return
-    if (v.layer && cur) lctx.drawImage(v.layer, (cur.minX - nb.minX) * this.S, (cur.minY - nb.minY) * this.S)
+    if (v.layer && cur)
+      lctx.drawImage(v.layer, (cur.minX - nb.minX) * this.S, (cur.minY - nb.minY) * this.S)
     v.layer = layer
     v.lctx = lctx
     v.layerBounds = nb
@@ -392,7 +453,15 @@ export class Stage {
     }
   }
 
-  private paint(v: ObjView, st: Stroke, idx: number, s0: number, s1: number, charsTo: number, charsFrom: number): void {
+  private paint(
+    v: ObjView,
+    st: Stroke,
+    idx: number,
+    s0: number,
+    s1: number,
+    charsTo: number,
+    charsFrom: number
+  ): void {
     if (!v.lctx) return
     if (st.kind === 'text') {
       if (charsTo > charsFrom) this.brush.stampTextRange(v.lctx, st, charsFrom, charsTo, v.xform)
@@ -423,7 +492,10 @@ export class Stage {
     const pending = this.pendingLength()
     // Catch-up speed is set by the backlog and HELD until the queue drains; recomputing it every
     // frame from what is left made the tail crawl (speed fell with the remaining work).
-    this.speedHold = Math.max(this.speedHold, Math.min(MAX_SPEED, Math.max(OUTLINE_SPEED, pending / CATCHUP_SECONDS)))
+    this.speedHold = Math.max(
+      this.speedHold,
+      Math.min(MAX_SPEED, Math.max(OUTLINE_SPEED, pending / CATCHUP_SECONDS))
+    )
     const speed = this.instant ? Infinity : this.speedHold
     this.stats.revealSpeed = speed
     // A big backlog gets more crayons: each lane draws a different object at full speed.
@@ -449,7 +521,10 @@ export class Stage {
     let laneId: string | null = null
     while (budget > 0 && this.queue.length > 0) {
       const want = laneId
-      let qi: number = want === null ? this.queue.findIndex((e) => !taken.has(e.id)) : this.queue.findIndex((e) => e.id === want)
+      let qi: number =
+        want === null
+          ? this.queue.findIndex((e) => !taken.has(e.id))
+          : this.queue.findIndex((e) => e.id === want)
       if (qi < 0 && laneId !== null) {
         laneId = null
         qi = this.queue.findIndex((e) => !taken.has(e.id))
@@ -500,13 +575,16 @@ export class Stage {
     return head
   }
 
-  private objectTransform(v: ObjView, now: number): { x: number; y: number; sx: number; sy: number; rot: number } {
+  private objectTransform(
+    v: ObjView,
+    now: number
+  ): { x: number; y: number; sx: number; sy: number; rot: number } {
     const t = (now - v.animT0) / 1000
     const bt = now / 1000 + v.breathPhase * 10
     let dx = 0
     let dy = 0
-    // Everything alive breathes a little; scenery half as much, the sky/ground not at all.
-    const life = v.id === BG_ID ? 0 : v.z < 0 ? 0.5 : 1
+    // Everything alive breathes a little; scenery half as much, the sky/ground and finale not at all.
+    const life = v.id === BG_ID || v.noLife ? 0 : v.z < 0 ? 0.5 : 1
     let rot = Math.sin(bt * 0.9) * 0.006 * life
     let breath = 1 + Math.sin(bt * 1.3) * 0.006 * life
     switch (v.anim) {
@@ -581,15 +659,24 @@ export class Stage {
     if (v.anim === 'spin') {
       // A spinning thing sweeps a circle around its anchor; that circle is the only stable shape.
       const r =
-        Math.max(Math.hypot(b.minX, b.minY), Math.hypot(b.maxX, b.minY), Math.hypot(b.minX, b.maxY), Math.hypot(b.maxX, b.maxY)) *
-        Math.abs(t.sy)
+        Math.max(
+          Math.hypot(b.minX, b.minY),
+          Math.hypot(b.maxX, b.minY),
+          Math.hypot(b.minX, b.maxY),
+          Math.hypot(b.maxX, b.maxY)
+        ) * Math.abs(t.sy)
       return { minX: t.x - r, minY: t.y - r, maxX: t.x + r, maxY: t.y + r }
     }
     const x1 = t.x + b.minX * t.sx
     const x2 = t.x + b.maxX * t.sx
     const y1 = t.y + b.minY * t.sy
     const y2 = t.y + b.maxY * t.sy
-    return { minX: Math.min(x1, x2), minY: Math.min(y1, y2), maxX: Math.max(x1, x2), maxY: Math.max(y1, y2) }
+    return {
+      minX: Math.min(x1, x2),
+      minY: Math.min(y1, y2),
+      maxX: Math.max(x1, x2),
+      maxY: Math.max(y1, y2),
+    }
   }
 
   private frame(now: number): void {
@@ -607,6 +694,17 @@ export class Stage {
     this.audio?.setIntensity(this.drawingNow ? Math.min(1, 0.35 + this.stats.revealSpeed / 600) : 0)
     if (this.wasBusy && !this.drawingNow && this.onIdle) this.onIdle()
     this.wasBusy = this.drawingNow
+
+    if (this.finaleState && !this.finaleState.done) {
+      const fv = this.views.get(this.finaleState.id)
+      if (fv && fv.strokes.length > 0 && fv.head >= fv.strokes.length) {
+        this.finaleState.done = true
+        this.spawnFinaleBursts(this.finaleState.seed, now)
+        const resolve = this.finaleState.resolve
+        this.finaleState = null
+        resolve()
+      }
+    }
 
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.globalAlpha = 1
@@ -685,7 +783,8 @@ export class Stage {
       // Where the tail points: top-center of the character, ignoring wobble so it does not swing.
       // A spinning thing has no top, so point at its pivot instead.
       const tf = this.objectTransform(v, now)
-      const head: Vec = v.anim === 'spin' ? { x: tf.x, y: tf.y } : { x: (wb.minX + wb.maxX) / 2, y: wb.minY }
+      const head: Vec =
+        v.anim === 'spin' ? { x: tf.x, y: tf.y } : { x: (wb.minX + wb.maxX) / 2, y: wb.minY }
       // Prefer above the head; if that runs off the top, sit beside the head instead.
       let bx = head.x
       let by = wb.minY - ry - 5
@@ -757,7 +856,10 @@ export class Stage {
   }
 
   private drawCursor(head: Vec | null, dt: number, now: number): void {
-    const target = head ?? { x: REST.x + Math.sin(now / 900) * 1.2, y: REST.y + Math.cos(now / 700) * 0.8 }
+    const target = head ?? {
+      x: REST.x + Math.sin(now / 900) * 1.2,
+      y: REST.y + Math.cos(now / 700) * 0.8,
+    }
     const k = head ? 1 : 1 - Math.exp(-dt * 4)
     this.cursor.x += (target.x - this.cursor.x) * k
     this.cursor.y += (target.y - this.cursor.y) * k
@@ -810,6 +912,40 @@ export class Stage {
     return c.toDataURL('image/jpeg', 0.7)
   }
 
+  /**
+   * Draw the closing "The End" title on a top layer with the crayon cursor and scratch audio, then
+   * (once its last stroke is revealed) fire star and sparkle bursts. Resolves when the title is fully
+   * revealed; `settle()` snaps it complete. Deterministic: no Math.random, seeded from the story seed.
+   */
+  finale(seed: number): Promise<void> {
+    const old = this.views.get(FINALE_ID)
+    if (old) {
+      this.views.delete(FINALE_ID)
+      this.queue = this.queue.filter((q) => q.id !== FINALE_ID)
+    }
+    const size = 16
+    const text = 'The End'
+    const width = size * 0.55 * text.length
+    const x = WORLD_W / 2 - width / 2
+    const y = WORLD_H * 0.28
+    const v = this.newView(FINALE_ID, 0, 0)
+    v.z = 2e9
+    v.noLife = true
+    const shape: Shape = { k: 'text', x, y, size, color: FINALE_INK, text }
+    this.addShapes(v, [shape], {})
+    return new Promise<void>((resolve) => {
+      this.finaleState = { id: FINALE_ID, seed, resolve, done: false }
+    })
+  }
+
+  private spawnFinaleBursts(seed: number, now: number): void {
+    const rng = mulberry32(hashString(`${seed}:finale`))
+    // Stars across the upper half, sparkles around the title: three fixed-from-seed bursts.
+    this.fx.spawn('stars', WORLD_W * (0.24 + rng() * 0.1), WORLD_H * (0.14 + rng() * 0.08), 9, now)
+    this.fx.spawn('stars', WORLD_W * (0.64 + rng() * 0.1), WORLD_H * (0.12 + rng() * 0.08), 9, now)
+    this.fx.spawn('sparkle', WORLD_W / 2 + (rng() - 0.5) * 12, WORLD_H * 0.24, 8, now)
+  }
+
   /** Reset everything (new story). */
   clear(): void {
     this.views.clear()
@@ -818,6 +954,7 @@ export class Stage {
     this.pageTurn = null
     this.fx.clear()
     this.zCounter = 0
+    this.finaleState = null
   }
 
   /**
@@ -843,5 +980,12 @@ export class Stage {
     this.pageTurn = null
     this.bubbles = []
     this.fx.clear()
+    // A settled finale is a static complete card: resolve it, no bursts (fx were just cleared).
+    if (this.finaleState && !this.finaleState.done) {
+      this.finaleState.done = true
+      const resolve = this.finaleState.resolve
+      this.finaleState = null
+      resolve()
+    }
   }
 }

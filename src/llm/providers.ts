@@ -32,6 +32,8 @@ export interface ApiKeys {
   anthropic: string
   openrouter: string
   openai: string
+  /** Deepgram streaming STT; not an LLM provider, so it never appears in makeProvider. */
+  deepgram: string
 }
 
 class AnthropicProvider implements LlmProvider {
@@ -48,7 +50,8 @@ class AnthropicProvider implements LlmProvider {
 
   async *stream(req: LlmRequest): AsyncGenerator<LlmChunk, void, void> {
     // Sonnet 5 and Opus 5 run adaptive thinking by default; we want first tokens fast, so switch it off.
-    const thinkingOff = /fable-5|mythos-5|sonnet-5|opus-5|opus-4-8|opus-4-7|sonnet-4-6|opus-4-6/.test(this.model)
+    const thinkingOff =
+      /fable-5|mythos-5|sonnet-5|opus-5|opus-4-8|opus-4-7|sonnet-4-6|opus-4-6/.test(this.model)
     const stream = this.client.messages.stream(
       {
         model: this.model,
@@ -57,7 +60,11 @@ class AnthropicProvider implements LlmProvider {
         messages: [
           {
             role: 'user',
-            content: req.user.map((b) => (b.cache ? { type: 'text', text: b.text, cache_control: { type: 'ephemeral' } } : { type: 'text', text: b.text })),
+            content: req.user.map((b) =>
+              b.cache
+                ? { type: 'text', text: b.text, cache_control: { type: 'ephemeral' } }
+                : { type: 'text', text: b.text }
+            ),
           },
         ],
         ...(thinkingOff ? { thinking: { type: 'disabled' } } : {}),
@@ -94,7 +101,10 @@ const chunkSchema = z.object({
       prompt_tokens: z.number().optional(),
       completion_tokens: z.number().optional(),
       cost: z.number().optional(),
-      prompt_tokens_details: z.object({ cached_tokens: z.number().optional() }).nullable().optional(),
+      prompt_tokens_details: z
+        .object({ cached_tokens: z.number().optional() })
+        .nullable()
+        .optional(),
     })
     .nullable()
     .optional(),
@@ -113,7 +123,8 @@ class OpenAiCompatProvider implements LlmProvider {
   }
 
   async *stream(req: LlmRequest): AsyncGenerator<LlmChunk, void, void> {
-    const base = this.kind === 'openrouter' ? 'https://openrouter.ai/api/v1' : 'https://api.openai.com/v1'
+    const base =
+      this.kind === 'openrouter' ? 'https://openrouter.ai/api/v1' : 'https://api.openai.com/v1'
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.apiKey}`,
       'Content-Type': 'application/json',

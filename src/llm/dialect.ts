@@ -4,14 +4,16 @@ import type { Command } from '~/engine/types'
 import { buildUserBlocks, SYSTEM_PROMPT, SYSTEM_PROMPT_UNMODERATED } from './prompt'
 import type { PromptBlock } from './providers'
 import { JsonDialect } from './json-dsl'
+import { OpsDialect } from './ops-dsl'
 
-export const DIALECT_IDS = ['lines', 'json'] as const
+export const DIALECT_IDS = ['lines', 'json', 'ops'] as const
 export type DialectId = (typeof DIALECT_IDS)[number]
 export const isDialectId = (s: string): s is DialectId => (DIALECT_IDS as readonly string[]).includes(s)
 
 export const DIALECT_LABELS: Record<DialectId, string> = {
   lines: 'crayon lines (terse, v1)',
   json: 'json ops (paths + face helper, v2)',
+  ops: 'ops (json ops, terse lines, v3)',
 }
 
 export type DialectParse = { ok: true; cmds: Command[] } | { ok: false; error: string }
@@ -45,7 +47,9 @@ export interface DialectOptions {
 }
 
 export function makeDialect(id: DialectId, scene: Scene, opts: DialectOptions): Dialect {
-  return id === 'json' ? new JsonDialect(scene, opts) : new LinesDialect(scene, opts)
+  if (id === 'json') return new JsonDialect(scene, opts)
+  if (id === 'ops') return new OpsDialect(scene, opts)
+  return new LinesDialect(scene, opts)
 }
 
 /** The original one-command-per-line crayon DSL. */

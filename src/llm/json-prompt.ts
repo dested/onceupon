@@ -82,6 +82,7 @@ export const JSON_SYSTEM_PROMPT = `You are the crayon inside a picture-book app.
 - magic: effect sparkles on the thing, then the change (recolor, move, remove, or a new entity).
 - it broke: effect burst small, then redraw it as two halves (replace its shapes), or remove it.
 - turns a color: recolor with from = its current fill from the scene JSON.
+- the end: the app ends the story itself when the child says "The End"; never write those words or announce an ending.
 
 # For a small child
 This is a picture book for a 4-year-old, and you are the grown-up holding the crayon. Judge the MEANING of the new words, not just the vocabulary. If they are not okay for the book, draw nothing for them: output exactly one line, {"op":"skip"}, and nothing else. Skip: potty and bathroom stuff, private parts or bodies undressed, kissing or romance beyond a hug, anything sexual, blood, gore, wounds, dying shown, cruelty, real weapons, drugs, alcohol, smoking, self-harm, hateful words or symbols, mean names for people, and anything you would not put in a book at a preschool. "They went to the bathroom together" is a skip even though every word is clean. Cartoon mischief is fine: things explode with a poof, get eaten with a gulp, fall down and pop back up, monsters are goofy, fights are pillow fights. Never write rude words in say. No brand logos or real people.
@@ -126,7 +127,10 @@ NEW STORY: then the bunny went inside and sat down at the table for dinner
 {"op":"move","id":"bunny","x":480,"y":525,"duration":1.5,"style":"walk"}`
 
 /** The same prompt with the kid-safety section removed (Settings → moderation off). */
-export const JSON_SYSTEM_PROMPT_UNMODERATED = JSON_SYSTEM_PROMPT.replace(/# For a small child\n[^\n]+\n\n/, '').replace('{"op":"skip"}\n  See below.\n', '')
+export const JSON_SYSTEM_PROMPT_UNMODERATED = JSON_SYSTEM_PROMPT.replace(
+  /# For a small child\n[^\n]+\n\n/,
+  ''
+).replace('{"op":"skip"}\n  See below.\n', '')
 
 export interface JsonPromptInput {
   storyChunks: string[]
@@ -138,6 +142,14 @@ export interface JsonPromptInput {
 export function buildJsonUserBlocks(input: JsonPromptInput): PromptBlock[] {
   return [
     ...storyBlocks('STORY SO FAR:', input.storyChunks),
-    { text: ['CURRENT SCENE:', input.sceneJson, '', 'NEW STORY (illustrate only this):', input.newWords.trim()].join('\n') },
+    {
+      text: [
+        'CURRENT SCENE:',
+        input.sceneJson,
+        '',
+        'NEW STORY (illustrate only this):',
+        input.newWords.trim(),
+      ].join('\n'),
+    },
   ]
 }

@@ -109,6 +109,7 @@ Colors: ${CRAYON_NAMES.join(' ')} or #hex.
 - gets a present: draw a small box r with a ribbon l, fx sparkle on it, say character wow.
 - hungry: say character yum?, draw the food near the character.
 - kiss / hug (a hug only): mv one @other 1, fx hearts between them.
+- the end: the app ends the story itself when the child says "The End"; never write those words or announce an ending.
 
 # For a small child
 This is a picture book for a 4-year-old, and you are the grown-up holding the crayon. Judge the MEANING of the new words, not just the vocabulary. If they are not okay for the book, draw nothing for them: output exactly one line, skip, and nothing else. Skip: potty and bathroom stuff (going to the bathroom, poop, pee, farts, butts), private parts or bodies undressed, kissing or romance beyond a hug, anything sexual, blood, gore, wounds, dying shown, cruelty, real weapons, drugs, alcohol, smoking, self-harm, hateful words or symbols, mean names for people, and anything you would not put in a book at a preschool. "They went to the bathroom together" is a skip even though every word is clean. Cartoon mischief is fine and fun: things explode with a poof, get eaten with a gulp, fall down and pop back up, monsters are goofy, fights are pillow fights. Never write rude words in say or t. No brand logos or real people.
@@ -147,7 +148,10 @@ NEW WORDS: and then the dragon pooped on the house
 skip`
 
 /** The same prompt with the kid-safety section removed (Settings → moderation off). */
-export const SYSTEM_PROMPT_UNMODERATED = SYSTEM_PROMPT.replace(/# For a small child\n[^\n]+\n\n/, '')
+export const SYSTEM_PROMPT_UNMODERATED = SYSTEM_PROMPT.replace(
+  /# For a small child\n[^\n]+\n\n/,
+  ''
+)
 
 export interface PromptInput {
   /** Every chunk of words already sent, in order. */
@@ -164,7 +168,15 @@ export interface PromptInput {
 export function buildUserBlocks(input: PromptInput): PromptBlock[] {
   return [
     ...storyBlocks('STORY SO FAR:', input.storyChunks),
-    { text: ['ON THE PAGE NOW:', input.sceneSummary, '', 'NEW WORDS (draw these):', input.newWords.trim()].join('\n') },
+    {
+      text: [
+        'ON THE PAGE NOW:',
+        input.sceneSummary,
+        '',
+        'NEW WORDS (draw these):',
+        input.newWords.trim(),
+      ].join('\n'),
+    },
   ]
 }
 
@@ -175,7 +187,11 @@ const STORY_DROP_AT = 90
 export function storyBlocks(header: string, chunks: string[]): PromptBlock[] {
   const kept = chunks.length > STORY_DROP_AT ? chunks.slice(-STORY_KEEP) : chunks
   if (kept.length === 0) return [{ text: `${header}\n(nothing yet)\n` }]
-  const blocks: PromptBlock[] = [{ text: kept.length < chunks.length ? `${header} (earlier parts left out)` : header }]
-  kept.forEach((c, i) => blocks.push({ text: c, ...(i === kept.length - 1 ? { cache: true } : {}) }))
+  const blocks: PromptBlock[] = [
+    { text: kept.length < chunks.length ? `${header} (earlier parts left out)` : header },
+  ]
+  kept.forEach((c, i) =>
+    blocks.push({ text: c, ...(i === kept.length - 1 ? { cache: true } : {}) })
+  )
   return blocks
 }

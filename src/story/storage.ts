@@ -3,6 +3,8 @@ import { z } from 'zod'
 const storyEventSchema = z.discriminatedUnion('k', [
   z.object({ k: z.literal('words'), t: z.number(), text: z.string() }),
   z.object({ k: z.literal('cmd'), t: z.number(), line: z.string() }),
+  // The child said "The End": the app plays a finale and shows the closing card.
+  z.object({ k: z.literal('end'), t: z.number() }),
 ])
 export type StoryEvent = z.infer<typeof storyEventSchema>
 
@@ -58,7 +60,9 @@ export function listStories(): StoryMeta[] {
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
       cover: r.cover,
-      words: r.events.filter((e) => e.k === 'words').reduce((n, e) => n + (e.k === 'words' ? e.text.split(/\s+/).length : 0), 0),
+      words: r.events
+        .filter((e) => e.k === 'words')
+        .reduce((n, e) => n + (e.k === 'words' ? e.text.split(/\s+/).length : 0), 0),
     }))
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }

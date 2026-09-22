@@ -15,6 +15,7 @@ export class Replayer {
     private handlers: {
       onWords: (final: string, chunk: string) => void
       onProgress: (i: number, n: number) => void
+      onEnd: (seed: number) => void
       onDone: () => void
     }
   ) {}
@@ -60,6 +61,8 @@ export class Replayer {
         .map((e) => (e.k === 'words' ? e.text : ''))
         .join(' ')
       this.handlers.onWords(soFar, ev.text)
+    } else if (ev.k === 'end') {
+      this.handlers.onEnd(this.record.seed)
     } else {
       this.director.execute(ev.line)
     }

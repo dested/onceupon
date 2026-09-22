@@ -8,8 +8,10 @@ import type { ApiKeys } from '~/llm/providers'
 import type { CallStat, DirectorStatus } from '~/llm/director'
 import type { StoryMeta } from './storage'
 
-export const STT_MODES = ['auto', 'browser', 'openai'] as const
+export const STT_MODES = ['auto', 'browser', 'openai', 'deepgram'] as const
 export type SttMode = (typeof STT_MODES)[number]
+
+export type SttKind = 'browser' | 'openai' | 'deepgram'
 
 export interface Settings {
   provider: Provider
@@ -20,21 +22,38 @@ export interface Settings {
   sound: boolean
   /** Kid-safe moderation: safety section in the prompt + bad-word masking. Off for testing. */
   moderation: boolean
-  /** auto = OpenAI Realtime when an OpenAI key exists, else Chrome's recognizer. */
+  /** auto = OpenAI (key), else Deepgram (key), else Chrome's recognizer. */
   stt: SttMode
+  /** OpenAI STT model (OpenAI ears only). */
   sttModel: string
-  /** USD per minute of audio sent to the transcriber; an estimate the user can edit. */
-  sttRatePerMin: number
-  /** Microphone device id (OpenAI ears only; Chrome's recognizer always uses the default). */
+  /** Deepgram STT model (Deepgram ears only). */
+  deepgramModel: string
+  /** USD per minute of audio; null = the resolved vendor's default (see sttRateFor). */
+  sttRateOverride: number | null
+  /** Microphone device id (OpenAI or Deepgram ears; Chrome's recognizer always uses the default). */
   micDeviceId: string
 }
 
 export const DEFAULT_STT_MODEL = 'gpt-live-transcribe'
-export const DEFAULT_STT_RATE = 0.006
+export const DEFAULT_DEEPGRAM_MODEL = 'nova-3'
 
-export function resolveStt(s: Settings): 'browser' | 'openai' {
-  if (s.stt === 'auto') return s.keys.openai ? 'openai' : 'browser'
+export function resolveStt(s: Settings): SttKind {
+  if (s.stt === 'auto') return s.keys.openai ? 'openai' : s.keys.deepgram ? 'deepgram' : 'browser'
   return s.stt
+}
+
+/** Vendor list price per minute of audio, by resolved ears and model. */
+export function sttRateFor(kind: SttKind, model: string): number {
+  if (kind === 'browser') return 0
+  if (kind === 'openai') return /live/.test(model) ? 0.017 : 0.006
+  return 0.0077 // deepgram nova-3 streaming, list
+}
+
+/** The rate the spend chip uses: the user's override if set, else the resolved vendor default. */
+export function effectiveSttRate(s: Settings): number {
+  if (s.sttRateOverride !== null) return s.sttRateOverride
+  const kind = resolveStt(s)
+  return sttRateFor(kind, kind === 'deepgram' ? s.deepgramModel : s.sttModel)
 }
 
 export interface PageThumb {
@@ -45,6 +64,8 @@ export interface PageThumb {
 
 export interface LineLog {
   id: number
+  /** `performance.now()` when the line landed. */
+  t: number
   line: string
   ok: boolean
   error: string | null
@@ -57,6 +78,9 @@ export interface AppState {
   /** Mic clicked, session not yet confirmed ready. */
   micStarting: boolean
   status: DirectorStatus
+  /** The child said "The End": the finale is drawing (`ending`), then the closing card shows (`ended`). */
+  ending: boolean
+  ended: boolean
   /** Words of the model call in flight (being drawn) and words heard but not sent yet. */
   drawingWords: string
   queuedWords: string
@@ -128,18 +152,27 @@ const envSchema = z.object({
   VITE_ANTHROPIC_API_KEY: z.string().optional(),
   VITE_OPENROUTER_API_KEY: z.string().optional(),
   VITE_OPENAI_API_KEY: z.string().optional(),
+  VITE_DEEPGRAM_API_KEY: z.string().optional(),
 })
 
 const settingsSchema = z.object({
   provider: z.string(),
   model: z.string(),
   dialect: z.string().optional(),
-  keys: z.object({ anthropic: z.string(), openrouter: z.string(), openai: z.string() }),
+  // deepgram optional so settings stored before it existed still parse.
+  keys: z.object({
+    anthropic: z.string(),
+    openrouter: z.string(),
+    openai: z.string(),
+    deepgram: z.string().optional(),
+  }),
   sound: z.boolean(),
   moderation: z.boolean().optional(),
   stt: z.string().optional(),
   sttModel: z.string().optional(),
+  deepgramModel: z.string().optional(),
   sttRatePerMin: z.number().optional(),
+  sttRateOverride: z.number().nullable().optional(),
   micDeviceId: z.string().optional(),
 })
 
@@ -151,17 +184,19 @@ function loadSettings(): Settings {
     anthropic: env.success ? (env.data.VITE_ANTHROPIC_API_KEY ?? '') : '',
     openrouter: env.success ? (env.data.VITE_OPENROUTER_API_KEY ?? '') : '',
     openai: env.success ? (env.data.VITE_OPENAI_API_KEY ?? '') : '',
+    deepgram: env.success ? (env.data.VITE_DEEPGRAM_API_KEY ?? '') : '',
   }
   const base: Settings = {
     provider: DEFAULT_MODEL.provider,
     model: DEFAULT_MODEL.id,
-    dialect: 'json',
+    dialect: 'ops',
     keys: envKeys,
     sound: true,
     moderation: true,
     stt: 'auto',
     sttModel: DEFAULT_STT_MODEL,
-    sttRatePerMin: DEFAULT_STT_RATE,
+    deepgramModel: DEFAULT_DEEPGRAM_MODEL,
+    sttRateOverride: null,
     micDeviceId: '',
   }
   try {
@@ -170,20 +205,32 @@ function loadSettings(): Settings {
     const parsed = settingsSchema.safeParse(JSON.parse(raw))
     if (!parsed.success) return base
     const d = parsed.data
+    // Rate migration: prefer a stored override; else the old flat rate, where the old default 0.006
+    // means "no override" and any other saved value becomes the explicit override.
+    const sttRateOverride =
+      d.sttRateOverride !== undefined
+        ? d.sttRateOverride
+        : d.sttRatePerMin === undefined
+          ? null
+          : d.sttRatePerMin === 0.006
+            ? null
+            : d.sttRatePerMin
     return {
       provider: isProvider(d.provider) ? d.provider : base.provider,
       model: d.model || base.model,
-      dialect: d.dialect && isDialectId(d.dialect) ? d.dialect : 'json',
+      dialect: d.dialect && isDialectId(d.dialect) ? d.dialect : 'ops',
       keys: {
         anthropic: d.keys.anthropic || envKeys.anthropic,
         openrouter: d.keys.openrouter || envKeys.openrouter,
         openai: d.keys.openai || envKeys.openai,
+        deepgram: d.keys.deepgram || envKeys.deepgram,
       },
       sound: d.sound,
       moderation: d.moderation ?? true,
-      stt: d.stt === 'browser' || d.stt === 'openai' ? d.stt : 'auto',
+      stt: d.stt === 'browser' || d.stt === 'openai' || d.stt === 'deepgram' ? d.stt : 'auto',
       sttModel: d.sttModel && d.sttModel !== 'gpt-4o-transcribe' ? d.sttModel : DEFAULT_STT_MODEL,
-      sttRatePerMin: d.sttRatePerMin ?? DEFAULT_STT_RATE,
+      deepgramModel: d.deepgramModel || DEFAULT_DEEPGRAM_MODEL,
+      sttRateOverride,
       micDeviceId: d.micDeviceId ?? '',
     }
   } catch {
@@ -220,6 +267,8 @@ export const appStore = new Store<AppState>({
   listening: false,
   micStarting: false,
   status: 'idle',
+  ending: false,
+  ended: false,
   drawingWords: '',
   queuedWords: '',
   transcriptFinal: '',
