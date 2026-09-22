@@ -1,5 +1,10 @@
 # Updates
 
+## 2026-09-22 — plans updated after the viability review (packs only, gifting, web checkout)
+
+Sal: "packs only, ONLY"; 60 s/week free; "road trip and gifting are core, maybe two minutes up front, not locked into anything; update all the notes and plans." GTM and production plans now decide: free first story ~2 min with the sleepy-crayon paywall, packs 40/120/400, gift codes sold on the website via Stripe and redeemed behind the gate, US web checkout link-out, a finale-style rebuy screen, Apple featuring + share loop as the growth engine with Apple Ads as a capped seed, road trip = 400 pack + offline replay. No code.
+Touched: plans/2026-09-22-go-to-market.md, plans/2026-09-22-ipad-app-production.md
+
 ## 2026-09-22 — The End finale + tracker content-dedupe and corrections
 
 Spec: plans/2026-09-22-the-end-and-tracker.md (four fixes from Sal's Sep 22 Deepgram session).

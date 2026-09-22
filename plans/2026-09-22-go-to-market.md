@@ -21,10 +21,13 @@ Every pack keeps at least 60% margin even if every minute gets used, and unused 
 
 No subscription (Sal, 2026-09-22). Minutes are the product, bought outright, never expiring, no renewals to cancel, nothing to explain to a grandparent. The economics support it: a minute costs ~3.4¢ and sells for 10 to 25¢.
 
-1. **Free: the first story is free.** Up to 3 minutes, one time, ending with The End finale and the share card. Cost ~10¢. This is the trial: a kid who has heard their dragon come to life is the sales pitch. After that, **60 free seconds a week**, refilled on a fixed weekday ("Saturday story"), enough to remind the parent the app is there and too little to live on.
+1. **Free: the first story is free.** About 2 minutes of mic time, one time (Sal: "maybe two minutes", a server-side constant to tweak). Cost ~7¢. This is the trial: a kid who has heard their dragon come to life is the sales pitch. If the child says "The End" first, the finale plays and the share card follows as normal. If the minutes run out mid-story, the crayon "gets sleepy", plays The End for them, and the closing card becomes the paywall: "want more minutes?" with the 120 pack highlighted. That screen, with a kid saying "one more!", is the conversion. After that, **60 free seconds a week**, refilled on a fixed weekday ("Saturday story"), enough to remind the parent the app is there and too little to live on.
 2. **Story pack, 40 minutes, $9.99.** The default buy. About eight stories.
 3. **Big pack, 120 minutes, $19.99.** The "we're going to use this" buy, positioned as the value pick on the paywall (per-minute price shown: 17¢ vs 25¢).
-4. **Family pack, 400 minutes, $39.99.** The gift SKU and the road-trip SKU; 10¢ a minute. Restore Purchases keeps a balance across reinstalls (the ledger lives on the server, keyed to the device account, credited only from validated receipts).
+4. **Family pack, 400 minutes, $39.99.** The gift SKU and the road-trip SKU; 10¢ a minute. Restore Purchases keeps a balance across reinstalls (the ledger lives on the server, keyed to the device account, credited only from validated receipts or redeemed codes).
+5. **Gifting is a web product (decided 2026-09-22).** Apple has no IAP gifting, so gift codes are sold on onceupon.app with Stripe: grandma buys 40, 120 or 400 minutes, gets a code and a printable card, texts it; the parent redeems it in the app's parent area behind the parental gate (or on the website, signed in to the same device account via a link). Apple's multiplatform rule (3.1.3(b)) allows redeeming consumables bought elsewhere as long as the same packs are sold in-app, which they are. A web sale nets ~97% of price instead of 85%.
+6. **Web checkout for packs, US storefront.** Since the 2025 Epic ruling, US apps may link out to external purchase without commission; the paywall's "buy on the web" link sits behind the parental gate and goes to the same Stripe shop. IAP stays the default button; the web link is the cheaper path for parents who take it.
+7. **The rebuy screen.** Zero balance looks like the finale card, not an error: "the crayon needs more minutes", the pack bought last time pre-selected, Restore Purchases and "redeem a gift" underneath. Packs per buyer is the number that makes ads work; this screen is where it is earned.
 
 No taster pack: the free story is the taster, and a $2.99 SKU trains people to buy small.
 
@@ -110,8 +113,8 @@ Apple Ads have no headline field; the ad is the product page. So the copy that m
 
 | Week | Ship | Notes |
 | --- | --- | --- |
-| 1 | Server (keys, Sonnet relay, STT token minting, ledger, free grants), IAP with RevenueCat or own validation (three consumables), The End finale, share upload and page, parental gate, the Expo shell with the WebView, mic spike on a real iPad | The sal-starter repo; the website skeleton (landing, privacy, terms, support, share pages) ships with it because the listing needs the URLs |
-| 2 | Tutorial replay, MP4 export (device side first), settings and parent area, production build with debug and moderation toggle stripped, TestFlight to 10 families | Record the App Store preview from real TestFlight stories |
+| 1 | Server (keys, Sonnet relay, STT token minting, ledger, free grants, gift-code redeem), IAP with RevenueCat or own validation (three consumables), Stripe shop + gift codes on the website, The End finale, sleepy-crayon paywall and rebuy screen, share upload and page, parental gate, the Expo shell with the WebView, mic spike on a real iPad | The sal-starter repo; the website skeleton (landing, shop, gift, privacy, terms, support, share pages) ships with it because the listing needs the URLs |
+| 2 | Tutorial replay, MP4 export (device side first), settings and parent area (balance, buy, redeem a gift, restore), production build with debug and moderation toggle stripped, TestFlight to 10 families | Record the App Store preview from real TestFlight stories; measure first-purchase rate and rebuy on the TestFlight families before touching ads |
 | 3 | App Store Connect: listing, screenshots, preview, Kids questionnaire, privacy labels, Small Business Program enrollment, submit | Kids-category review runs longer; expect one rejection round on the parental gate or the AI disclosure; answer in review notes up front |
 | 4 | Approved: Apple Ads on at $50 a day, featuring nomination, launch post, share-loop instrumentation live | Two weeks of data before touching bids or pack prices |
 
@@ -119,7 +122,7 @@ Server-side MP4 rendering, teachers, and non-US markets come after the first mon
 
 ## KPIs (one dashboard, read weekly)
 
-Installs by source, cost per install, install to first story, first story to first purchase, pack mix, repeat-purchase rate within 60 days, minutes used per buyer (the COGS driver), COGS per paying user, share rate per finished story, installs from share pages, refund rate.
+Installs by source, cost per install, install to first story, first story to first purchase (target 10%), pack mix, packs per buyer within 60 days (target 1.5), gift codes sold and redeemed, web checkout share, minutes used per buyer (the COGS driver), COGS per paying user, share rate per finished story (target 25%), installs from share pages, refund rate.
 
 ## Risks
 
@@ -129,23 +132,15 @@ Installs by source, cost per install, install to first story, first story to fir
 - **Cost tail.** Packs bound the spend by construction (a minute is paid before it is served); the only caps needed are per-device daily limits on the free grant and abuse protection on the ledger.
 - **COPPA.** No audio stored server-side, no accounts, the share upload is masked text only and parent-initiated. Written into the privacy policy in plain words.
 
-## Sal's notes (2026-09-22, evening)
+## Decisions from the viability review (2026-09-22, evening)
 
-- Road trip and gifting are core, not extras. Gifting has to be fully supported.
-- Free first story: probably 2 minutes, not 3; to be tweaked.
-- Nothing is locked; the pricing model can change if the numbers say so.
+Sal: "I love the road trip idea and the gifting has to be fully supported. Maybe two minutes up front. I'm not locked into anything." Reviewed the numbers and decided:
 
-## Is it viable, and what to change
-
-Serving is not the problem: every pack clears 60% margin at full use. The problem is buying installs at the App Store median (~$3.20) when a pack-only funnel at a 5% first-purchase rate returns ~$0.47 per install. Read the right way, that is not "unviable"; it says **this is an organic and viral business with a small paid seed, not a paid-acquisition machine**, which is what nearly every kids app that survives turns out to be. The levers, biggest first:
-
-1. **Two product numbers decide everything: first-purchase rate and packs per buyer.** At 5% and 1 pack, an install is worth ~$0.47 and only brand and exact high-intent keywords pay back. At 10% and 1.5 packs (a 40/120 mix averaging ~$14), an install is worth ~$2.10 and most of the keyword plan works. Both are product decisions, not marketing ones, and both are testable in TestFlight before spending a dollar on ads:
-   - The paywall moment is the end of the free story. The free story runs up to 2 minutes of mic time; when it runs out mid-story the crayon "gets sleepy", plays The End for them, and the card says "want more minutes?" with the 120-pack highlighted. A kid saying "one more!" at that screen is the conversion.
-   - The rebuy moment is the zero-balance screen, which should look like the finale card, not an error, and remember the pack they bought last time.
-2. **Move purchases off Apple where allowed, and make gifting a web product.** Since the 2025 Epic ruling, US apps may link out to web checkout without commission; a parental gate makes that legal in a Kids app. Sell packs on the website with Stripe (~3% instead of 15%) and sell **gift codes** there: grandma buys 400 minutes on onceupon.app, texts the code, the parent redeems it in the app behind the gate. Apple's multiplatform rule (3.1.3(b)) allows redeeming consumables bought elsewhere as long as the same packs are also sold in-app, which they are. This is the only clean way to gift on iOS (Apple has no IAP gifting), it lifts margin on every web sale from 85% to 97% of price, and it opens a buyer who never installs the app.
-3. **Apple featuring is the single biggest free lever for a Kids app with a new mechanic.** Nominate on approval day with the preview video and three real stories. One week on the Kids page is worth months of ads.
-4. **Every story is an ad.** The share page and the MP4 watermark are the acquisition channel; instrument installs from share pages from day one and treat share rate as a top-three KPI.
-5. **Apple Ads as a seed only:** brand terms and a dozen exact high-intent terms at a hard $2.50 cost-per-install cap; harvest and scale only keywords whose measured revenue per install beats their cost. No Discovery budget until first-purchase rate is known.
-6. **Widen the market later, not now:** Android doubles the addressable market on the same engine (Expo already targets it); preschools and libraries buy site licences at a cost per seat no consumer channel matches; a web version of the story screen (the engine already runs in a browser) adds a Stripe-priced funnel with no store cut at all.
-
-Road trip, honestly: live drawing needs the network (model and ears), so the road-trip story needs the car's hotspot. What works offline is replay: every saved story and the finale play with no connection. The 400-minute pack plus offline replay is the road-trip pitch; do not promise offline storytelling.
+- **This is an organic and viral business with a small paid seed, not a paid-acquisition machine.** Serving clears 60% margin at full use; the only weak number is buying installs at the App Store median (~$3.20) against ~$0.47 per install from a 5% first-purchase rate. Nearly every surviving kids app looks like this.
+- **Two product numbers decide everything and both are tested in TestFlight before any ad spend:** first-purchase rate (the sleepy-crayon paywall at the end of the free story) and packs per buyer (the rebuy screen). Targets: 10% first purchase, 1.5 packs per buyer with a 40/120 mix, which makes an install worth ~$2.10 and most of the keyword plan pay back. At 5% and 1 pack, only brand and exact high-intent keywords are bought.
+- **Gifting via web gift codes and US web checkout** (pricing decision items 5 and 6) are in scope for launch, not later.
+- **Apple featuring is the single biggest free lever:** nominate on approval day with the preview video and three real stories.
+- **Every story is an ad:** share-page installs are instrumented from day one and share rate is a top-three KPI.
+- **Apple Ads is a seed:** brand terms and a dozen exact high-intent terms at a hard $2.50 cost per install; no Discovery budget until the first-purchase rate is known; scale only keywords whose measured revenue per install beats their cost.
+- **Road trip = the 400 pack plus offline replay.** Live drawing needs the network (model and ears), so the car needs a hotspot; every saved story and its finale replay offline. Do not promise offline storytelling.
+- **Later, in this order:** Android on the same Expo shell (doubles the market), preschools and libraries on site licences, a browser version of the story screen sold through Stripe with no store cut.
