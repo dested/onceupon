@@ -1,6 +1,6 @@
 # Updates
 
-## 2026-09-22 — plans updated after the viability review (packs only, gifting, web checkout)
+## 2026-09-22 — plans updated after the viability review (packs only, gifting, web checkout) Then: admin portal section added to the production plan (overview, usage, ledger, revenue, costs, shares, kid-safety, feature flags incl. the free-story-seconds knob, alerts); week 2 of the launch sequence carries it. Then: no RevenueCat (own StoreKit 2 JWS validation + server notifications); the kid is the narrator: voice recorded on device for every story, in replay and mp4, on the share page only for paying accounts after a consent notice (a purchase is COPPA-accepted parental consent).
 
 Sal: "packs only, ONLY"; 60 s/week free; "road trip and gifting are core, maybe two minutes up front, not locked into anything; update all the notes and plans." GTM and production plans now decide: free first story ~2 min with the sleepy-crayon paywall, packs 40/120/400, gift codes sold on the website via Stripe and redeemed behind the gate, US web checkout link-out, a finale-style rebuy screen, Apple featuring + share loop as the growth engine with Apple Ads as a capped seed, road trip = 400 pack + offline replay. No code.
 Touched: plans/2026-09-22-go-to-market.md, plans/2026-09-22-ipad-app-production.md

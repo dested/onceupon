@@ -43,7 +43,7 @@ Even with all three, paid acquisition at median costs pays back only on the best
 
 **Tell a story. Watch it draw.** The iPad listens and a crayon draws the child's own words as they say them. No tapping, no menus, no videos to watch; talking is the whole game. For parents: creative screen time that is the kid's imagination out loud, with a picture book at the end to send to grandma.
 
-One line for everything: *Your kid talks. The crayon draws. Grandma cries.*
+One line for everything: *Your kid talks. The crayon draws. Grandma cries.* The story is told in the child's own voice, saved that way, and shared that way.
 
 Audience in order: parents of 3 to 7 year olds on iPad (buyer and gatekeeper), grandparents (the share-link audience and the gift buyer), preschool and kindergarten teachers (later, a classroom mode).
 
@@ -89,7 +89,7 @@ Apple Ads have no headline field; the ad is the product page. So the copy that m
 - Grandparents: `Your child tells a story, the crayon draws it, you send the link. Grandma watches it come to life. First story free.`
 - Competitor: `Not another video to watch. Your child makes the story out loud and a crayon draws it live. Say "The End" and share it.`
 
-**Share page (the organic ad):** headline `Ellie made this story` (the first name only if the parent typed one; otherwise `A story by a 5-year-old`), the replay, then `Made with Once Upon. Your kid's turn: get it on the App Store.` Video download button. Nothing else.
+**Share page (the organic ad):** headline `Ellie made this story` (the first name only if the parent typed one; otherwise `A story by a 5-year-old`), the replay in the child's own voice, then `Made with Once Upon. Your kid's turn: get it on the App Store.` Video download button. Nothing else. The voice is what makes grandma forward it.
 
 **MP4 end card (2 s):** `Made with Once Upon` in the crayon hand, the app icon, `onceupon.app`.
 
@@ -113,14 +113,14 @@ Apple Ads have no headline field; the ad is the product page. So the copy that m
 
 | Week | Ship | Notes |
 | --- | --- | --- |
-| 1 | Server (keys, Sonnet relay, STT token minting, ledger, free grants, gift-code redeem), IAP with RevenueCat or own validation (three consumables), Stripe shop + gift codes on the website, The End finale, sleepy-crayon paywall and rebuy screen, share upload and page, parental gate, the Expo shell with the WebView, mic spike on a real iPad | The sal-starter repo; the website skeleton (landing, shop, gift, privacy, terms, support, share pages) ships with it because the listing needs the URLs |
-| 2 | Tutorial replay, MP4 export (device side first), settings and parent area (balance, buy, redeem a gift, restore), production build with debug and moderation toggle stripped, TestFlight to 10 families | Record the App Store preview from real TestFlight stories; measure first-purchase rate and rebuy on the TestFlight families before touching ads |
+| 1 | Server (keys, Sonnet relay, STT token minting, ledger, free grants, gift-code redeem), IAP with own receipt validation (three consumables, no RevenueCat), Stripe shop + gift codes on the website, The End finale, sleepy-crayon paywall and rebuy screen, share upload and page, parental gate, the Expo shell with the WebView, mic spike on a real iPad | The sal-starter repo; the website skeleton (landing, shop, gift, privacy, terms, support, share pages) ships with it because the listing needs the URLs |
+| 2 | Tutorial replay, MP4 export (device side first), settings and parent area (balance, buy, redeem a gift, restore), admin portal, production build with debug and moderation toggle stripped, TestFlight to 10 families | Record the App Store preview from real TestFlight stories; measure first-purchase rate and rebuy on the TestFlight families in the admin portal before touching ads |
 | 3 | App Store Connect: listing, screenshots, preview, Kids questionnaire, privacy labels, Small Business Program enrollment, submit | Kids-category review runs longer; expect one rejection round on the parental gate or the AI disclosure; answer in review notes up front |
 | 4 | Approved: Apple Ads on at $50 a day, featuring nomination, launch post, share-loop instrumentation live | Two weeks of data before touching bids or pack prices |
 
 Server-side MP4 rendering, teachers, and non-US markets come after the first month of data.
 
-## KPIs (one dashboard, read weekly)
+## KPIs (the admin portal's overview page, read weekly)
 
 Installs by source, cost per install, install to first story, first story to first purchase (target 10%), pack mix, packs per buyer within 60 days (target 1.5), gift codes sold and redeemed, web checkout share, minutes used per buyer (the COGS driver), COGS per paying user, share rate per finished story (target 25%), installs from share pages, refund rate.
 

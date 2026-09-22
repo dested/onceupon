@@ -24,7 +24,7 @@ Calculator: `plans/2026-09-22-pricing-model.html` (open in a browser; the artifa
 | Margin per pack (served in full)        | 5.47      |
 | Free tier per month (10 s/day, 1,000 DAU, 30% use it) | 113 |
 
-A month at 980 packs: revenue $9,790, Apple $1,469, serving sold minutes $1,922, free tier $113, gross profit ~$6,290 before Apple's $99, the server, RevenueCat or receipt validation, support and refunds.
+A month at 980 packs: revenue $9,790, Apple $1,469, serving sold minutes $1,922, free tier $113, gross profit ~$6,290 before Apple's $99, the server, support and refunds.
 
 - Output tokens are about half the bill. JSON ops (~1,580 tokens/beat measured on Sonnet) would double the crayon line; Lines (~220) halves it again at a worse picture.
 - Ears: Deepgram Nova-3 streaming $0.0077 list ($0.0048 promo); OpenAI gpt-live-transcribe is $0.017 (the app's old flat $0.006 was wrong for it); AssemblyAI $0.0025; Apple on-device free but native only. Deepgram is in behind a flag (plans/2026-09-22-deepgram-ears.md) for the kid-speech A/B.
@@ -44,8 +44,32 @@ New `server/` on the sal-starter stack (Bun, tRPC, Postgres + Prisma):
 - **Ears stay a direct socket, with minted tokens.** OpenAI Realtime issues ephemeral client secrets; Deepgram has short-lived grant tokens (`/v1/auth/grant`). The server mints one per listening session with a TTL no longer than the remaining balance, so audio never flows through your box and a leaked token is worth minutes, not a key.
 - **The server is the ledger.** Anonymous device account (no sign-in for a kids app; device token + App Attest to deter abuse; restore via StoreKit on reinstall). Balance in seconds. A listening session opens with a start event, heartbeats every 15 s, closes on stop/background; the server debits wall-clock mic time and refuses to mint tokens or stream drawings when the balance is gone. Client shows a soft "the crayon is getting sleepy" at one minute left.
 - **Free allowance** is a server-side grant per device: the first story free (about 2 min of mic time, once; a server constant Sal will tweak), then 60 seconds a week refilled on a fixed weekday; never enforced client-side. When the free story's minutes run out mid-story the client plays The End for the child ("the crayon is sleepy") and the closing card becomes the paywall.
-- **Purchases**: three consumable products (`minutes_40`, `minutes_120`, `minutes_400`), no subscription. Plus **gift codes** sold on the website with Stripe (same three sizes; code + printable card; redeemed in the app's parent area behind the gate, or on the site), and a **web checkout link** on the paywall for the US storefront (post-Epic link-out, behind the gate). The ledger credits from validated receipts and redeemed codes only; a code redeems once and is bound to the device account that redeemed it. Receipt validation server-side via the App Store Server API (JWS transactions, `@apple/app-store-server-library`) or RevenueCat, whose virtual-currency feature is literally a minutes balance and handles refunds/restores. RevenueCat is the faster path; own validation is one fewer vendor. Either way credit the balance from the server, never from the client.
+- **Purchases**: three consumable products (`minutes_40`, `minutes_120`, `minutes_400`), no subscription. Plus **gift codes** sold on the website with Stripe (same three sizes; code + printable card; redeemed in the app's parent area behind the gate, or on the site), and a **web checkout link** on the paywall for the US storefront (post-Epic link-out, behind the gate). The ledger credits from validated receipts and redeemed codes only; a code redeems once and is bound to the device account that redeemed it. **No RevenueCat (decided 2026-09-22).** With consumables only, no subscriptions, a ledger that already lives on our server, and Stripe for web and gifts, RevenueCat would duplicate the ledger, add a third-party SDK to a Kids app, and take 1% above $2.5k a month. Own validation is about a day: the app sends the StoreKit 2 JWS transaction, the server verifies it with `@apple/app-store-server-library` (Apple's official TypeScript library), rejects a transaction id it has seen, credits the balance; App Store Server Notifications v2 (a webhook) handle refunds by debiting. Restore Purchases re-sends the transaction history and the server re-credits anything missing. Android later is one more adapter (Google Play Developer API). Credit the balance from the server, never from the client.
 - Spend alerts on Anthropic and the STT vendor; per-device daily caps; Sentry without PII (allowed in Kids apps only if no identifiers leave the device).
+
+## Admin portal (Sal: "I need to see everything, usage and all that")
+
+Part of the sal-starter app at `/admin`, one admin login (passkey or the starter's auth with a single allow-listed email), tRPC admin router, Postgres views over the same tables the product writes. Everything the server already has to know to meter and bill is what the portal shows; nothing is collected only for the dashboard, and no child data beyond what the product holds (device accounts, masked words of shared stories).
+
+**Overview (the landing page):** today, 7 days, 30 days: installs (first device-account creation), first stories, finished stories (The End), purchases by pack and by channel (IAP, web, gift redeem), revenue gross and net, minutes served, cost of goods (Sonnet + ears, from the call log), gross margin, free-tier minutes given, share pages created and installs from share pages, refunds. Each as a stat tile with a sparkline; one chart of revenue vs COGS per day.
+
+**Usage:** mic minutes per day, beats per day, output tokens per beat (p50/p95), first-token and done latencies (p50/p95), restart rate, `skip` rate, ears vendor split, model split, cache hit rate. Filter by day range, ears vendor, model, dialect. This is the debug panel's stats across every user.
+
+**Ledger:** search a device account by id (or by gift code, or by receipt id): balance, every grant (first story, weekly), purchase (pack, channel, price, receipt or Stripe id), redemption, debit (session start/stop with mic minutes), refund. Actions: credit or debit minutes with a reason (support), void a gift code, block a device (abuse), reset a free story.
+
+**Revenue:** purchases table (time, pack, channel, gross, Apple or Stripe fee, net, device); daily totals; Apple vs web share; gift codes sold, redeemed, outstanding (liability); refund list; Apple Small Business Program status note.
+
+**Costs:** per-call log from the relay (device, model, dialect, input/cached/output tokens, cost, latency, restart or skip) and per-session ears minutes by vendor; daily totals against the Anthropic and Deepgram/OpenAI bills; cost per paying user, cost per free user; the top 20 devices by cost in the period (the abuse view).
+
+**Shares:** share pages by day, views, video downloads, installs attributed, expiry queue; open a share page; unpublish (abuse or a parent's request by email). Text only, never audio.
+
+**Kid-safety:** `skip` events per day with the (masked) words, so prompt drift shows up; masker hits; a way to add a word to the masker list without a deploy.
+
+**Settings (feature flags, no deploy):** free first-story seconds (the "maybe two minutes" knob), weekly free seconds, pack sizes and store product ids, ears vendor default and per-vendor rate, model and dialect default, moderation on (locked on in production builds), kill switches (pause purchases, pause the relay, read-only mode), share link lifetime (90 days), Apple Ads attribution on/off. Every change is logged with who and when.
+
+**Alerts (email to Sal):** daily spend over a threshold, one device over a per-day cost cap, Stripe or Apple webhook failures, relay error rate, ears socket failure rate, a refund.
+
+Charts follow the dataviz rules already used by the calculator (one scale, thin marks, direct labels, light and dark). The KPI list in the go-to-market plan is this portal's overview page.
 
 ## App Store, Kids category
 
@@ -67,7 +91,7 @@ New `server/` on the sal-starter stack (Bun, tRPC, Postgres + Prisma):
 The replay system already plays a `StoryRecord` deterministically with narration captions, so the tutorial is a canned record plus timed coach moments, not a new engine feature.
 
 - Author one short story record once (dragon, castle, page turn, an effect, a bubble) and bundle it. Replay it through the `Replayer` with the real Stage so what the kid sees is exactly what the app does.
-- Four beats, each a short narrator voice line (pre-rendered TTS, bundled audio; a five-year-old does not read) with a matching on-canvas cue:
+- Four beats, each a short coach line (a five-year-old does not read, so a voice; whose voice is an open question below) with a matching on-canvas cue:
   1. "Tell your story like you're telling a friend" while the mic sticker pulses and the caption shows words arriving.
   2. "When the crayon starts drawing, watch your creation" as the first strokes land; the caption highlights the yellow drawing state.
   3. "When it stops, tell more of your story" on the idle pause; the record continues with the next chunk.
@@ -79,7 +103,7 @@ The replay system already plays a `StoryRecord` deterministically with narration
 Saying "the end" is the story's close and the moment the app gets to be delightful.
 
 - Detection is client-side on final transcript text (`the end`, `and that's the end`, `the end!` as the last words of a chunk), never a model round trip: zero latency and works with any ears. The words are dropped from the story tail; the Director is not called for them. The prompt is told the story may end so it never draws a literal "the end".
-- Finale is engine-side and deterministic (replays identically): mic stops and the meter stops first; the stage stamps a hand-scrawled "The End" title (the engine already has `title` and text stamping), a stars/sparkle burst, the crayon cursor draws a closing swirl, the page-flip sound; a canned narrator "The End!" if a voice pack exists.
+- Finale is engine-side and deterministic (replays identically): mic stops and the meter stops first; the stage stamps a hand-scrawled "The End" title (the engine already has `title` and text stamping), a stars/sparkle burst, the crayon cursor draws a closing swirl, the page-flip sound; and the child's own recorded "The End!" (the last thing the ears heard) plays over it; no canned voice.
 - Then the closing card: play it again, share it (parental gate, see below), a new story. Autosave already happens; the closing card also sets the story's cover from the finale frame.
 - Long silence (say 90 s of mic-open with no words) prompts "say The End when you're done" instead of burning minutes; two minutes more and the app ends the story itself with the same finale.
 
@@ -89,7 +113,7 @@ A story record is tiny (words plus DSL lines) and replay needs no keys, no mic a
 
 - Share = upload the `StoryRecord` to the server, get `https://<site>/s/<random id>`, open the native share sheet. Unlisted by default (unguessable id), no listing page, no search.
 - Parental gate before sharing: it is a link-out and it publishes a child's words. The word masker output is what gets uploaded, never raw audio, never a name field. The parent can unpublish from the app (delete on the server) and the link dies.
-- The share page renders the replay in the browser with the same engine and the same seeded determinism, plus play/again, the narration captions, the cover as the OG image so iMessage and WhatsApp show a picture, a "download video" button, and a "made with Once Upon" link to the store. Works on any phone with no app installed.
+- The share page renders the replay in the browser with the same engine and the same seeded determinism, plus play/again, the narration captions, the child's own voice when the parent has turned it on (paying accounts, after the consent notice), the cover as the OG image so iMessage and WhatsApp show a picture, a "download video" button, and a "made with Once Upon" link to the store. Works on any phone with no app installed.
 - Links expire 90 days after upload (a nightly job deletes the record and its cached video); the page says so, and the app can re-share to mint a fresh link.
 
 ## MP4 export, from the app and from the website
@@ -99,7 +123,8 @@ Both, because a link is what you text and a file is what gets kept. The engine i
 - One entry point on the Stage: render the record at time t into an offscreen canvas (`setInstant` is already most of this; the replay scrubber already rebuilds a page to an event index). The exporter steps t in 1/30 s increments, so a 4-minute story is 7,200 frames rendered as fast as the machine can go, at 1280x800 with the crayon audio and page flips mixed in from the same seeded audio engine. Words go in as burned-in captions, the way the replay shows them.
 - In the app: encode on the device with WebCodecs (Safari 16.4+, so every iPad this ships on) and mux with Mediabunny (already in the Remotion toolbox); the mp4 lands in the share sheet or Photos. No server, no cost, no upload.
 - On the website: the share page renders the same stepper in headless Chrome once on first request, caches the mp4 next to the record for the link's 90 days, and serves it. Rendering is cheap enough (a few seconds of CPU per minute of story) not to need Remotion Lambda.
-- The kid's voice (decided 2026-09-22): an opt-in in the parent area keeps each story's mic audio on the device only, never uploaded, never on the share page, and the local mp4 export muxes it in. The recognizer already has the PCM frames; the session writes them to a per-story file on device alongside the record, timestamped against the same clock as the events so the voice lines up with the drawing. Local-only keeps it out of COPPA's collection rules; the moment the voice leaves the device it needs verifiable parental consent, which a parental gate is not. Deleting the story deletes the audio.
+- **The kid is the narrator (Sal, 2026-09-22: "it's his voice audio").** Every story records the child's voice on the device while they tell it (the recognizer already has the PCM frames; encode to Opus or AAC via MediaRecorder on the same stream, ~250 KB a minute, stored beside the record in the shell's file storage, timestamped against the same clock as the events). Replay plays the voice and the drawing together; the local mp4 muxes it; the finale plays the child's own "The End!". Deleting the story deletes the audio.
+- **The voice on the share page needs verifiable parental consent, and a purchase is one.** COPPA lists a monetary transaction as an accepted consent method, so: a parent who has bought a pack (or redeemed a gift, which was bought) can turn on "share with voice" once, with a plain-language notice at that moment (what is uploaded, who can hear it, that the link expires in 90 days, how to unpublish). Free accounts share captions only. The audio is served only from the share page, deleted with the link at 90 days or on unpublish, never used for anything else, and stated as such in the privacy policy. Zero-retention transcription stays as is.
 
 ## The website, on sal-starter
 
@@ -110,7 +135,6 @@ Pages: landing (an embedded live replay is the hero, the pitch is the product), 
 ## Open questions for Sal
 
 1. Free tier: a one-time first story plus a small daily allowance, or daily only? What daily-active free count are you planning for?
-2. RevenueCat or own receipt validation?
 3. Ears vendor for launch: decide after the Deepgram A/B on a real kid.
-4. Narrator voice for the tutorial and The End: there is none today. Recorded human, TTS rendered once and bundled, or no voice (captions and a parent beside them)?
-   Settled: share links expire after 90 days; mp4 download exists in both the app and the website; the child's audio is kept on-device (opt-in) and muxed into the local mp4 only.
+4. Tutorial coach lines: The End and the story narration are the child's own voice now, but the four coach lines in the tutorial ("tell your story like you're telling a friend") still need a voice or a parent reading captions. A recorded human, TTS rendered once, or captions only?
+   Settled: share links expire after 90 days; mp4 download exists in both the app and the website; the child's voice is recorded on the device for every story, plays in replay and the mp4, and goes on the share page only for paying accounts after a consent notice; no RevenueCat.
