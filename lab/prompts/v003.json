@@ -1,0 +1,9 @@
+{
+  "parent": 1,
+  "note": "Mirror only at x=0; 4-leg template; person hair/trait marks; build-up rule",
+  "rationale": "The most common failures are attachment and anatomy errors, not size. First, 'use mirror for every pair' made the drawer mirror ears and horns on off-center side-view heads. That caused floating ears in cat, dog, horse, cow, pig and giraffe. Second, the cat and dog recipes had no legs, or only one mirrored pair, so four-legged animals showed 0-2 legs and no species cue (horse neck and long head, dog muzzle, pig snout, cow udder). Four-legged animals were the worst category besides people and props. Third, people failed on identity: the brown head outline read as a beard, hair was missing or badly shaped, trait characters (girl, grandpa, pirate) had no signature marks, and the princess's arms floated off a pointed dress top. Fourth, there were layout errors: parts below y=0 or off the top of the page (umbrella, giraffe, owl), vertical wings (airplane, dragon), and boats and fish sitting on grass. Fixes: the mirror rule now says mirror flips across x=0. A new build-from-the-ground rule makes joined parts overlap and adds a top-of-page check. A new trait-marks rule covers role characters, and a new wings/water rule covers flying and water subjects. One shared four-legged template replaces cat and dog, with four spaced legs and per-species signatures. The person recipe gets a skin-tone outline and safe short and long hair shapes. The princess dress and crown are fixed, and the dragon gets wide wings and wavy fire. A water recipe and a still-eating beat are added. To pay for this, the star, heart, sun and moon recipes are cut to stamps, the place-change list is shortened, and the duplicate emotions and sleep lines are merged.",
+  "tokens": 7175,
+  "source": "editor",
+  "version": 3,
+  "createdAt": "2026-09-22T21:58:10.012Z"
+}

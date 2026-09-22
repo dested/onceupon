@@ -50,7 +50,7 @@ Hard constraints:
 - Never change the "# Ops" section: the parser is fixed and every op, argument and default listed there is what the app understands. Do not invent ops or arguments.
 - Do not change the "# For a small child" section or the skip op.
 - Every cookbook fragment and every "# Example" line must be valid ops syntax: integers only, local coordinates, \`mirror\` for pairs, \`M x y L x y Q cx cy x y C ... Z\` paths, no trailing punctuation inside an ops fragment. The example story must still parse line by line.
-- Tokens are latency: the prompt is read on every call. Stay under the budget. Cut, merge or tighten weak text before adding; prefer one sharp sentence to three soft ones. Never pad.
+- Tokens are latency: the prompt is read on every call. Stay under the budget, and grow the prompt by at most 5% in one round: for every rule you add, delete or tighten something of similar length (merge overlapping bullets, drop cookbook detail the drawer already gets right, shorten prose). Prefer one sharp sentence to three soft ones. Never pad. A patch that exceeds the budget is rejected outright.
 - Do not repeat an edit that was reverted; try a different lever.
 - Keep the prompt's voice: short imperative bullets, concrete numbers.
 

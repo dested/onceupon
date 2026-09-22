@@ -5,3 +5,19 @@ dist
 *.log
 lab/runs/
 lab/archive/
+
+# monorepo (apps are independent packages, no root workspaces)
+apps/*/node_modules
+apps/*/dist
+apps/*/.vite
+apps/web/.env
+apps/web/.env.*
+!apps/web/.env.example
+apps/mobile/.expo
+apps/mobile/ios
+apps/mobile/android
+apps/mobile/.env
+apps/mobile/*.jks
+apps/mobile/*.p8
+apps/mobile/*.p12
+apps/mobile/*.mobileprovision
