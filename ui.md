@@ -1,6 +1,6 @@
 # Once Upon — UI / visual language
 
-> Source of truth for how this looks. Follow it for anything visual. Last updated: 2026-09-20
+> Source of truth for how this looks. Follow it for anything visual. Last updated: 2026-09-22
 
 ## North star
 
@@ -34,13 +34,15 @@ UI tokens on the canvas or vice versa.
   prop (default -2deg), tones paper/red/blue/yellow/green. Text `text-xl`.
 - **IconButton** — 48px round sticker, `active` turns it yellow. Use for toolbar actions.
 - **PaperCard** — modal/card surface, `rounded-3xl`, 3px ink border, big offset shadow.
-- **Mic button** (in `StoryScreen`) — 96px round; yellow idle, red with a pinging ring when
-  listening. It is the one big affordance on the screen.
+- **Story studio** (`StoryScreen`, `StoryWelcome`, `.story-studio` in app.css) — a warm textured tabletop, coral stitched book spine, cream drawing paper, lavender welcome crayon, handwritten wordmark, and a separate microphone dock. Studio accents: lilac `#e6ddec`, purple `#7b5c91`, sage `#dce7d5`, coral `#d9937e`.
+- **Mic button** — 86px wax-yellow sticker with a coral pause state and a gentle breathing ring; smaller on compact screens. Live bars follow actual microphone energy. Reduced-motion preferences disable UI animation.
 
 ## Patterns
 
-- Overlays float on the canvas with absolute positioning: toolbar top-right, filmstrip
-  top-left, subtitles bottom-center above the mic, typed input bottom-right, debug bottom-left.
+- The live drawing screen uses three rows: navigation, a flexible picture book, and the microphone dock. iPad landscape comes first; portrait, small screens, safe areas and dynamic viewport height are supported. Navigation and mic controls stay outside the drawing.
+- Page number opens earlier-page thumbnails in a horizontally scrolling tray. Typing opens on demand from Or type. Sound, settings and the development-only drawing lab live in Story options; spend appears only with the lab.
+- Welcome artwork disappears when story words arrive and never enters the saved canvas. The ending actions occupy the microphone dock, preserving the finale artwork. New story confirms before leaving an unfinished story.
+- Replay retains its floating toolbar and filmstrip. Subtitles float over the lower paper in both views.
 - Subtitles sit on a translucent paper pill with a soft glow so they read on dark skies.
 - Thumbnails (filmstrip, bookshelf) are tilted alternately ±2.5deg like taped photos.
 - Destructive actions confirm inline (Delete → "sure?"), never with `window.confirm`.

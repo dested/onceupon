@@ -8,11 +8,17 @@ bun scripts/tracker-check.ts   # tracker dedupe/correction regression; prints a 
 bun run dev                    # http://localhost:7710
 ```
 
+## Drawing screen layout and controls [cheap]
+
+Check 1024×768 and 1366×1024 landscape, 768×1024 portrait, and a compact phone viewport. The book and dock fit without scrolling, buttons remain touch-sized, and captions stay inside the paper. Open Story options; toggle sound twice. Or type opens the focused input; Escape closes it. Tell a sentence, open New story and choose Keep telling this one: words remain. Finish with The End and play the saved story again. Earlier pages open from the page button. Backgrounding stops listening; returning requires another mic tap.
+
+Sep 22: typecheck/build passed; 1024×768 frame inspected with no horizontal overflow and primary controls at least 46px. Browser automation reached typed story, ending, replay and saved bookshelf entry, but its overall run stalled after escalation; not a clean full-suite pass. Real iPad microphone and WKWebView remain human/device checks.
+
 ## The End finale [cheap]
 
-Type `Once upon a time a dragon lived in a castle. The End`, Enter. Expect: the dragon-and-castle
+Click Or type, then type `Once upon a time a dragon lived in a castle. The End`, Enter. Expect: the dragon-and-castle
 scene draws, then a handwritten "The End" title reveals across the upper page with a star/sparkle
-burst; the mic button and typed input are gone; the status reads `the end!`; a closing card
+burst; the mic button and typed input are gone; the microphone dock becomes the ending actions; a closing card
 (`[data-testid=the-end-card]`) shows "play it again" and "new story". "play it again" opens this
 story's replay; the replay ends with the same finale. Bookshelf → Play does the same. In a replay,
 scrub to the end: the finale shows settled. bx: `bx fill typed "Once upon a time a dragon lived in a
@@ -22,13 +28,13 @@ castle. The End"`, `bx press Enter`, `bx wait 6000`, `bx snap`, then `bx exists 
 
 Needs an Anthropic key in `.env.local` or Settings.
 
-1. Open http://localhost:7710, click the bug icon (or press backtick) for the debug panel.
-2. In the bottom-right input type: `Once upon a time a big green dragon lived in a castle with a princess`, Enter.
+1. Open http://localhost:7710, open Story options → Drawing lab (or press backtick) for the debug panel.
+2. Click Or type, then in the input type: `Once upon a time a big green dragon lived in a castle with a princess`, Enter.
 3. Expect: sky/ground fill, a dragon on the left, castle right, latency row in the debug panel (first token under ~1.5s on Haiku).
 4. Type: `then the dragon flew to the beach and ate a giant ice cream`, Enter.
 5. Expect: a page turn (filmstrip thumbnail top-left), the dragon redrawn/carried over, ice cream then removed with sparkle.
 
-With bx: `bx open http://localhost:7710`, `bx fill typed "<sentence>"`, `bx press Enter`, `bx wait 7000`, `bx snap`.
+With bx: `bx open http://localhost:7710`, `bx click "Type a story"`, `bx fill typed "<sentence>"`, `bx press Enter`, `bx wait 7000`, `bx snap`.
 
 ## Debug report [cheap]
 
@@ -42,7 +48,7 @@ After any beat, debug panel → "copy report" reads "copied" for 2s and the clip
 
 ## Subtitle states [cheap]
 
-Type two sentences quickly. The first sentence sits on a yellow highlight while its call streams (`[data-testid=subtitles-drawing]`); the second is grey (`subtitles-waiting`) until its own call starts. Mic status reads "drawing the yellow bit! keep going".
+Type two sentences quickly. The first sentence sits on a yellow highlight while its call streams (`[data-testid=subtitles-drawing]`); the second is grey (`subtitles-waiting`) until its own call starts. The paper status reads "Your words are coming to life".
 
 ## ops dialect (default) [cheap]
 

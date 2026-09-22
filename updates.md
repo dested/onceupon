@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-22 — iPad drawing screen
+Built the approved picture-book screen: stitched coral binding, illustrated welcome, mic dock, optional typing and page trays, quieter options, new-story confirmation, and finale/replay actions. Added safe areas, compact/portrait layouts, reduced motion, and pause/save on backgrounding. Typecheck/build passed; browser flow exercised with partial automation (runner stalled).
+Touched: src/ui/{StoryScreen,StoryWelcome,Filmstrip}.tsx, src/styles/app.css, index.html, cliffnotes.md, ui.md, features/story-loop.md, verify.md.
+
 ## 2026-09-22 — plans updated after the viability review (packs only, gifting, web checkout) Then: admin portal section added to the production plan (overview, usage, ledger, revenue, costs, shares, kid-safety, feature flags incl. the free-story-seconds knob, alerts); week 2 of the launch sequence carries it. Then: no RevenueCat (own StoreKit 2 JWS validation + server notifications); the kid is the narrator: voice recorded on device for every story, in replay and mp4, on the share page only for paying accounts after a consent notice (a purchase is COPPA-accepted parental consent). Tutorial coach lines: TTS rendered once, bundled.
 
 Sal: "packs only, ONLY"; 60 s/week free; "road trip and gifting are core, maybe two minutes up front, not locked into anything; update all the notes and plans." GTM and production plans now decide: free first story ~2 min with the sleepy-crayon paywall, packs 40/120/400, gift codes sold on the website via Stripe and redeemed behind the gate, US web checkout link-out, a finale-style rebuy screen, Apple featuring + share loop as the growth engine with Apple Ads as a capped seed, road trip = 400 pack + offline replay. No code.

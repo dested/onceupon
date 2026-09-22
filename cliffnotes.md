@@ -1,6 +1,6 @@
 # Once Upon — cliffnotes
 
-> Living map of the project. Read first, every task. Last updated: 2026-09-22 (ops dialect)
+> Living map of the project. Read first, every task. Last updated: 2026-09-22 (iPad drawing screen)
 
 ## What it is
 
@@ -71,9 +71,10 @@ src/
     session.ts             LiveSession (mic + director + stage + autosave) and ReplaySession
     debug-report.ts        buildDebugReport(): the pasteable text dump behind the debug panel's "copy report" (one clock, merged timeline)
   ui/
-    StoryScreen.tsx        canvas, mic button, toolbar, typed-input fallback, panels (warnings only as a red dot on the bug icon; text lives in the debug panel)
+    StoryScreen.tsx        iPad picture-book layout, mic dock, options, expandable typing/page trays, new-story confirmation and ending actions
+    StoryWelcome.tsx       decorative SVG crayon and empty-page invitation; never enters saved drawings
     Subtitles.tsx          one clipped line along the bottom; newest words stay visible (float-right trick)
-    SpendChip.tsx          running $ / calls / time-to-first-stroke under the toolbar
+    SpendChip.tsx          running $ / calls / time-to-first-stroke, visible with the development drawing lab
     Filmstrip.tsx          thumbnails of earlier pages, top-left
     SettingsPanel.tsx      provider/model picker + API key
     DebugPanel.tsx         latency stats + raw DSL stream (backtick key) + voice lab (level meter, save clip, compare models, transcriber trace)
@@ -168,6 +169,8 @@ scripts/                   one-off dev scripts (probe-deepgram.ts: stream a WAV 
 - Web Speech only exists in Chrome/Edge. The typed-sentence input at bottom-right is the mic-free path (also what `bx` tests use).
 
 ## Status
+
+- Drawing screen redesigned for iPad: stitched book, welcome illustration, separate mic dock, safe-area/portrait/compact layouts, optional typing, earlier-page tray, new-story confirmation, and finale actions. Backgrounding pauses listening and saves. Existing browser-direct keys/settings remain; this is the drawing UI, not the native/server launch milestone.
 
 - Default drawing language is `ops` (v3) since 2026-09-22. Side-by-side on Sonnet 5, same two sentences: json 2230 + 934 output tokens, 17.7s + 8.9s, $0.052; ops 649 + 293 tokens, 7.4s + 3.6s, $0.013, picture equal or better (mirrored pairs, true circles). `json` and `lines` stay selectable and saved stories replay in the dialect they were recorded with.
 - Earlier experiment: JSON ops dialect on Haiku 4.5, same opening sentence: first token ~500ms either way; JSON call 1116 output tokens / 6.5s / $0.008 vs lines ~200 tokens / ~2.5s / ~$0.002.
