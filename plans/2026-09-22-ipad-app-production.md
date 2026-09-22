@@ -134,6 +134,8 @@ Pages: landing (an embedded live replay is the hero, the pitch is the product), 
 
 ## Open questions for Sal
 
-1. Free tier: a one-time first story plus a small daily allowance, or daily only? What daily-active free count are you planning for?
-3. Ears vendor for launch: decide after the Deepgram A/B on a real kid.
+1. The exact free first-story length (about 2 minutes; a server constant).
+2. Ears vendor for launch: decide after the Deepgram versus OpenAI A/B on a real kid.
+3. Expected free daily actives, for the calculator's free-tier line.
+
    Settled: tutorial coach lines are TTS rendered once and bundled; share links expire after 90 days; mp4 download exists in both the app and the website; the child's voice is recorded on the device for every story, plays in replay and the mp4, and goes on the share page only for paying accounts after a consent notice; no RevenueCat.
