@@ -1,0 +1,9 @@
+{
+  "version": 5,
+  "parent": 4,
+  "createdAt": "2026-09-22T22:55:36.397Z",
+  "note": "Lone subject = any single thing, scale from height; frog/ghost/airplane recipes; mane fringe; restore dropped recipes",
+  "rationale": "Agent-mode rounds r003 (v3, 70.9) and r004 (v4) agree on what is left:\n1. too-small is the top remaining kind. v4 scoped the lone-subject rule to food/toy/animal/vehicle, so people, creatures, plants and buildings drawn alone (pirate, ghost, robot, monster, boy, girl, grandpa, princess, flower, cat on a bed) sat small in an empty page. v5 makes the rule cover any single thing and replaces the height buckets with scale = 300 / recipe height plus the top check; flying things get y=330.\n2. Frog failed twice (head merged into the body) and ghost twice (tiny, faint): both had no recipe. v5 adds short recipes with a separate head / a floating sheet with a wavy hem.\n3. Airplane failed in both rounds (hollow box wings; front view clipped off the page). v5 adds a side-view recipe with fan wings drawn after the body.\n4. The horse/unicorn mane slab read as a saddle; v5 draws it as a thick fringe line.\n5. Pirate hat covered the eyes; the hat now sits on the head top.\n6. v4 dropped star, heart, sun stamp, ball, table and the birthday beat to fit the cap; none are in the test set but real stories use them. v5 restores them in two compact lines and removes the blank lines the deletions left.",
+  "tokens": 5409,
+  "source": "manual"
+}

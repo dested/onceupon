@@ -21,12 +21,22 @@ import type { DrawLine } from './types'
 const SETTLE_MIN_MS = 4000
 const SETTLE_CAP_MS = 15000
 
-export function renderOps(canvas: HTMLCanvasElement, lines: string[], seed: number): DrawLine[] {
+export function renderOps(
+  canvas: HTMLCanvasElement,
+  lines: string[],
+  seed: number,
+  /** Fixed backing size for a detached canvas (agent mode); omit to follow the element's CSS size. */
+  size?: { w: number; h: number }
+): DrawLine[] {
   const scene = new Scene()
   const clock = new VirtualClock()
-  const stage = new Stage(canvas, { seed, clock })
-  // Keep the canvas at its CSS size; only match the backing store to the element and DPR.
-  stage.resize()
+  if (size) {
+    canvas.width = size.w
+    canvas.height = size.h
+  }
+  const stage = size ? new Stage(canvas, { seed, clock, size }) : new Stage(canvas, { seed, clock })
+  // Visible canvas: match the backing store to the element and DPR. Fixed size: the Stage already did.
+  if (!size) stage.resize()
   stage.setInstant(true)
   stage.showCursor = false
 

@@ -23,6 +23,7 @@ import { drawPhrase, type DrawOutcome } from './draw'
 import { blindGuess, judgeCase } from './judge'
 import { proposePatch } from './editor'
 import { applyPatch, countPromptTokens, validatePrompt } from './prompt-tools'
+import { readBytes } from './api'
 import {
   appendHistory,
   loadCampaign,
@@ -390,6 +391,15 @@ export class Campaign {
     version: number
   ): Promise<void> {
     const cfg = this._state.config
+    // A round that judged fewer than 90% of its planned cases is not trustworthy: never keep it.
+    const judged = round.judged ?? 0
+    if (judged < 0.9 * round.planned) {
+      round.kept = false
+      round.verdict = `incomplete: ${judged}/${round.planned} judged`
+      await saveRound(round)
+      this.log(`${round.id} ${round.verdict}`)
+      return
+    }
     const newOverall = round.meanOverall ?? 0
     const bestOverall = bestRound.meanOverall ?? 0
     const delta = newOverall - bestOverall
@@ -479,6 +489,7 @@ export class Campaign {
     let next = 0
     const active = new Map<number, string>()
     let stopped = false
+    let judgeFailStreak = 0
 
     const worker = async (): Promise<void> => {
       for (;;) {
@@ -506,6 +517,14 @@ export class Campaign {
 
         active.delete(myIdx)
         this.setProgress({ done: results.length, active: [...active.values()] })
+
+        judgeFailStreak = result.critiqueError === null ? 0 : judgeFailStreak + 1
+        if (judgeFailStreak >= 3 && !stopped) {
+          stopped = true
+          this.log('judge failing repeatedly, stopping')
+          this.setState({ status: 'stopped' })
+          return
+        }
       }
     }
 
@@ -530,6 +549,7 @@ export class Campaign {
     catOf: Map<string, string>
   ): void {
     const critiques = results.map((r) => r.critique).filter((c): c is Critique => c !== null)
+    round.judged = critiques.length
     round.meanOverall = mean(critiques.map((c) => c.overall))
     round.meanRecognizable = mean(critiques.map((c) => c.recognizable))
     round.blindYesRate =
@@ -630,7 +650,7 @@ export class Campaign {
 
   private async critique(
     c: LabCase,
-    outcome: DrawOutcome
+    source: { image: Blob; ops: string }
   ): Promise<{
     critique: Critique | null
     critiqueError: string | null
@@ -640,7 +660,7 @@ export class Campaign {
     let blind = ''
     let blindCost: number | null = null
     try {
-      const bg = await blindGuess(outcome.image, cfg.blindModel)
+      const bg = await blindGuess(source.image, cfg.blindModel)
       blind = bg.guess
       blindCost = bg.costUsd
     } catch (e) {
@@ -649,8 +669,8 @@ export class Campaign {
     try {
       const j = await judgeCase({
         c,
-        ops: outcome.ops,
-        image: outcome.image,
+        ops: source.ops,
+        image: source.image,
         blindGuess: blind,
         model: cfg.judgeModel,
       })
@@ -737,6 +757,65 @@ export class Campaign {
     const result: CaseResult = { draw, critique, critiqueError }
     await saveCaseResult('play', result, outcome.image)
     return result
+  }
+
+  /**
+   * Judge every case in a round that has no critique yet (e.g. an agent-mode round whose drawings were
+   * saved but not judged, or a round the API ran out on midway). Reads each saved jpg back, runs the
+   * blind guess and judge, re-saves the case, recomputes the round, and — for a non-baseline round —
+   * re-runs the keep/revert decision against the current best. Adds the judge/blind spend to the
+   * campaign total but changes no other campaign state beyond bestVersion/bestRoundId if a revisit
+   * flips the verdict.
+   */
+  async rejudge(rid: string): Promise<void> {
+    const round = (await loadRounds()).find((r) => r.id === rid)
+    if (!round) throw new Error(`no round ${rid} to rejudge`)
+    const results = await loadCaseResults(rid)
+    const allCases = await loadCases()
+    const caseById = new Map(allCases.map((c) => [c.id, c]))
+    const catOf = new Map(allCases.map((c) => [c.id, c.category]))
+
+    for (const r of results) {
+      if (r.critique) continue
+      const bytes = await readBytes(r.draw.imagePath)
+      if (!bytes) {
+        this.log(`rejudge ${rid}: image missing for ${r.draw.caseId}, skipped`)
+        continue
+      }
+      const image = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' })
+      const c: LabCase = caseById.get(r.draw.caseId) ?? {
+        id: r.draw.caseId,
+        phrase: r.draw.phrase,
+        tier: 'subject',
+        category: catOf.get(r.draw.caseId) ?? 'play',
+        expect: [],
+      }
+      const { critique, critiqueError, blindCost } = await this.critique(c, {
+        image,
+        ops: r.draw.ops,
+      })
+      const updated: CaseResult = { draw: r.draw, critique, critiqueError }
+      await saveCaseResult(rid, updated, image)
+      r.critique = critique
+      r.critiqueError = critiqueError
+      round.judgeCostUsd += (blindCost ?? 0) + (critique?.judgeCostUsd ?? 0)
+      this.setState({
+        spentUsd: this._state.spentUsd + (blindCost ?? 0) + (critique?.judgeCostUsd ?? 0),
+      })
+    }
+
+    this.recomputeMeans(round, results, catOf)
+    round.done = results.length
+    await saveRound(round)
+
+    if (round.n > 0) {
+      const bestId = this._state.bestRoundId
+      if (bestId && bestId !== rid) {
+        const bestRound = (await loadRounds()).find((x) => x.id === bestId)
+        if (bestRound) await this.decideKeep(round, bestRound, round.promptVersion)
+      }
+    }
+    this.log(`rejudged ${rid}: ${round.judged ?? 0}/${round.planned} judged`)
   }
 
   /**

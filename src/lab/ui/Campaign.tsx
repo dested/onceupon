@@ -16,6 +16,7 @@ export function CampaignTab({ campaign }: { campaign: Campaign }) {
   const idleish = state.status === 'idle' || state.status === 'stopped' || state.status === 'done'
 
   const [draft, setDraft] = useState<CampaignConfig>(state.config)
+  const [rejudging, setRejudging] = useState<string | null>(null)
   const cases = useLoader<LabCase[]>(
     () => loadCases(),
     [],
@@ -75,6 +76,18 @@ export function CampaignTab({ campaign }: { campaign: Campaign }) {
       await campaign.resume()
     } catch (e) {
       toast.push(errText(e))
+    }
+  }
+
+  async function onRejudge(rid: string) {
+    setRejudging(rid)
+    try {
+      await campaign.rejudge(rid)
+      rounds.refresh()
+    } catch (e) {
+      toast.push(errText(e))
+    } finally {
+      setRejudging(null)
     }
   }
 
@@ -305,6 +318,7 @@ export function CampaignTab({ campaign }: { campaign: Campaign }) {
                 <Th>cost</Th>
                 <Th>kept</Th>
                 <Th>verdict</Th>
+                <Th>judge</Th>
               </tr>
             </thead>
             <tbody>
@@ -325,6 +339,21 @@ export function CampaignTab({ campaign }: { campaign: Campaign }) {
                   <Td>{r.kept === null ? '—' : r.kept ? '✓' : '✗'}</Td>
                   <Td className="max-w-[18rem] truncate" title={r.verdict}>
                     {r.verdict}
+                  </Td>
+                  <Td>
+                    {(r.judged ?? 0) < r.done ? (
+                      <button
+                        disabled={rejudging !== null}
+                        onClick={() => void onRejudge(r.id)}
+                        title={`${r.judged ?? 0}/${r.done} judged — run the judge on the rest`}
+                        className="border-ink bg-paper rounded-lg border-2 px-2 py-0.5 text-xs whitespace-nowrap disabled:opacity-40">
+                        {rejudging === r.id
+                          ? 'judging…'
+                          : `judge ${r.done - (r.judged ?? 0)} missing`}
+                      </button>
+                    ) : (
+                      <span className="text-ink-soft text-xs">✓</span>
+                    )}
                   </Td>
                 </tr>
               ))}

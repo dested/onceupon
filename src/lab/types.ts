@@ -149,6 +149,8 @@ export const roundSummarySchema = z.object({
   /** Case results expected / finished. */
   planned: z.number().int(),
   done: z.number().int(),
+  /** Case results that carry a critique (optional; older rounds saved before this field omit it). */
+  judged: z.number().int().nonnegative().optional(),
   meanOverall: z.number().nullable(),
   meanRecognizable: z.number().nullable(),
   /** Share of cases whose blindMatch is `yes`, 0..1. */

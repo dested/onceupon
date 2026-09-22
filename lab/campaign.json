@@ -60,8 +60,8 @@
       "bird-nest-tree"
     ]
   },
-  "bestVersion": 3,
-  "bestRoundId": "r001",
+  "bestVersion": 4,
+  "bestRoundId": "r004",
   "baselinePromptTokens": 6451,
   "baselineOutputTokens": 213.06666666666666,
   "currentRoundId": null,
@@ -145,7 +145,10 @@
     "15:05:58 judge failed for a dragon breathing fire at a castle: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011CfKEiaLZEUB3Nh8EqFyqR\"}",
     "15:05:58 r002 kept: +4.3 overall (65.2 → 69.5)",
     "15:05:58 error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011CfKEic7xoKYKPD1AYDKkM\"}",
-    "15:10:15 r002 downgraded by Fable: only 10/45 judged (credits ran out), not a fair keep; best back to v3 until r002 is rejudged"
+    "15:10:15 r002 downgraded by Fable: only 10/45 judged (credits ran out), not a fair keep; best back to v3 until r002 is rejudged",
+    "15:46:32 r003 kept: +5.7 overall (65.2 → 70.9)",
+    "15:46:50 r003 is the agent-mode baseline (v3, 70.9); later rounds compare to it",
+    "15:58:15 r004 kept: +4.8 overall (70.9 → 75.8)"
   ],
-  "updatedAt": "2026-09-22T22:10:15.549Z"
+  "updatedAt": "2026-09-22T22:58:15.658Z"
 }

@@ -1,7 +1,9 @@
 node_modules
 dist
+dist-hosted
 .env
 .env.local
+.env.*.local
 *.log
 lab/runs/
 lab/archive/
@@ -21,3 +23,4 @@ apps/mobile/*.jks
 apps/mobile/*.p8
 apps/mobile/*.p12
 apps/mobile/*.mobileprovision
+lab/agent/r*/
