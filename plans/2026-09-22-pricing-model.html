@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Once Upon Minutes</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --paper: #fbf6ea;
+    --paper-deep: #efe6d2;
+    --paper-line: #e2d6bc;
+    --ink: #3b2f2f;
+    --ink-soft: #8a7a6a;
+    --ink-faint: #b8a894;
+    --yellow: #fbbf24;
+    --red: #ef4444;
+    --green: #22c55e;
+    --s-out: #2a78d6;   /* LLM output tokens */
+    --s-in: #eb6834;    /* LLM input tokens */
+    --s-stt: #1baf7a;   /* ears */
+    --s-apple: #b8a894; /* store cut */
+    --s-margin: #2a78d6;
+    --good: #1f7a3a;
+    --bad: #c0392b;
+    --tile: #fffdf7;
+    --shadow: #3b2f2f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #221c1a;
+      --paper-deep: #2e2623;
+      --paper-line: #3f3531;
+      --ink: #f3ebdc;
+      --ink-soft: #b9aa97;
+      --ink-faint: #7d6e5f;
+      --s-out: #3987e5;
+      --s-in: #d95926;
+      --s-stt: #199e70;
+      --s-apple: #7d6e5f;
+      --s-margin: #3987e5;
+      --good: #4ccb74;
+      --bad: #f07567;
+      --tile: #2a2320;
+      --shadow: #0f0b0a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #221c1a;
+    --paper-deep: #2e2623;
+    --paper-line: #3f3531;
+    --ink: #f3ebdc;
+    --ink-soft: #b9aa97;
+    --ink-faint: #7d6e5f;
+    --s-out: #3987e5;
+    --s-in: #d95926;
+    --s-stt: #199e70;
+    --s-apple: #7d6e5f;
+    --s-margin: #3987e5;
+    --good: #4ccb74;
+    --bad: #f07567;
+    --tile: #2a2320;
+    --shadow: #0f0b0a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.45;
+    padding-inline: 16px;
+    padding-block: 0 48px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  header { padding-block: 28px 18px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; }
+  h1 { font-family: "Patrick Hand", "Comic Sans MS", cursive; font-weight: 400; font-size: 2.6rem; margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
+  header p { margin: 0; color: var(--ink-soft); max-width: 60ch; }
+  h2 { font-family: "Patrick Hand", cursive; font-weight: 400; font-size: 1.5rem; margin: 0 0 8px; }
+  h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); margin: 0 0 8px; font-weight: 600; }
+
+  .grid { display: grid; grid-template-columns: 330px 1fr; gap: 28px; align-items: start; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+  aside { display: flex; flex-direction: column; gap: 18px; }
+  fieldset { border: 3px solid var(--ink); border-radius: 18px; padding: 12px 14px 14px; margin: 0; background: var(--tile); box-shadow: 3px 4px 0 var(--shadow); }
+  legend { font-family: "Patrick Hand", cursive; font-size: 1.35rem; padding: 0 8px; }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; margin-top: 10px; }
+  .row label { font-weight: 600; font-size: 0.95rem; }
+  .row .val { font-family: "JetBrains Mono", monospace; font-size: 0.85rem; color: var(--ink-soft); text-align: right; font-variant-numeric: tabular-nums; }
+  .row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--ink); margin: 0; }
+  .row select, .row input[type=number] { grid-column: 1 / -1; font: inherit; padding: 6px 8px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper); color: var(--ink); }
+  .row small { grid-column: 1 / -1; color: var(--ink-soft); font-size: 0.82rem; line-height: 1.3; }
+  .seg { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg label { flex: 1; text-align: center; border: 2px solid var(--ink); border-radius: 10px; padding: 5px 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; background: var(--paper); }
+  .seg input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .seg input:checked + span { display: block; }
+  .seg label:has(input:checked) { background: var(--yellow); color: #3b2f2f; }
+  .seg label:has(input:focus-visible) { outline: 3px solid var(--s-out); outline-offset: 2px; }
+  input:focus-visible, select:focus-visible { outline: 3px solid var(--s-out); outline-offset: 2px; }
+
+  .results { display: flex; flex-direction: column; gap: 26px; min-width: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 1080px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+  .tile { background: var(--tile); border: 3px solid var(--ink); border-radius: 18px; padding: 12px 14px 10px; box-shadow: 3px 4px 0 var(--shadow); }
+  .tile .k { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); font-weight: 600; }
+  .tile .v { font-family: "JetBrains Mono", monospace; font-size: 1.7rem; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; line-height: 1.15; }
+  .tile .s { color: var(--ink-soft); font-size: 0.85rem; margin-top: 4px; }
+  .tile.good .v { color: var(--good); }
+  .tile.bad .v { color: var(--bad); }
+
+  .panel { min-width: 0; }
+  .chart { width: 100%; height: auto; display: block; overflow: visible; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.85rem; color: var(--ink-soft); margin: 8px 0 0; padding: 0; list-style: none; }
+  .legend li { display: flex; align-items: center; gap: 6px; }
+  .legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 2px solid var(--paper-line); }
+  th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 600; }
+  td.n, th.n { text-align: right; font-family: "JetBrains Mono", monospace; font-size: 0.9rem; }
+  tr.total td { font-weight: 700; border-bottom: none; border-top: 3px solid var(--ink); }
+  tr.pick td { background: color-mix(in srgb, var(--yellow) 22%, transparent); }
+  .tablewrap { overflow-x: auto; }
+  .note { color: var(--ink-soft); font-size: 0.9rem; margin: 6px 0 0; max-width: 70ch; }
+  .note b { color: var(--ink); }
+  .callout { border-left: 5px solid var(--red); padding: 6px 12px; background: var(--tile); border-radius: 0 12px 12px 0; margin-top: 8px; font-size: 0.95rem; }
+  .sources { font-size: 0.82rem; color: var(--ink-soft); }
+  .sources a { color: var(--ink-soft); }
+  .tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--paper); font-size: 0.82rem; padding: 6px 9px; border-radius: 8px; transform: translate(-50%, -125%); white-space: nowrap; z-index: 9; font-variant-numeric: tabular-nums; }
+  .tip[hidden] { display: none; }
+  @media (prefers-reduced-motion: no-preference) { .tile .v { transition: color 0.2s; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Once Upon minutes</h1>
+    <p>What a minute of mic-open story time costs to serve, and what a pack of minutes earns after Apple. Drag things.</p>
+  </header>
+
+  <div class="grid">
+    <aside>
+      <fieldset>
+        <legend>Crayon (the drawing model)</legend>
+        <div class="row">
+          <label for="model">Model</label><span class="val" id="modelPrice"></span>
+          <select id="model">
+            <option value="sonnet5" selected>Sonnet 5 · $2 in / $10 out</option>
+            <option value="haiku45">Haiku 4.5 · $1 in / $5 out</option>
+            <option value="opus5">Opus 5 · $5 in / $25 out</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Drawing language</label><span class="val"></span>
+          <div class="seg">
+            <label><input type="radio" name="dialect" id="dialectOps" value="ops" checked>Ops</label>
+            <label><input type="radio" name="dialect" id="dialectJson" value="json">JSON ops</label>
+            <label><input type="radio" name="dialect" id="dialectLines" value="lines">Lines</label>
+          </div>
+          <small>Ops is the default now: the JSON contract as terse lines. Measured on Sonnet 5, same two sentences: JSON 3,164 output tokens, Ops 942, same picture or better.</small>
+        </div>
+        <div class="row">
+          <label>Numbers</label><span class="val"></span>
+          <div class="seg">
+            <label><input type="radio" name="preset" id="presetMeasured" value="measured" checked>Measured</label>
+            <label><input type="radio" name="preset" id="presetConservative" value="conservative">Conservative</label>
+          </div>
+          <small>Measured: Sal's 78-second Deepgram + Sonnet 5 + Ops session on Sep 22 (7 billed calls, 1,063 output tokens, 96% of input from cache, $0.023). Conservative: the two dense opening sentences taken as every beat.</small>
+        </div>
+        <div class="row">
+          <label for="beats">Beats per mic minute</label><span class="val" id="beatsVal"></span>
+          <input type="range" id="beats" min="2" max="12" step="1" value="6">
+          <small>One call per sentence-ish chunk (≤14 words). Six to seven a minute is a kid talking most of the time.</small>
+        </div>
+        <div class="row">
+          <label for="outTok">Output tokens per beat</label><span class="val" id="outTokVal"></span>
+          <input type="range" id="outTok" min="30" max="2400" step="10" value="150">
+        </div>
+        <div class="row">
+          <label for="sceneTok">Scene snapshot tokens (uncached)</label><span class="val" id="sceneTokVal"></span>
+          <input type="range" id="sceneTok" min="0" max="2000" step="50" value="100">
+        </div>
+        <div class="row">
+          <label for="restart">Calls restarted mid-beat</label><span class="val" id="restartVal"></span>
+          <input type="range" id="restart" min="0" max="80" step="5" value="30">
+          <small>An aborted early call still bills its input plus ~100 output tokens.</small>
+        </div>
+        <div class="row">
+          <label for="session">Average session length</label><span class="val" id="sessionVal"></span>
+          <input type="range" id="session" min="1" max="30" step="1" value="8">
+          <small>Sets how big the cached story-so-far gets.</small>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Ears (speech to text)</legend>
+        <div class="row">
+          <label for="stt">Vendor</label><span class="val"></span>
+          <select id="stt">
+            <option value="0.017">OpenAI gpt-live-transcribe · $0.017/min</option>
+            <option value="0.006">OpenAI gpt-4o-transcribe (realtime) · $0.006/min</option>
+            <option value="0.0077" selected>Deepgram Nova-3 streaming · $0.0077/min list</option>
+            <option value="0.0048">Deepgram Nova-3 streaming · $0.0048/min promo</option>
+            <option value="0.0065">Deepgram Flux streaming · $0.0065/min promo</option>
+            <option value="0.0025">AssemblyAI Universal-Streaming · $0.0025/min</option>
+            <option value="0">Apple on-device SFSpeechRecognizer · free</option>
+            <option value="custom">Custom rate</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="sttRate">Rate, $ per mic minute</label><span class="val"></span>
+          <input type="number" id="sttRate" min="0" max="1" step="0.0005" value="0.0077">
+          <small>Billed on session (mic-open) time, talking or not.</small>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Pack</legend>
+        <div class="row">
+          <label for="packMin">Minutes in a pack</label><span class="val" id="packMinVal"></span>
+          <input type="range" id="packMin" min="5" max="120" step="5" value="40">
+        </div>
+        <div class="row">
+          <label for="packPrice">Price</label><span class="val" id="packPriceVal"></span>
+          <input type="range" id="packPrice" min="0.99" max="29.99" step="1" value="9.99">
+        </div>
+        <div class="row">
+          <label>Apple's cut</label><span class="val"></span>
+          <div class="seg">
+            <label><input type="radio" name="cut" id="cut15" value="0.15" checked>15% small business</label>
+            <label><input type="radio" name="cut" id="cut30" value="0.30">30%</label>
+          </div>
+          <small>15% while you net under $1M a year on the store and enroll.</small>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Free tier</legend>
+        <div class="row">
+          <label for="freeSec">Free seconds per week</label><span class="val" id="freeSecVal"></span>
+          <input type="range" id="freeSec" min="0" max="1800" step="30" value="60">
+        </div>
+        <div class="row">
+          <label for="freeDau">Daily active free users</label><span class="val" id="freeDauVal"></span>
+          <input type="range" id="freeDau" min="0" max="20000" step="100" value="1000">
+        </div>
+        <div class="row">
+          <label for="freeUse">Share who use the whole allowance</label><span class="val" id="freeUseVal"></span>
+          <input type="range" id="freeUse" min="0" max="100" step="5" value="30">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Sales</legend>
+        <div class="row">
+          <label for="packs">Packs sold per month</label><span class="val" id="packsVal"></span>
+          <input type="range" id="packs" min="0" max="5000" step="10" value="980">
+        </div>
+        <div class="row">
+          <label for="burn">Share of bought minutes actually used</label><span class="val" id="burnVal"></span>
+          <input type="range" id="burn" min="10" max="100" step="5" value="65">
+          <small>Breakage. Unused minutes are pure margin; treat them as owed, not earned.</small>
+        </div>
+      </fieldset>
+    </aside>
+
+    <section class="results">
+      <div class="tiles">
+        <div class="tile"><div class="k">Cost per mic minute</div><div class="v" id="tMin"></div><div class="s" id="tMinS"></div></div>
+        <div class="tile"><div class="k">Cost to serve a pack</div><div class="v" id="tPack"></div><div class="s" id="tPackS"></div></div>
+        <div class="tile good"><div class="k">Margin per pack</div><div class="v" id="tMargin"></div><div class="s" id="tMarginS"></div></div>
+        <div class="tile" id="tFreeTile"><div class="k">Free tier per month</div><div class="v" id="tFree"></div><div class="s" id="tFreeS"></div></div>
+      </div>
+
+      <div class="panel">
+        <h2>Where a minute goes</h2>
+        <svg id="minuteChart" class="chart" viewBox="0 0 720 96" role="img" aria-label="Stacked bar of cost per mic minute"></svg>
+        <ul class="legend">
+          <li><i style="background:var(--s-out)"></i>Drawing output tokens</li>
+          <li><i style="background:var(--s-in)"></i>Drawing input (system, scene, story)</li>
+          <li><i style="background:var(--s-stt)"></i>Ears</li>
+        </ul>
+        <p class="note" id="minuteNote"></p>
+      </div>
+
+      <div class="panel">
+        <h2>One pack, dollar by dollar</h2>
+        <svg id="packChart" class="chart" viewBox="0 0 720 96" role="img" aria-label="Stacked bar of a pack's price split into Apple's cut, cost to serve, and margin"></svg>
+        <ul class="legend">
+          <li><i style="background:var(--s-apple)"></i>Apple</li>
+          <li><i style="background:var(--s-in)"></i>Serving the minutes</li>
+          <li><i style="background:var(--s-margin)"></i>Yours</li>
+        </ul>
+        <p class="note" id="packNote"></p>
+      </div>
+
+      <div class="panel">
+        <h2>A month</h2>
+        <div class="tablewrap">
+        <table id="monthTable">
+          <thead><tr><th>Line</th><th class="n">$ / month</th><th>How</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        </div>
+        <p class="note" id="monthNote"></p>
+      </div>
+
+      <div class="panel">
+        <h2>Offer ladder</h2>
+        <div class="tablewrap">
+        <table id="ladderTable">
+          <thead><tr><th>Offer</th><th class="n">Price</th><th class="n">Minutes</th><th class="n">Net after Apple</th><th class="n">Cost to serve</th><th class="n">Margin</th><th class="n">$ / min charged</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        </div>
+        <p class="note" id="ladderNote"></p>
+      </div>
+
+      <div class="panel">
+        <h2>Ears, side by side</h2>
+        <div class="tablewrap">
+        <table id="sttTable">
+          <thead><tr><th>Vendor</th><th class="n">$ / min</th><th class="n">Minute all-in</th><th class="n">40-min pack</th><th>Notes</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        </div>
+        <div class="callout" id="sttCallout"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Assumptions</h3>
+        <p class="note">Anthropic list prices from the repo's pricing table (Sonnet 5: $2 in, $10 out, cache read $0.20, cache write $2.50 per MTok). System prompt is a cached read every call (about 6,000 tokens Ops as measured, 5,300 JSON, 4,200 Lines). Each beat sends the scene snapshot and a ~150-token header uncached, writes the new ~30 words to cache, and reads the story-so-far from cache (grows with session length). Output tokens per beat: the measured preset is the Sep 22 session average (~150 on Ops; beats ranged 34 to 352); the conservative preset is the dense opening two sentences (942 tokens for two beats on Ops, 3,164 on JSON ops); Lines measured ~200 on Haiku. Restarts bill input plus 100 output tokens. Put fresh numbers from the debug panel into the sliders as the prompts change.</p>
+        <p class="sources">Speech prices, September 2026: <a href="https://costgoat.com/pricing/openai-transcription">OpenAI transcription</a> (gpt-live-transcribe and realtime whisper $0.017/min; gpt-4o-transcribe $0.006; gpt-transcribe $0.0045 file only), <a href="https://deepgram.com/pricing">Deepgram</a> (Nova-3 streaming $0.0077 list, $0.0048 promo; Flux $0.0065 promo), <a href="https://www.assemblyai.com/pricing">AssemblyAI</a> (Universal-Streaming $0.15/hr). <a href="https://developer.apple.com/app-store/small-business-program/">Apple Small Business Program</a> 15% on consumables under $1M net.</p>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(function () {
+  const MODELS = {
+    sonnet5: { name: 'Sonnet 5', input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+    haiku45: { name: 'Haiku 4.5', input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
+    opus5: { name: 'Opus 5', input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+  };
+  // out = output tokens per beat. ops and json measured on Sonnet 5 (two sentences: 942 and 3,164 tokens);
+  // lines measured on Haiku. system = cached system-prompt tokens; scene = uncached snapshot tokens.
+  // Presets for the ops dialect: measured (Sep 22 session: 34-352 output tokens a beat, avg ~150,
+  // 85-250 uncached input tokens, 6-7 beats a minute) vs conservative (the dense opening two sentences).
+  const PRESET = {
+    measured: { beats: 6, out: 150, scene: 100 },
+    conservative: { beats: 8, out: 470, scene: 300 },
+  };
+  const DIALECT = {
+    ops: { system: 6000, out: 150, scene: 100 },
+    json: { system: 5300, out: 1580, scene: 600 },
+    lines: { system: 4200, out: 220, scene: 150 },
+  };
+  const STT = [
+    { name: 'OpenAI gpt-live-transcribe', rate: 0.017, note: 'What the app uses today. Word-by-word, ~1s lag. Best kid-speech so far.' },
+    { name: 'OpenAI gpt-4o-transcribe (realtime)', rate: 0.006, note: 'Same socket, but only returns after a pause; loses the live feel.' },
+    { name: 'Deepgram Nova-3 streaming', rate: 0.0077, note: 'List price; $0.0048 promo now. Interim words, ~300ms. Untested on kids here.' },
+    { name: 'Deepgram Flux streaming', rate: 0.0065, note: 'Promo; list $0.0077. Built for turn-taking; may fit the quiet-window logic.' },
+    { name: 'AssemblyAI Universal-Streaming', rate: 0.0025, note: 'Cheapest hosted. Session-billed. Kid accuracy unknown.' },
+    { name: 'Apple SFSpeechRecognizer on-device', rate: 0, note: 'Free, native only (bridge into the webview). Accuracy on a five-year-old is the open question.' },
+  ];
+  const $ = (id) => document.getElementById(id);
+  const money = (n, d = 2) => (n < 0 ? '-' : '') + '$' + Math.abs(n).toFixed(d);
+  const cents = (n) => n < 0.995 ? (n * 100).toFixed(n < 0.0995 ? 2 : 1) + '¢' : money(n);
+  const fmt = (n) => n.toLocaleString('en-US');
+
+  const ids = ['model','beats','outTok','sceneTok','restart','session','stt','sttRate','packMin','packPrice','freeSec','freeDau','freeUse','packs','burn','dialectOps','dialectJson','dialectLines','cut15','cut30','presetMeasured','presetConservative'];
+  const KEY = 'onceupon-minutes-v6';
+  const dialectOf = () => ($('dialectOps').checked ? 'ops' : $('dialectJson').checked ? 'json' : 'lines');
+
+  function read() {
+    return {
+      model: $('model').value,
+      dialect: dialectOf(),
+      beats: +$('beats').value,
+      outTok: +$('outTok').value,
+      sceneTok: +$('sceneTok').value,
+      restart: +$('restart').value / 100,
+      session: +$('session').value,
+      sttRate: +$('sttRate').value,
+      packMin: +$('packMin').value,
+      packPrice: +$('packPrice').value,
+      cut: $('cut15').checked ? 0.15 : 0.30,
+      freeSec: +$('freeSec').value,
+      freeDau: +$('freeDau').value,
+      freeUse: +$('freeUse').value / 100,
+      packs: +$('packs').value,
+      burn: +$('burn').value / 100,
+    };
+  }
+
+  // Cost of one mic minute of the drawing model, split into output and input dollars.
+  function llmPerMinute(s) {
+    const m = MODELS[s.model];
+    const d = DIALECT[s.dialect];
+    const beatsTotal = s.beats * s.session;
+    const wordsTok = 30, headerTok = 150, abortOut = 100;
+    const storyReadAvg = (beatsTotal / 2) * wordsTok;
+    const inputPerBeat =
+      (d.system * m.cacheRead + storyReadAvg * m.cacheRead + wordsTok * m.cacheWrite + (s.sceneTok + headerTok) * m.input) / 1e6;
+    const outputPerBeat = (s.outTok * m.output) / 1e6;
+    const restartIn = s.restart * inputPerBeat;
+    const restartOut = s.restart * (abortOut * m.output) / 1e6;
+    return {
+      output: (outputPerBeat + restartOut) * s.beats,
+      input: (inputPerBeat + restartIn) * s.beats,
+      perBeat: inputPerBeat + outputPerBeat + restartIn + restartOut,
+    };
+  }
+
+  function compute(s) {
+    const llm = llmPerMinute(s);
+    const perMin = llm.output + llm.input + s.sttRate;
+    const packCost = perMin * s.packMin;
+    const packCostUsed = packCost * s.burn;
+    const apple = s.packPrice * s.cut;
+    const net = s.packPrice - apple;
+    const margin = net - packCost;
+    const freeMinDay = (s.freeSec / 60 / 7) * s.freeDau * s.freeUse;
+    const freeMonth = freeMinDay * perMin * 30;
+    const revenue = s.packs * s.packPrice;
+    const appleMonth = revenue * s.cut;
+    const cogsPacks = s.packs * packCostUsed;
+    const profit = revenue - appleMonth - cogsPacks - freeMonth;
+    const packsToCoverFree = margin > 0 ? Math.ceil(freeMonth / (net - packCostUsed)) : Infinity;
+    return { llm, perMin, packCost, packCostUsed, apple, net, margin, freeMonth, freeMinDay, revenue, appleMonth, cogsPacks, profit, packsToCoverFree };
+  }
+
+  function stacked(svg, segs, total, labelFn) {
+    const W = 720, H = 96, x0 = 0, barY = 18, barH = 40, gap = 2;
+    const usable = W - gap * (segs.length - 1);
+    let x = x0;
+    let out = '';
+    segs.forEach((g, i) => {
+      const w = total > 0 ? Math.max(0, (g.value / total) * usable) : 0;
+      const last = i === segs.length - 1, first = i === 0;
+      const r = 4;
+      const path = w > 0 ? `M${x + (first ? r : 0)},${barY} H${x + w - (last ? r : 0)} ${last ? `a${r},${r} 0 0 1 ${r},${r} V${barY + barH - r} a${r},${r} 0 0 1 -${r},${r}` : `V${barY + barH}`} H${x + (first ? r : 0)} ${first ? `a${r},${r} 0 0 1 -${r},-${r} V${barY + r} a${r},${r} 0 0 1 ${r},-${r}` : `V${barY}`} Z` : '';
+      out += `<path d="${path}" fill="${g.color}" data-tip="${g.name}: ${labelFn(g.value)} (${total > 0 ? Math.round(g.value / total * 100) : 0}%)"></path>`;
+      if (w > 64) out += `<text x="${x + w / 2}" y="${barY + barH / 2 + 5}" text-anchor="middle" font-size="13" font-family="JetBrains Mono, monospace" fill="#fff" pointer-events="none">${labelFn(g.value)}</text>`;
+      if (w > 110) out += `<text x="${x + w / 2}" y="${barY + barH + 18}" text-anchor="middle" font-size="12" fill="var(--ink-soft)" pointer-events="none">${g.name}</text>`;
+      x += w + gap;
+    });
+    out += `<text x="${W}" y="12" text-anchor="end" font-size="13" font-family="JetBrains Mono, monospace" fill="var(--ink)" font-weight="600">${labelFn(total)}</text>`;
+    svg.innerHTML = out;
+  }
+
+  function render() {
+    const s = read();
+    const r = compute(s);
+    const m = MODELS[s.model];
+
+    $('modelPrice').textContent = '';
+    $('beatsVal').textContent = s.beats + ' / min';
+    $('outTokVal').textContent = fmt(s.outTok) + ' tok';
+    $('sceneTokVal').textContent = fmt(s.sceneTok) + ' tok';
+    $('restartVal').textContent = Math.round(s.restart * 100) + '%';
+    $('sessionVal').textContent = s.session + ' min';
+    $('packMinVal').textContent = s.packMin + ' min';
+    $('packPriceVal').textContent = money(s.packPrice);
+    $('freeSecVal').textContent = (s.freeSec >= 60 ? (s.freeSec / 60).toFixed(s.freeSec % 60 ? 1 : 0) + ' min' : s.freeSec + ' s') + ' / wk';
+    $('freeDauVal').textContent = fmt(s.freeDau);
+    $('freeUseVal').textContent = Math.round(s.freeUse * 100) + '%';
+    $('packsVal').textContent = fmt(s.packs);
+    $('burnVal').textContent = Math.round(s.burn * 100) + '%';
+
+    $('tMin').textContent = cents(r.perMin);
+    $('tMinS').textContent = `${cents(r.llm.perBeat)} a beat on ${m.name} + ${cents(s.sttRate)} ears`;
+    $('tPack').textContent = money(r.packCost);
+    $('tPackS').textContent = `${s.packMin} min at ${cents(r.perMin)}; ${money(r.packCostUsed)} if ${Math.round(s.burn * 100)}% gets used`;
+    $('tMargin').textContent = money(r.margin);
+    $('tMarginS').textContent = `${money(r.net)} after Apple's ${Math.round(s.cut * 100)}%, ${r.net > 0 ? Math.round(r.margin / r.net * 100) : 0}% of net`;
+    const mt = $('tMargin').closest('.tile'); mt.classList.toggle('good', r.margin > 0); mt.classList.toggle('bad', r.margin <= 0);
+    $('tFree').textContent = money(r.freeMonth, 0);
+    $('tFreeS').textContent = `${fmt(Math.round(r.freeMinDay * 10) / 10)} free min/day; ${isFinite(r.packsToCoverFree) ? fmt(r.packsToCoverFree) + ' packs cover it' : 'no pack covers it'}`;
+
+    stacked($('minuteChart'), [
+      { name: 'Output', value: r.llm.output, color: 'var(--s-out)' },
+      { name: 'Input', value: r.llm.input, color: 'var(--s-in)' },
+      { name: 'Ears', value: s.sttRate, color: 'var(--s-stt)' },
+    ], r.perMin, cents);
+    const outShare = Math.round(r.llm.output / r.perMin * 100);
+    const jsonMin = (DIALECT.json.out - s.outTok) * m.output / 1e6 * s.beats;
+    $('minuteNote').innerHTML = `Output tokens are <b>${outShare}%</b> of a minute. The lever is tokens per beat, not the model's input price: every 100 output tokens per beat is ${cents(100 * m.output / 1e6 * s.beats)} a minute${s.dialect === 'ops' ? `, and Ops over JSON ops saves <b>${cents(jsonMin)}</b> a minute on ${m.name}` : ''}.`;
+
+    stacked($('packChart'), [
+      { name: 'Apple', value: r.apple, color: 'var(--s-apple)' },
+      { name: 'Serving', value: Math.min(r.packCost, r.net), color: 'var(--s-in)' },
+      { name: 'Yours', value: Math.max(0, r.margin), color: 'var(--s-margin)' },
+    ], s.packPrice, (v) => money(v));
+    $('packNote').innerHTML = r.margin > 0
+      ? `A ${s.packMin}-minute pack at ${money(s.packPrice)} costs ${money(r.packCost)} to serve in full. You could give away <b>${Math.floor(r.margin / r.perMin)}</b> more minutes before breaking even.`
+      : `This pack loses money: serving ${s.packMin} minutes costs ${money(r.packCost)} against ${money(r.net)} net.`;
+
+    const rows = [
+      ['Pack revenue', r.revenue, `${fmt(s.packs)} × ${money(s.packPrice)}`],
+      ['Apple', -r.appleMonth, `${Math.round(s.cut * 100)}% of revenue`],
+      ['Serving sold minutes', -r.cogsPacks, `${fmt(s.packs)} packs × ${s.packMin} min × ${Math.round(s.burn * 100)}% used`],
+      ['Serving the free tier', -r.freeMonth, `${fmt(Math.round(r.freeMinDay * 10) / 10)} min/day × 30`],
+    ];
+    const tb = $('monthTable').tBodies[0];
+    tb.innerHTML = rows.map(([k, v, how]) => `<tr><td>${k}</td><td class="n">${money(v, 0)}</td><td class="note" style="margin:0">${how}</td></tr>`).join('')
+      + `<tr class="total"><td>Gross profit</td><td class="n" style="color:${r.profit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(r.profit, 0)}</td><td></td></tr>`;
+    $('monthNote').innerHTML = `Not in here: Apple's $99/yr, the proxy server, RevenueCat or your own receipt validation, support, and the minutes a parent asks to be refunded. Free tier per daily-active free user: <b>${cents(r.freeMinDay > 0 ? r.freeMonth / (s.freeDau || 1) : 0)}</b> a month.`;
+
+    const ladder = [
+      { name: 'Story pack (locked)', price: 9.99, min: 40, kind: 'pack' },
+      { name: 'Big pack', price: 19.99, min: 120, kind: 'pack' },
+      { name: 'Family pack', price: 39.99, min: 400, kind: 'pack' },
+    ];
+    const lb = $('ladderTable').tBodies[0];
+    lb.innerHTML = ladder.map((o) => {
+      const netO = o.price * (1 - s.cut), cost = o.min * r.perMin, mg = netO - cost;
+      return `<tr class="${o.name.includes('locked') ? 'pick' : ''}"><td>${o.name}</td><td class="n">${money(o.price)}</td><td class="n">${fmt(o.min)}${o.kind === 'sub' ? ' / mo' : ''}</td><td class="n">${money(netO)}</td><td class="n">${money(cost)}</td><td class="n" style="color:${mg > 0 ? 'var(--good)' : 'var(--bad)'}">${money(mg)}</td><td class="n">${cents(o.price / o.min)}</td></tr>`;
+    }).join('');
+    $('ladderNote').innerHTML = `Packs only, no subscription (Sal, Sep 22). Costed at full use, so every row is the worst case; unused minutes are owed, not spent. Bigger packs charge less per minute but keep the margin: a minute costs ${cents(r.perMin)} whatever the pack.`;
+
+    const stb = $('sttTable').tBodies[0];
+    stb.innerHTML = STT.map((v) => {
+      const pm = r.llm.output + r.llm.input + v.rate;
+      const pick = Math.abs(v.rate - s.sttRate) < 1e-9;
+      return `<tr class="${pick ? 'pick' : ''}"><td>${v.name}</td><td class="n">${v.rate === 0 ? 'free' : money(v.rate, 4)}</td><td class="n">${cents(pm)}</td><td class="n">${money(pm * 40)}</td><td class="note" style="margin:0">${v.note}</td></tr>`;
+    }).join('');
+    const live = STT[0].rate, cheap = STT[4].rate;
+    $('sttCallout').innerHTML = `The app's spend chip prices ears at <b>$0.006/min</b> (<code>DEFAULT_STT_RATE</code>), but the live model it defaults to bills <b>${money(live, 3)}/min</b>, nearly 3× that. On a ${s.packMin}-minute pack, ears alone are ${money(live * s.packMin)} on OpenAI live versus ${money(cheap * s.packMin)} on AssemblyAI; the crayon is the same either way.`;
+
+    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+  }
+
+  function restore() {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+    if (!s) return;
+    try {
+      $('model').value = s.model;
+      ($('dialect' + (s.dialect === 'lines' ? 'Lines' : s.dialect === 'json' ? 'Json' : 'Ops'))).checked = true;
+      $('beats').value = s.beats; $('outTok').value = s.outTok; $('sceneTok').value = s.sceneTok;
+      $('restart').value = Math.round(s.restart * 100); $('session').value = s.session;
+      $('sttRate').value = s.sttRate; $('packMin').value = s.packMin; $('packPrice').value = s.packPrice;
+      (s.cut === 0.3 ? $('cut30') : $('cut15')).checked = true;
+      $('freeSec').value = s.freeSec; $('freeDau').value = s.freeDau; $('freeUse').value = Math.round(s.freeUse * 100);
+      $('packs').value = s.packs; $('burn').value = Math.round(s.burn * 100);
+      const opt = [...$('stt').options].find((o) => o.value !== 'custom' && Math.abs(+o.value - s.sttRate) < 1e-9);
+      $('stt').value = opt ? opt.value : 'custom';
+    } catch (e) {}
+  }
+
+  document.querySelectorAll('input[name=preset]').forEach((el) => el.addEventListener('change', () => {
+    const p = PRESET[$('presetMeasured').checked ? 'measured' : 'conservative'];
+    $('beats').value = p.beats; $('outTok').value = p.out; $('sceneTok').value = p.scene;
+    $('dialectOps').checked = true; render();
+  }));
+  // Dialect radio sets sensible token defaults; model select is just pricing.
+  document.querySelectorAll('input[name=dialect]').forEach((el) => el.addEventListener('change', () => {
+    const d = DIALECT[dialectOf()];
+    $('outTok').value = d.out; $('sceneTok').value = d.scene; render();
+  }));
+  $('stt').addEventListener('change', () => { if ($('stt').value !== 'custom') $('sttRate').value = $('stt').value; render(); });
+  $('sttRate').addEventListener('input', () => {
+    const opt = [...$('stt').options].find((o) => o.value !== 'custom' && Math.abs(+o.value - +$('sttRate').value) < 1e-9);
+    $('stt').value = opt ? opt.value : 'custom'; render();
+  });
+  ids.forEach((id) => { const el = $(id); if (el && id !== 'stt' && id !== 'sttRate' && !id.startsWith('dialect')) el.addEventListener('input', render); });
+
+  const tip = $('tip');
+  document.querySelectorAll('svg.chart').forEach((svg) => {
+    svg.addEventListener('mousemove', (e) => {
+      const t = e.target.closest('[data-tip]');
+      if (!t) { tip.hidden = true; return; }
+      tip.textContent = t.dataset.tip; tip.hidden = false;
+      tip.style.left = e.clientX + 'px'; tip.style.top = e.clientY + 'px';
+    });
+    svg.addEventListener('mouseleave', () => { tip.hidden = true; });
+  });
+
+  restore();
+  render();
+})();
+</script>
+
+</body>
+</html>
