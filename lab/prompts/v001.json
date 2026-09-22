@@ -1,0 +1,9 @@
+{
+  "parent": 0,
+  "note": "Lone subject: center x=600, 280-350 tall via scale; add fruit recipe",
+  "rationale": "All three failures are food drawn as a lone subject: each was placed at the first-character slot (x=350) and drawn at prop size, so it sat small and lopsided on an empty page. The prompt never says what to do when one thing is the whole picture. The rule is general: any lone subject (food, toy, animal, vehicle) goes at page center and fills about half the page height. I added this rule at the two moments the drawer reads sizes and positions: the Paper size line and the placement bullet. It uses the existing scale= argument so every cookbook recipe gets bigger without rewriting coordinates. I also added a round-fruit recipe (apple, orange, cherry), since fruit is a common food subject with no template.",
+  "tokens": 6667,
+  "source": "editor",
+  "version": 1,
+  "createdAt": "2026-09-22T20:37:40.939Z"
+}

@@ -1,5 +1,26 @@
 # Decisions
 
+## 2026-09-22 — MP4 export: the live engine on a virtual clock, hardware H.264, CPU canvases
+
+**Why:** the video must match replay and be reproducible, so it is the real Stage/Director/dialect stepped on a `VirtualClock` (no second renderer, no screen recording). Measured: GPU canvases vary by a few pixels between runs, so export canvases are CPU; Chrome's software H.264 (OpenH264) varies byte-wise for identical frames while the hardware encoder does not, so hardware is preferred; Mediabunny's `AudioBufferSource` varied the chunk layout, so audio is encoded with `AudioEncoder` up front and both tracks are muxed in a fixed order. Result: two exports differ only in the container creation times.
+**Rejected:** MediaRecorder on a live canvas (real time, frame drops, not deterministic); a separate export renderer (drifts from replay); Remotion (server/React render path for something the engine already draws); software-first encoding (non-deterministic).
+
+## 2026-09-22 — Prompt tuning is a measured hill-climb, promoted by hand
+
+**Why:** the prompt is the product's picture quality and its latency (every token is read on every
+call). Editing it by eye from one bad horse does not generalize. The lab (`lab.html`) draws a fixed
+test set through the real engine, has a vision judge score each picture and file every fault as a
+general rule, aggregates a whole round before an editor model proposes one patch, and keeps a
+version only if the mean score rises without output tokens or blind recognizability getting worse.
+Opus 5.5 judges and edits (sharper critique, better generalizing patches); Sonnet 5 draws because it
+is the production model. Versions live in `lab/prompts/`, the app keeps `src/llm/ops-prompt.ts`
+until Promote rewrites it: the campaign can run unattended without changing what the app does.
+The `# Ops` grammar section is frozen (the parser is fixed); edits may only touch guidance, cookbook,
+beats and the example, and every example line must still parse.
+**Rejected:** auto write-back on every kept round (a parallel session edits `src/llm`, and a bad
+judge round would ship); per-word critiques driving per-word rules (overfits; the editor sees a
+round, not a case); a headless Bun renderer (the engine is canvas code; the browser is the truth).
+
 ## 2026-09-22 — The End is detected on the client, not by the model
 
 **Why:** the child says "The End" and the story should stop drawing, play a finale and stop the meter.

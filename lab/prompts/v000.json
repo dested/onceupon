@@ -1,0 +1,9 @@
+{
+  "version": 0,
+  "parent": null,
+  "createdAt": "2026-09-22T20:18:03.000Z",
+  "note": "seeded from src/llm/ops-prompt.ts",
+  "rationale": "seeded from src/llm/ops-prompt.ts",
+  "tokens": 6451,
+  "source": "seed"
+}

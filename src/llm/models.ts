@@ -49,6 +49,7 @@ export interface Usage {
 const PRICING: Array<{ match: RegExp; input: number; output: number; cacheRead: number; cacheWrite: number }> = [
   { match: /claude-(fable|mythos)-5-1/, input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5 },
   { match: /claude-(fable|mythos)-5/, input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+  { match: /claude-opus-5-5/, input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
   { match: /claude-opus-(5|4-8|4-7|4-6|4-5)/, input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   { match: /claude-opus-4/, input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 },
   { match: /claude-sonnet-5/, input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },

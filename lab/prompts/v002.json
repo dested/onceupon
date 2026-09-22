@@ -1,0 +1,9 @@
+{
+  "parent": 1,
+  "note": "Lone-subject scale fix; object rule: no face, overlap joins, contrast, detail",
+  "rationale": "All three food subjects scored near 80 with no major issues. The minor issues cluster around the lone-subject rendering. Too-small (3): the scale threshold said 'under 180', so the 180-tall apple and near-threshold recipes got only 1.5 and landed below 280. Missing-part and wrong-color: stacked food parts share one fill (cake tiers are both pink) and lack the one detail that says what the thing is (cone waffle, frosting). Bad-overlap: stacked parts either gap or bury each other. Other: the ice cream got a face; the drawer applies the character face rule to objects. One general bullet covers objects and food: no face unless it acts, a slight overlap where stacked parts join, contrasting fills for neighbours, and one signature detail. It generalizes to toys, vehicles and buildings too. Two cookbook examples model it: waffle lines on the cone and white frosting on the cake. The threshold fix is a one-word change.",
+  "tokens": 6844,
+  "source": "editor",
+  "version": 2,
+  "createdAt": "2026-09-22T20:38:34.033Z"
+}

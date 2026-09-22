@@ -1,6 +1,6 @@
 # Once Upon — cliffnotes
 
-> Living map of the project. Read first, every task. Last updated: 2026-09-22 (iPad drawing screen)
+> Living map of the project. Read first, every task. Last updated: 2026-09-22 (mp4 export)
 
 ## What it is
 
@@ -45,7 +45,8 @@ src/
     stage.ts               Stage renderer: per-object layers, reveal queue, tweens, idle motion, bubbles, page turn, crayon cursor
     fx.ts                  particle effects (explode, sparkle, hearts, rain, fire, smoke, stars, poof, scribble-out)
     face.ts                faceShapes(): eyes + mouth anchored to a head contour (json dialect's face op)
-    audio.ts               synthesized crayon scratch + page flip (Web Audio)
+    audio.ts               synthesized crayon scratch + page flip (Web Audio, seeded noise); StageAudio, AudioCues + renderAudioCues() for offline export
+    clock.ts               Clock seam: realClock (live) and VirtualClock (export steps time; timers fire in order at their due time)
   llm/
     models.ts              provider + preset model list, per-MTok pricing, estimateCost()
     providers.ts           LlmProvider: Anthropic SDK (browser-direct) and OpenAI-compatible SSE (OpenRouter, OpenAI)
@@ -63,11 +64,14 @@ src/
     deepgram.ts            Deepgram Nova-3 streaming over a browser WebSocket (subprotocol auth, binary PCM16 frames, KeepAlive), same Recognizer shape; finals+interim mapped to RecResult[]
     clip-lab.ts            voice lab: run a saved clip through gpt-live-transcribe (socket), gpt-4o-transcribe and whisper-1 (REST) side by side
     beat-rules.ts          when a thought becomes a beat: trackerOptionsFor(settings) + the mic-energy hold constants (VOICE_LEVEL, VOICE_HOLD_MS)
+  export/
+    mp4.ts                 exportStoryVideo(): record -> VirtualClock replay -> 1280x800@30 H.264 (WebCodecs) + AAC -> Mediabunny mp4; VoiceTrack seam
+    frame.ts               BookFrame: the home screen's storybook drawn on canvas around the stage, caption pill, tags, corner logo, end card
   story/
     store.ts               app state (useSyncExternalStore), settings load/persist, env keys via zod
     storage.ts             StoryRecord zod schema, localStorage list/get/save/delete
     the-end.ts             THE_END phrase regex + splitTheEnd(): the child saying "The End" ends the story (client-side, before the model)
-    replay.ts              Replayer: plays a StoryRecord through a Director with gaps capped; seek()/position for the scrubber
+    replay.ts              Replayer: plays a StoryRecord through a Director with gaps capped (replaySchedule(), shared with export); seek()/position for the scrubber
     session.ts             LiveSession (mic + director + stage + autosave) and ReplaySession
     debug-report.ts        buildDebugReport(): the pasteable text dump behind the debug panel's "copy report" (one clock, merged timeline)
   ui/
@@ -79,11 +83,24 @@ src/
     SettingsPanel.tsx      provider/model picker + API key
     DebugPanel.tsx         latency stats + raw DSL stream (backtick key) + voice lab (level meter, save clip, compare models, transcriber trace)
     Bookshelf.tsx          saved stories grid, play, two-tap delete
-    ReplayScreen.tsx       replay canvas + play again
+    ReplayScreen.tsx       replay canvas + play again + download video
+    VideoExport.tsx        VideoExportButton (replay toolbar icon / closing-card button) + progress PaperCard with cancel; blob -> browser download
     bits.tsx               StickerButton, IconButton, PaperCard
+  lab/                     drawing lab (lab.html): word -> picture -> critique -> prompt hill-climb; spec plans/2026-09-22-drawing-lab.md
+    types.ts               zod contracts for everything under lab/ (cases, prompt versions, draw results, critiques, rounds, campaign, patches)
+    cases.ts               DEFAULT_CASES: ~45 subjects + 15 action phrases with judge expectations; seeds lab/cases.json
+    draw.ts                drawPhrase(): one phrase through the real OpsDialect + Stage (batch: VirtualClock, detached 1280x800; live: visible canvas), settled JPEG
+    judge.ts               blindGuess() (names the picture without the words) + judgeCase() (Opus 5.5 vision, structured JudgeOutput, JUDGE_SYSTEM)
+    editor.ts              proposePatch(): Opus 5.5 turns a round's critiques into find/replace edits on the prompt (EDITOR_SYSTEM)
+    prompt-tools.ts        applyPatch, validatePrompt (grammar section frozen, example lines must parse), diffLines, countPromptTokens
+    campaign.ts            Campaign: rounds, worker pool, keep/revert rule, resume from lab/campaign.json; runOne() for the playground
+    store.ts / api.ts      typed disk model over the dev-server file API (/__lab/*)
+    App.tsx, ui/           the page: Playground, Campaign, Results, Prompts, Cases tabs, detail drawer, inline SVG charts
+lab.html                   second Vite entry -> src/lab/main.tsx (http://localhost:7710/lab.html)
+lab/                       lab data: cases.json, campaign.json, history.jsonl, prompts/vNNN.md+json (tracked); runs/rNNN/*.jpg|.ops.txt|.json (gitignored)
 features/                  feature specs
 plans/                     dated working docs; 2026-09-22-pricing-model.html is the interactive cost calculator (open in a browser)
-scripts/                   one-off dev scripts (probe-deepgram.ts: stream a WAV to Deepgram with a key; tracker-check.ts: `bun scripts/tracker-check.ts`, tracker dedupe/correction regression, no framework)
+scripts/                   one-off dev scripts (probe-deepgram.ts: stream a WAV to Deepgram with a key; tracker-check.ts: `bun scripts/tracker-check.ts`, tracker dedupe/correction regression, no framework; lab-plugin.ts: the Vite dev plugin behind /__lab/* (file API confined to lab/, promote rewrites OPS_SYSTEM_PROMPT); export-check.mjs: `node scripts/export-check.mjs <outDir> <storyId>`, headless mp4 export + determinism check, see verify.md)
 ```
 
 ## File map (concept -> where)
@@ -108,7 +125,9 @@ scripts/                   one-off dev scripts (probe-deepgram.ts: stream a WAV 
 | what counts as not-for-kids          | `src/llm/prompt.ts` "For a small child" (the model judges, answers `skip`); `src/story/clean.ts` word masker       |
 | what the debug report contains       | `src/story/debug-report.ts`; button in `DebugPanel.tsx` (`copy-report`), also `window.__onceupon.report()`                    |
 | when a thought becomes a beat        | `src/speech/beat-rules.ts` (tracker options per recognizer, voice hold), `recognition.ts` `TranscriptTracker.tick`         |
+| the mp4 export (look, timing, codecs) | `src/export/mp4.ts` (stepper, encoders, mux), `src/export/frame.ts` (book, overlays, logo, end card); spec `features/mp4-export.md` |
 | ears cost / spend chip               | `src/story/store.ts` `Spend.audioMs`, `effectiveSttRate`/`sttRateFor`, `settings.sttRateOverride`; `SpendChip.tsx` |
+| tune the drawing prompt with evidence | the lab: `lab.html` → Playground (one word), Campaign (hill-climb); judge rubric `src/lab/judge.ts`, editor rules `editor.ts`, test set `cases.ts` |
 
 ## Screens
 
@@ -154,6 +173,8 @@ scripts/                   one-off dev scripts (probe-deepgram.ts: stream a WAV 
 - **The tracker dedupes released words by content.** Deepgram's `speech_final` re-segments an already-released interim into a SHORTER final at a new result index, so position-based consumption cannot survive the shift and the overlap went out twice. `TranscriptTracker` keeps a rolling normalized `releasedTail` and drops any leading chunk words that repeat it. A final whose leading words disagree with what was released (Deepgram rewrote "Please" → "The") fires the `correct` callback; `LiveSession.correct` rewrites the record and transcript but NOT the Director (the model already drew from the old words, and that is fine). `DEEPGRAM_TRACKER.minWords` is 2 so a one-word interim beat never releases. Regression: `bun scripts/tracker-check.ts`.
 - **The End is client-side.** `story/the-end.ts` matches the phrase on every chunk before it is recorded or sent; the model never sees "The End" (the prompts also tell it never to write those words). The finale is a stage-only top layer (`Stage.finale`), deterministic from the story seed; the `end` event replays it. `store.ended`/`store.ending` gate the closing card and hide the mic + typed input.
 - **Mic energy holds a beat.** `session.ts` tracks `lastLoudAt` from the streaming recognizers' `onLevel` (`VOICE_LEVEL` 0.2 on the 0..1 level, `VOICE_HOLD_MS` 400, both in `speech/beat-rules.ts`) and passes `talking` into `tracker.tick`; while talking, the quiet-window early release is skipped (max-words and recognizer finals still fire). Chrome reports no level, so it is unaffected. If beats hold too long on a quiet mic, lower `VOICE_LEVEL`.
+- **Vite full-reloads the page on any changed root file that is not a module** (a `.md` edit by a parallel session, `lab/` data the lab writes). `vite.config.ts` therefore watches only `src/`, `public/`, `scripts/`, the two html entries and `.env*` (`notSource`). Do not widen it: a running lab campaign lives in the page and dies on reload (it resumes from `lab/campaign.json`, a persisted `running` loads as `paused`).
+- **The drawing lab is the way to change the prompt.** `lab.html` draws a phrase through the real dialect and stage, snapshots a 1280x800 JPEG (`Stage.showCursor = false` so the crayon is not in the judged image), has Sonnet 5 name it blind, has Opus 5.5 critique it against `cases.ts` expectations (every issue carries a general drawing rule), and once per round asks Opus 5.5 for find/replace edits to the prompt; a round is kept only if mean overall improves by `keepMinDelta` without output tokens growing past `maxOutputGrowth` or blind recognition falling. Prompt versions live in `lab/prompts/`; the app keeps using `src/llm/ops-prompt.ts` until you press Promote (Prompts tab), which rewrites the template literal in place. The `# Ops` grammar section is frozen by `validatePrompt`; the editor may only touch wording, cookbook, beats and the example. The SDK's `zodOutputFormat` (0.126) sends enums and min/max as `description` text, not JSON Schema constraints, so the judge parses the raw text through a lenient zod schema (`judge.ts`: unknown kind → `other`, numbers clamped) and retries once. First round finding: `mirror` reflects across the entity's x=0, so a side-view head at x=100 gets its mirrored ear at x=-100, floating left of the body.
 - **Ask for the debug report before tuning anything.** Debug panel → "copy report" (or `window.__onceupon.report()`) dumps settings, tracker rules, every call (sent / first token / done / tokens / cost / restarts), and a merged timeline of the child's words, each DSL line as it landed, and the ears trace, all in ms since the session started (`LiveSession.t0`; call `sentAt` and `LineLog.t` are `performance.now()`, the ears trace is relative to `listenT0`, the report converts). The DSL line log keeps the last 200 lines and the ears trace the last 60 events; the story record itself is complete.
 - **Never put story words in the transcription prompt.** Transcription models emit their prompt text during quiet/unclear audio; a vocabulary hint with "dragon, castle, exploded" produced phantom dragons in every session. The prompt is empty now. Mid-speech commits every 2.5s (`maxTurnMs`) keep words flowing while a child talks without pausing.
 - **Voice lab first when ears feel wrong.** Debug panel: the green bar is mic level (if it barely moves, it is the device or the OS, not the model: pick another mic in Settings → Ears). "compare models on clip" runs the last 30s through three models; if whisper-1 and gpt-4o-transcribe get it right and the live one does not, it is the model. The trace under it shows every delta/final with ms since the click.
@@ -161,6 +182,8 @@ scripts/                   one-off dev scripts (probe-deepgram.ts: stream a WAV 
 - **STT model matters more than anything:** `gpt-live-transcribe` streams word by word (~1s behind the voice, no turn detection allowed, only delta events on one item; sentence punctuation is our "final"). `gpt-transcribe` / `gpt-4o-transcribe` only return after a pause. Default is the live model; the others remain selectable.
 - **OpenAI Realtime:** the beta shape (`OpenAI-Beta` header, `transcription_session.update`, `openai-beta.realtime-v1` subprotocol) is retired and errors. Transcripts arrive as word deltas ~0.3s after the speaker pauses (server VAD, 450ms), not mid-sentence.
 - **bx tabs are throttled** (rAF ~1/s when unfocused): drawing looks 10x slow there and short effects vanish between frames. Use `stage.setInstant(true)` via `window.__onceupon` for screenshots; timing bugs must be judged in a focused tab.
+- **Video export is the live engine on a VirtualClock.** Never add a second renderer: anything that reads `performance.now()` or `setTimeout` in the draw path must go through the Stage/dialect `clock`, or exported frames drift from replay and stop being deterministic. Export canvases are CPU (`willReadFrequently`, Stage `software: true`): GPU canvases differed by a few pixels run to run. Chrome's software H.264 encoder (OpenH264) is NOT deterministic; the hardware one is, so the exporter prefers hardware. Audio is encoded up front with `AudioEncoder` and interleaved in a fixed order, so two exports differ only in the mvhd/tkhd/mdhd creation times. The book in `export/frame.ts` copies `.storybook` CSS values: change both together. The corner logo is a placeholder wordmark in `drawLogo()`.
+- **Automated Chrome here exits on any download** (even a 5-byte blob), in bx and plain Playwright. To verify exports, capture the Blob instead (see verify.md).
 - **Resize** re-rasterizes all layers (`Stage.rebuildLayer`). Layers are capped at 4096px.
 - **Prompt caching needs a 4096-token prefix on Haiku 4.5** (1024 on Sonnet 5, 512 on Opus 5). Both system prompts carry a cookbook + story-beat section partly to be useful and partly to clear that bar; below it Anthropic silently caches nothing. The user message is blocks: header, one block per story chunk with the breakpoint on the last (`storyBlocks`), then the per-call tail, so each call reads the earlier story from cache and writes only the new chunk (hits are at block boundaries only). Debug panel shows `in/cacheWrite/cacheRead` per call; verify with the recipe in verify.md if it ever reads 0 again.
 - **Thinking is switched off** for Sonnet 5 / Opus 5 in `providers.ts` for first-token speed.
@@ -176,4 +199,5 @@ scripts/                   one-off dev scripts (probe-deepgram.ts: stream a WAV 
 - Earlier experiment: JSON ops dialect on Haiku 4.5, same opening sentence: first token ~500ms either way; JSON call 1116 output tokens / 6.5s / $0.008 vs lines ~200 tokens / ~2.5s / ~$0.002.
 - Done: DSL, renderer, effects, audio, speech intake, director, providers, settings, subtitles (three-state), filmstrip, bookshelf, replay with narration captions, kid-safety (`skip` + masker), per-call usage + cost + estimated ears cost (Anthropic from stream usage; OpenRouter reports cost; OpenAI priced only if added to PRICING). Typed-input path verified end to end on Haiku 4.5 (first token 0.6 to 1.1s).
 - OpenAI Realtime transcription verified from a script with synthesized speech (GA endpoint `?intent=transcription`, `session.update` with `type: transcription`, subprotocol auth). Live mic on it not yet confirmed by a human. OpenRouter/OpenAI LLM providers still unverified.
-- Ideas not built: export replay to video, story summary compaction for very long stories, per-model prompt variants.
+- MP4 export (`features/mp4-export.md`): download video from replay and the closing card, storybook frame, crayon audio, captions, corner logo, end card; deterministic. The child's voice track is a seam only.
+- Ideas not built: story summary compaction for very long stories, per-model prompt variants.

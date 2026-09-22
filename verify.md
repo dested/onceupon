@@ -68,6 +68,15 @@ Direct engine check without a model: `window.__onceupon.director.execute('{"op":
 2. Play → drawing replays; each heard chunk appears as a paper caption near the top (`[data-testid=narration]`) as it is reached. Bottom bar: pause/play and a slider (`[data-testid=scrubber]` shows `i/n`). Drag the slider: the page jumps to that point fully drawn and keeps playing; pause holds the position; at the end the button reads "again".
 3. Delete → "sure?" → card gone. Inside a replay, the trash icon top-right → "delete this story?" → back on the shelf without it. "clear N empty" (top-right of the shelf, only when 0-word stories exist) → confirm → they are gone.
 
+## MP4 export [cheap]
+
+1. Replay any saved story → download icon top-right → the "Making your video" card shows a yellow bar, a phase and "cancel"; the replay keeps playing. When it finishes the card says "Your video is in your downloads" and the browser downloads `<title-slug>.mp4`. The closing card after "The End" has the same action as "Download video".
+2. Cancel mid-way → the card closes and nothing downloads.
+3. `ffprobe -v error -show_entries format=duration:stream=codec_name,profile,width,height,r_frame_rate,sample_rate,channels -of compact <file>` → h264 1280x800 30/1 + aac 48000 2ch; duration ≈ replay length + settle + 1.5 s hold + 2 s end card.
+4. Look: storybook border and spine rings, caption pill, "Made by you" top-right, page number bottom-left, logo chip bottom-right on every frame, end card "Made with Once Upon".
+
+Scripted (automated Chrome here exits on any real download, so this captures the Blob): `bx stop`, then `node scripts/export-check.mjs <outDir> <storyId> 2` → two .mp4s + per-frame hashes. Determinism: `hashes-1.txt` == `hashes-2.txt`, and `cmp -l a.mp4 b.mp4` shows only ~10 bytes (mvhd/tkhd/mdhd creation times); `ffmpeg -i f.mp4 -map 0 -c copy -f streamhash -hash md5 -` identical for both. `CANCEL=1` runs the cancel check first. Needs the 7710 dev server; if Vite restarts mid-run the script times out, just rerun.
+
 ## Microphone [medium, needs a human]
 
 With an OpenAI key set, Settings → Ears is auto = OpenAI Realtime (words appear ~0.5s after a pause). Without one, Chrome only. Click the big mic, allow the permission, speak a sentence and pause. Subtitles show
@@ -100,3 +109,20 @@ the debug panel for HTTP errors from the provider (the story screen never shows 
 ## Transcriber smoke test without a mic [cheap, ~$0.01]
 
 `bun run <scratch>/rt-test.ts` pattern: TTS a sentence to PCM16 24k, stream it into `wss://api.openai.com/v1/realtime?intent=transcription` with `session.update { type: 'transcription', audio.input.{format,transcription,turn_detection} }`, expect `...transcription.completed` with the sentence. The script lives in the session scratchpad; recreate from `src/speech/openai-realtime.ts` if needed.
+
+## Drawing lab [cheap, ~$0.05 per playground draw]
+
+Needs an Anthropic key. `bun run dev`, open http://localhost:7710/lab.html. Playground: phrase `horse`,
+Draw. Expect: the crayon draws live, ops stream into the dark panel, within ~30 s a critique card with
+a blind guess, an overall score, six subscores and issues (each with a general rule);
+`lab/runs/play/` gains a jpg + json + ops.txt. bx (use a non-default profile if another session holds
+`default`): `bx --profile lab open http://localhost:7710/lab.html`, `bx --profile lab fill phrase horse`,
+`bx --profile lab click draw`, `bx --profile lab wait 40000`, `bx --profile lab text`.
+
+## Drawing lab campaign [heavy — ask first, ~$3 per round on the full set]
+
+Campaign tab: pick 3 cases, maxRounds 1, Start. Expect `lab/runs/r000/` with a jpg/json/ops.txt per
+case and `round.json` with means, `lab/campaign.json` status `done`, 3 lines in `lab/history.jsonl`.
+Start again with maxRounds 2: `lab/prompts/v001.md` appears, `r001` runs on it, the rounds table
+shows kept or reverted with a verdict. Prompts tab: v001 diff shows the editor's edits; Promote
+rewrites only the template literal in `src/llm/ops-prompt.ts` (check `git diff`); promote v000 to undo.
