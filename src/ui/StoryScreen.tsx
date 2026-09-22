@@ -28,6 +28,7 @@ import { KeyGate } from './KeyGate'
 import { DebugPanel } from './DebugPanel'
 import { SpendChip } from './SpendChip'
 import { StoryWelcome } from './StoryWelcome'
+import { VideoExportButton } from './VideoExport'
 
 export function StoryScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -339,6 +340,15 @@ export function StoryScreen() {
                   <Play size={21} fill="currentColor" />
                   Play it again
                 </button>
+                <VideoExportButton
+                  variant="studio"
+                  getStoryId={() => {
+                    const session = sessionRef.current
+                    if (!session) return null
+                    session.save()
+                    return session.storyId
+                  }}
+                />
                 <button className="studio-button" onClick={newStory}>
                   <Plus size={21} />
                   New story

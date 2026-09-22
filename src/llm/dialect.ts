@@ -1,3 +1,4 @@
+import type { Clock } from '~/engine/clock'
 import { parseLine } from '~/engine/dsl'
 import type { Scene } from '~/engine/scene'
 import type { Command } from '~/engine/types'
@@ -44,6 +45,8 @@ export interface Dialect {
 export interface DialectOptions {
   /** Kid-safety section in the prompt (the model answers `skip` for not-for-kids meaning). */
   moderation: boolean
+  /** Time source for delayed commands (pose endings); video export passes a VirtualClock. Default: real time. */
+  clock?: Clock
 }
 
 export function makeDialect(id: DialectId, scene: Scene, opts: DialectOptions): Dialect {

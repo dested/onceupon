@@ -1,9 +1,13 @@
 /** Cream construction paper with tooth. Rendered once per canvas size. */
-export function makePaper(width: number, height: number): HTMLCanvasElement {
+export function makePaper(
+  width: number,
+  height: number,
+  ctxOpts: CanvasRenderingContext2DSettings = {}
+): HTMLCanvasElement {
   const c = document.createElement('canvas')
   c.width = Math.max(1, width)
   c.height = Math.max(1, height)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', ctxOpts)
   if (!ctx) return c
   ctx.fillStyle = '#fbf6ea'
   ctx.fillRect(0, 0, c.width, c.height)
@@ -11,7 +15,7 @@ export function makePaper(width: number, height: number): HTMLCanvasElement {
   const tile = document.createElement('canvas')
   tile.width = 256
   tile.height = 256
-  const tctx = tile.getContext('2d')
+  const tctx = tile.getContext('2d', ctxOpts)
   if (tctx) {
     const img = tctx.createImageData(256, 256)
     let h = 88172645

@@ -13,7 +13,8 @@ import {
 } from './geometry'
 import { BG_ID, type SceneEvent } from './scene'
 import { darken } from './colors'
-import type { CrayonAudio } from './audio'
+import type { StageAudio } from './audio'
+import { realClock, type Clock } from './clock'
 
 interface Tween {
   from: number
@@ -122,17 +123,23 @@ export class Stage {
   private offX = 0
   private offY = 0
   private zCounter = 0
-  private cursor: Vec = { ...REST }
+  private rest: Vec
+  private cursor: Vec
   private cursorColor = '#e63b2e'
   private cursorAngle = 0
   private pageTurn: { img: HTMLCanvasElement; t0: number } | null = null
   private seed: number
   private instant = false
   private drawingNow = false
+  private pageCount = 1
   /** The closing "The End" title: resolves once its last stroke is revealed, then bursts fire. */
   private finaleState: { id: string; seed: number; resolve: () => void; done: boolean } | null =
     null
-  private audio: CrayonAudio | null
+  private audio: StageAudio | null
+  private clock: Clock
+  private ctxOpts: CanvasRenderingContext2DSettings
+  /** Fixed backing size (video export); null = follow the element's CSS size x DPR. */
+  private fixedSize: { w: number; h: number } | null
   stats: StageStats = {
     pendingStrokes: 0,
     pendingLength: 0,
@@ -142,11 +149,34 @@ export class Stage {
   }
   onPageSnapshot: ((dataUrl: string, pageIndex: number) => void) | null = null
   onIdle: (() => void) | null = null
+  /** Draw the crayon cursor (the drawing lab turns it off for judged snapshots). */
+  showCursor = true
   private wasBusy = false
 
-  constructor(canvas: HTMLCanvasElement, opts: { seed: number; audio?: CrayonAudio | null }) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    opts: {
+      seed: number
+      audio?: StageAudio | null
+      clock?: Clock
+      size?: { w: number; h: number }
+      /**
+       * Rasterize on the CPU (every canvas the stage owns). GPU canvases can differ by a few
+       * pixels between runs depending on memory pressure; video export needs identical frames.
+       */
+      software?: boolean
+      /** Where the idle crayon rests (world units); video export moves it off the corner logo. */
+      cursorRest?: Vec
+    }
+  ) {
+    this.rest = opts.cursorRest ?? REST
+    this.cursor = { ...this.rest }
     this.canvas = canvas
-    const ctx = canvas.getContext('2d')
+    this.clock = opts.clock ?? realClock
+    this.fixedSize = opts.size ?? null
+    this.last = this.clock.now()
+    this.ctxOpts = { willReadFrequently: opts.software ?? false }
+    const ctx = canvas.getContext('2d', this.ctxOpts)
     if (!ctx) throw new Error('2d context unavailable')
     this.ctx = ctx
     this.seed = opts.seed
@@ -166,12 +196,12 @@ export class Stage {
 
   resize(): void {
     const dpr = Math.min(2, window.devicePixelRatio || 1)
-    const w = Math.max(1, Math.floor(this.canvas.clientWidth * dpr))
-    const h = Math.max(1, Math.floor(this.canvas.clientHeight * dpr))
+    const w = this.fixedSize?.w ?? Math.max(1, Math.floor(this.canvas.clientWidth * dpr))
+    const h = this.fixedSize?.h ?? Math.max(1, Math.floor(this.canvas.clientHeight * dpr))
     if (this.canvas.width === w && this.canvas.height === h && this.paper) return
     this.canvas.width = w
     this.canvas.height = h
-    this.paper = makePaper(w, h)
+    this.paper = makePaper(w, h, this.ctxOpts)
     this.S = Math.min(w / WORLD_W, h / WORLD_H)
     this.offX = (w - WORLD_W * this.S) / 2
     this.offY = (h - WORLD_H * this.S) / 2
@@ -180,7 +210,7 @@ export class Stage {
 
   start(): void {
     if (this.raf) return
-    this.last = performance.now()
+    this.last = this.clock.now()
     const loop = (now: number): void => {
       this.frame(now)
       this.raf = requestAnimationFrame(loop)
@@ -212,7 +242,7 @@ export class Stage {
       ts: null,
       flipped: false,
       anim: 'none',
-      animT0: performance.now(),
+      animT0: this.clock.now(),
       breathPhase: (hashString(id) % 1000) / 1000,
       moving: false,
       layer: null,
@@ -236,7 +266,7 @@ export class Stage {
   }
 
   handle(ev: SceneEvent): void {
-    const now = performance.now()
+    const now = this.clock.now()
     switch (ev.k) {
       case 'objectCreated': {
         const v = this.newView(ev.obj.id, ev.obj.x, ev.obj.y)
@@ -364,9 +394,10 @@ export class Stage {
         const snap = document.createElement('canvas')
         snap.width = this.canvas.width
         snap.height = this.canvas.height
-        snap.getContext('2d')?.drawImage(this.canvas, 0, 0)
+        snap.getContext('2d', this.ctxOpts)?.drawImage(this.canvas, 0, 0)
         if (this.onPageSnapshot) this.onPageSnapshot(this.thumbnail(), ev.page.index - 1)
         this.pageTurn = { img: snap, t0: now }
+        this.pageCount = ev.page.index
         this.views.clear()
         this.queue = []
         this.bubbles = []
@@ -428,7 +459,7 @@ export class Stage {
     const layer = document.createElement('canvas')
     layer.width = Math.max(1, Math.ceil(w * this.S))
     layer.height = Math.max(1, Math.ceil(h * this.S))
-    const lctx = layer.getContext('2d')
+    const lctx = layer.getContext('2d', this.ctxOpts)
     if (!lctx) return
     if (v.layer && cur)
       lctx.drawImage(v.layer, (cur.minX - nb.minX) * this.S, (cur.minY - nb.minY) * this.S)
@@ -679,6 +710,27 @@ export class Stage {
     }
   }
 
+  /** Draw one frame at clock time `now` (ms). Video export steps this at 30 fps on a VirtualClock. */
+  renderAt(now: number): void {
+    this.frame(now)
+  }
+
+  /** Nothing left to animate but idle motion: no strokes queued, no effects, bubbles, page turn or finale pending. */
+  get settled(): boolean {
+    return (
+      this.queue.length === 0 &&
+      !this.fx.active &&
+      this.bubbles.length === 0 &&
+      this.pageTurn === null &&
+      this.finaleState === null
+    )
+  }
+
+  /** Current page number of the drawn story (1-based), counted from page turns. */
+  get pageNumber(): number {
+    return this.pageCount
+  }
+
   private frame(now: number): void {
     const dt = Math.min(0.1, (now - this.last) / 1000)
     this.last = now
@@ -856,9 +908,10 @@ export class Stage {
   }
 
   private drawCursor(head: Vec | null, dt: number, now: number): void {
+    if (!this.showCursor) return
     const target = head ?? {
-      x: REST.x + Math.sin(now / 900) * 1.2,
-      y: REST.y + Math.cos(now / 700) * 0.8,
+      x: this.rest.x + Math.sin(now / 900) * 1.2,
+      y: this.rest.y + Math.cos(now / 700) * 0.8,
     }
     const k = head ? 1 : 1 - Math.exp(-dt * 4)
     this.cursor.x += (target.x - this.cursor.x) * k
@@ -955,6 +1008,7 @@ export class Stage {
     this.fx.clear()
     this.zCounter = 0
     this.finaleState = null
+    this.pageCount = 1
   }
 
   /**
@@ -962,7 +1016,7 @@ export class Stage {
    * drop dying objects, effects, bubbles and the page-turn slide. Used after a replay scrub.
    */
   settle(): void {
-    const now = performance.now()
+    const now = this.clock.now()
     const was = this.instant
     this.instant = true
     while (this.queue.length > 0) this.advanceReveal(1, now)

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { realClock, type Clock } from '~/engine/clock'
 import { faceShapes } from '~/engine/face'
 import type { Scene } from '~/engine/scene'
 import { BG_ID } from '~/engine/scene'
@@ -282,12 +283,14 @@ export class JsonDialect implements Dialect {
   later: ((cmds: Command[]) => void) | null = null
   private ents = new Map<string, EntityMeta>()
   private timers: number[] = []
+  private clock: Clock
 
   constructor(
     private scene: Scene,
     opts: DialectOptions
   ) {
     this.system = opts.moderation ? JSON_SYSTEM_PROMPT : JSON_SYSTEM_PROMPT_UNMODERATED
+    this.clock = opts.clock ?? realClock
   }
 
   buildUser(input: DialectInput): PromptBlock[] {
@@ -300,7 +303,7 @@ export class JsonDialect implements Dialect {
 
   reset(): void {
     this.ents.clear()
-    for (const t of this.timers) clearTimeout(t)
+    for (const t of this.timers) this.clock.cancel(t)
     this.timers = []
   }
 
@@ -353,10 +356,10 @@ export class JsonDialect implements Dialect {
   }
 
   private schedule(ms: number, cmds: Command[]): void {
-    const t = window.setTimeout(() => {
+    const t = this.clock.after(ms, () => {
       this.timers = this.timers.filter((x) => x !== t)
       this.later?.(cmds)
-    }, ms)
+    })
     this.timers.push(t)
   }
 

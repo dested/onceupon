@@ -1,7 +1,26 @@
 import type { Director } from '~/llm/director'
-import type { StoryRecord } from './storage'
+import type { StoryEvent, StoryRecord } from './storage'
 
 const MAX_GAP_MS = 1400
+const MIN_GAP_MS = 30
+
+/** Wait after event i before the next one: the recorded gap with dead air squeezed out. */
+function gapAfter(ev: StoryEvent, next: StoryEvent): number {
+  return Math.min(MAX_GAP_MS, Math.max(MIN_GAP_MS, next.t - ev.t))
+}
+
+/** When each event plays, in ms from the start of a replay. The video export uses the same times. */
+export function replaySchedule(events: readonly StoryEvent[]): number[] {
+  const out: number[] = []
+  let t = 0
+  for (let i = 0; i < events.length; i++) {
+    out.push(t)
+    const ev = events[i]
+    const next = events[i + 1]
+    if (ev && next) t += gapAfter(ev, next)
+  }
+  return out
+}
 
 /** Plays a saved story back through a Director with dead air squeezed out. */
 export class Replayer {
@@ -69,7 +88,7 @@ export class Replayer {
     this.handlers.onProgress(this.idx + 1, events.length)
     this.idx++
     const next = events[this.idx]
-    const gap = next ? Math.min(MAX_GAP_MS, Math.max(30, next.t - ev.t)) : 600
+    const gap = next ? gapAfter(ev, next) : 600
     this.timer = window.setTimeout(() => this.step(), gap)
   }
 }

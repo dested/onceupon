@@ -12,6 +12,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "latest",
     "lucide-react": "^0.468.0",
+    "mediabunny": "^1.58.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zod": "^3.24.1"

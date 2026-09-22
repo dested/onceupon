@@ -6,6 +6,7 @@ import { deleteStory, listStories } from '~/story/storage'
 import { IconButton, StickerButton } from './bits'
 import { Subtitles } from './Subtitles'
 import { Filmstrip } from './Filmstrip'
+import { VideoExportButton } from './VideoExport'
 
 export function ReplayScreen({ storyId }: { storyId: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -62,6 +63,7 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
             <Trash2 size={22} strokeWidth={2.5} />
           </IconButton>
         )}
+        <VideoExportButton variant="icon" getStoryId={() => storyId} />
         <IconButton label="Back to bookshelf" onClick={() => appStore.set({ screen: 'shelf', replayId: null })}>
           <ArrowLeft size={24} strokeWidth={3} />
         </IconButton>
