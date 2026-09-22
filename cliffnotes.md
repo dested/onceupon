@@ -1,13 +1,32 @@
-# Once Upon — cliffnotes
+# Squiggletale — cliffnotes
 
-> Living map of the project. Read first, every task. Last updated: 2026-09-22 (mp4 export)
+> Living map of the project. Read first, every task. Last updated: 2026-09-22 (launch platform: monorepo, hosted mode, web, mobile)
 
 ## What it is
 
-A child tells a story out loud; a crayon draws it on the screen as they talk. Browser only,
-no server: the mic feeds Chrome's Web Speech API, chunks of words go to a fast LLM which
-streams back lines of a tiny drawing DSL, and a canvas renderer plays those lines as crayon
-strokes with living idle motion. Stories are saved to localStorage and can be replayed.
+**Squiggletale** (named 2026-09-22; "Once Upon" was a placeholder and is someone else's mark, see decisions.md). Brand strings live in `packages/shared/src/brand.ts`; the public domain will be squiggletale.app (+ .com), not yet registered.
+
+A child tells a story out loud; a crayon draws it on the screen as they talk. The mic feeds a
+streaming transcriber, chunks of words go to a fast LLM which streams back lines of a tiny drawing
+DSL, and a canvas renderer plays those lines as crayon strokes with living idle motion. Stories are
+saved locally and can be replayed, exported to mp4 and shared.
+
+**Two modes, one studio.** Without a flag the root app is the bring-your-own-key dev/lab app (keys
+in the browser, localhost). With `VITE_HOSTED=1` (`bun run build:hosted`) it is the product: a
+single-file build served by the website at `/app/` and bundled into the iPad app, talking to the
+server for the device ledger, the drawing relay and ears tokens. Spec: `features/launch-platform.md`;
+engineering shape: `plans/2026-09-22-launch-build.md`.
+
+## Monorepo (no workspaces; each app installs its own deps)
+
+| Path                  | What                                                                                                            | Run                                                                                                                                  |
+| --------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `/` (root)            | the studio: engine, dialects, story loop, UI, lab                                                               | `bun run dev` 7710 (lab session), `bun run dev:hosted` 7711, `bun run build:hosted` → `dist-hosted/index.html`                      |
+| `apps/web`            | sal-starter: website, `/api/app/*` for the studio, `/api/share/*`, `/admin`, serves the studio at `/app/`       | `cd apps/web && bun run dev` 7720; `bun run db:push`; `.env` from `.env.example` (DATABASE_URL, keys, ADMIN_EMAILS, Stripe, Apple) |
+| `apps/mobile`         | Expo shell (iPad first): WebView on the hosted studio, bridge, StoreKit 2, EAS Update                            | `bunx tsc --noEmit`, `bun test`, `bun run sync-studio`, `eas build` / `eas update` (EAS project `@quickgame/squiggletale`)          |
+| `packages/shared/src` | dependency-free contracts: `brand.ts` (name, origin, bundle id), `packs.ts`, `api.ts` (studio ↔ server), `bridge.ts` (studio ↔ shell) | imported by relative path from all three                                                                                    |
+
+Deploy: root `Dockerfile` + `drydock.yaml` (kind ssr, Postgres) build the studio then `apps/web`; the Drydock project must be switched from the old static one.
 
 ## Run it
 
@@ -18,9 +37,9 @@ strokes with living idle motion. Stories are saved to localStorage and can be re
 | `bun run typecheck` | `tsgo --noEmit`; must be green before done      |
 | `bun run build`     | static build to `dist/`                         |
 
-Keys: `.env.local` with `VITE_ANTHROPIC_API_KEY` / `VITE_OPENROUTER_API_KEY` / `VITE_OPENAI_API_KEY`,
+BYO mode keys: `.env.local` with `VITE_ANTHROPIC_API_KEY` / `VITE_OPENROUTER_API_KEY` / `VITE_OPENAI_API_KEY`,
 or paste them in the in-app Settings (stored in localStorage). Keys are used **from the browser**.
-Localhost only. Never deploy this as is.
+BYO mode is localhost only; the product ships in hosted mode (keys stay on the server).
 
 ## Directory tree
 
@@ -28,7 +47,18 @@ Localhost only. Never deploy this as is.
 index.html                 fonts (Patrick Hand, Gloria Hallelujah), mounts #app
 vite.config.ts             ~ alias, port 7710
 src/
-  main.tsx                 React root
+  main.tsx                 React root; `?player=<id>` mounts the public SharePlayer instead of the app
+  boot.ts                  before first render: bridge, storage backend, device registration (hosted), online/offline events
+  backend/                 hosted mode only (inert without VITE_HOSTED)
+    config.ts              HOSTED / NATIVE / API_ORIGIN flags
+    bridge.ts              studio side of the native bridge (postMessage up, injected receive() down), blob/base64 helpers
+    api.ts                 typed client for packages/shared api.ts (`api(name, input)`, `drawStream` NDJSON)
+    device.ts              register/restore the device account, pull state + config + mask words, consent, attribution
+    meter.ts               StoryMeter: session start, 15 s beats of mic-open ms, stop; exhausted → sleepy end
+    relay-provider.ts      LlmProvider over POST /api/app/draw
+    purchases.ts           prices, buyPack (StoreKit via bridge / web shop), restore, redeemGift, webShopUrl
+    share.ts               createShare/unpublish/list, shareLink (share sheet / Web Share / clipboard), shareVideo
+  tutorial/                first-launch tutorial: tutorial-record.json (scripts/author-tutorial.ts), coach/*.mp3 (scripts/render-coach.ts), cues.ts, coach.ts, Tutorial.tsx
   app.tsx                  screen switch: story | shelf | replay; backtick toggles debug
   styles/app.css           Tailwind v4 theme tokens (paper, ink, crayon colors, hand fonts)
   debug-handle.ts          window.__onceupon (scene, stage, director, story(), t0, listenT0(), report()) for bx and the debug report
@@ -68,8 +98,11 @@ src/
     mp4.ts                 exportStoryVideo(): record -> VirtualClock replay -> 1280x800@30 H.264 (WebCodecs) + AAC -> Mediabunny mp4; VoiceTrack seam
     frame.ts               BookFrame: the home screen's storybook drawn on canvas around the stage, caption pill, tags, corner logo, end card
   story/
-    store.ts               app state (useSyncExternalStore), settings load/persist, env keys via zod
-    storage.ts             StoryRecord zod schema, localStorage list/get/save/delete
+    store.ts               app state (useSyncExternalStore), settings load/persist, env keys via zod; hosted fields (balance, remaining, paying, config, endReason, paywall/parent/share/tutorial open)
+    storage.ts             StoryRecord zod schema (+ voice clips), cache-backed list/get/save/delete, voice clip blobs, kv
+    storage-backend.ts     LocalBackend (localStorage + IndexedDB) / BridgeBackend (native files via the bridge)
+    idb.ts                 tiny IndexedDB blob store
+    voice.ts               VoiceRecorder (MediaRecorder per listening span), VoicePlayer (in step with replay), makeVoiceTrack (mp4), renderVoiceFile (share)
     the-end.ts             THE_END phrase regex + splitTheEnd(): the child saying "The End" ends the story (client-side, before the model)
     replay.ts              Replayer: plays a StoryRecord through a Director with gaps capped (replaySchedule(), shared with export); seek()/position for the scrubber
     session.ts             LiveSession (mic + director + stage + autosave) and ReplaySession
@@ -86,6 +119,13 @@ src/
     ReplayScreen.tsx       replay canvas + play again + download video
     VideoExport.tsx        VideoExportButton (replay toolbar icon / closing-card button) + progress PaperCard with cancel; blob -> browser download
     bits.tsx               StickerButton, IconButton, PaperCard
+    SharePlayer.tsx        public player behind share links (`?player=<id>`; `&embed=1` = paper only, inside the website's book; `player=tutorial` = the bundled demo)
+    ParentGate.tsx         grown-up gate (spoken-number sum) before purchases, link-outs, first mic use
+    ParentArea.tsx         balance, buy, restore, gift redeem, family code, share-with-voice consent, shares list, tutorial, links
+    Paywall.tsx            sleepy-crayon paywall / rebuy screen (packs, restore, redeem, web shop)
+    ShareCard.tsx          after The End: name, include voice, make link, share sheet, download video
+    MinutesChip.tsx        remaining minutes tag in the header (coral when sleepy)
+    Offline.tsx            offline note/banner
   lab/                     drawing lab (lab.html): word -> picture -> critique -> prompt hill-climb; spec plans/2026-09-22-drawing-lab.md
     types.ts               zod contracts for everything under lab/ (cases, prompt versions, draw results, critiques, rounds, campaign, patches)
     cases.ts               DEFAULT_CASES: ~45 subjects + 15 action phrases with judge expectations; seeds lab/cases.json
@@ -100,7 +140,7 @@ lab.html                   second Vite entry -> src/lab/main.tsx (http://localho
 lab/                       lab data: cases.json, campaign.json, history.jsonl, prompts/vNNN.md+json (tracked); runs/rNNN/*.jpg|.ops.txt|.json (gitignored)
 features/                  feature specs
 plans/                     dated working docs; 2026-09-22-pricing-model.html is the interactive cost calculator (open in a browser)
-scripts/                   one-off dev scripts (probe-deepgram.ts: stream a WAV to Deepgram with a key; tracker-check.ts: `bun scripts/tracker-check.ts`, tracker dedupe/correction regression, no framework; lab-plugin.ts: the Vite dev plugin behind /__lab/* (file API confined to lab/, promote rewrites OPS_SYSTEM_PROMPT); export-check.mjs: `node scripts/export-check.mjs <outDir> <storyId>`, headless mp4 export + determinism check, see verify.md)
+scripts/                   one-off dev scripts (author-tutorial.ts + render-coach.ts: regenerate the tutorial record and coach mp3s; sync-studio.ts: copy dist-hosted/index.html into apps/mobile/assets/studio.html; probe-deepgram.ts: stream a WAV to Deepgram with a key; tracker-check.ts: `bun scripts/tracker-check.ts`, tracker dedupe/correction regression, no framework; lab-plugin.ts: the Vite dev plugin behind /__lab/* (file API confined to lab/, promote rewrites OPS_SYSTEM_PROMPT); lab-agent.ts + lab-render-round.sh + lab-record-judges.sh: agent-mode lab rounds without an API key (`plan`/`record-draw`/`record-judge`/`finish`/`save-prompt`/`worst`; Claude Code agents draw and judge, the page hook window.__lab.renderFromFile renders); export-check.mjs: `node scripts/export-check.mjs <outDir> <storyId>`, headless mp4 export + determinism check, see verify.md)
 ```
 
 ## File map (concept -> where)
@@ -127,6 +167,16 @@ scripts/                   one-off dev scripts (probe-deepgram.ts: stream a WAV 
 | when a thought becomes a beat        | `src/speech/beat-rules.ts` (tracker options per recognizer, voice hold), `recognition.ts` `TranscriptTracker.tick`         |
 | the mp4 export (look, timing, codecs) | `src/export/mp4.ts` (stepper, encoders, mux), `src/export/frame.ts` (book, overlays, logo, end card); spec `features/mp4-export.md` |
 | ears cost / spend chip               | `src/story/store.ts` `Spend.audioMs`, `effectiveSttRate`/`sttRateFor`, `settings.sttRateOverride`; `SpendChip.tsx` |
+| the studio ↔ server contract         | `packages/shared/src/api.ts` (types) → `apps/web/server/app-handlers/*.ts` (zod + logic) → `src/backend/api.ts` (client) |
+| the studio ↔ shell bridge            | `packages/shared/src/bridge.ts` → `apps/mobile/src/bridge/{host.ts,handlers/*}` (native) → `src/backend/bridge.ts` (studio) |
+| minutes, free grants, packs          | `apps/web/server/{ledger,sessions,flags}.ts`; pack sizes/prices `packages/shared/src/packs.ts`; meter `src/backend/meter.ts` |
+| purchases (Apple / Stripe / gifts)   | `apps/web/server/{apple,stripe,gifts,webhooks}.ts`; client `src/backend/purchases.ts`, `src/ui/Paywall.tsx`       |
+| share links and the share page       | `apps/web/server/{shares,share-routes}.ts`, page `apps/web/src/app/share.tsx`, player `src/ui/SharePlayer.tsx`, client `src/backend/share.ts` |
+| the drawing relay / ears tokens      | `apps/web/server/{relay,ears}.ts`; studio side `src/backend/relay-provider.ts`, `session.ts` `startListening`   |
+| admin portal                         | `apps/web/server/routers/admin.ts` + `admin-queries.ts`, pages `apps/web/src/app/admin/*`                        |
+| website pages and copy               | `apps/web/src/app/*.tsx` (routes in `site-routes.tsx`), components `components/paper.tsx`, `site-parts.tsx`      |
+| the app name / origin / bundle id    | `packages/shared/src/brand.ts` (mirrored by hand in `apps/mobile/app.config.ts` and `apps/web/index.html`)        |
+| the Expo shell (WebView, IAP, EAS)   | `apps/mobile/src/{App,StudioWebView}.tsx`, `studio-source.ts`, `app.config.ts`, `eas.json`                        |
 | tune the drawing prompt with evidence | the lab: `lab.html` → Playground (one word), Campaign (hill-climb); judge rubric `src/lab/judge.ts`, editor rules `editor.ts`, test set `cases.ts` |
 
 ## Screens
@@ -190,9 +240,15 @@ scripts/                   one-off dev scripts (probe-deepgram.ts: stream a WAV 
 - The Anthropic call uses `dangerouslyAllowBrowser`. That is the design for now (localhost). See decisions.md.
 - The only `as` cast in the app is the constructor boundary in `speech/recognition.ts`.
 - Web Speech only exists in Chrome/Edge. The typed-sentence input at bottom-right is the mic-free path (also what `bx` tests use).
+- **Hosted mode never trusts the client for money or minutes.** Only the server credits (verified JWS, paid Stripe session, gift code) and debits (beats). The studio's `remainingSec` is a display value; the relay refuses once the session is exhausted.
+- **The bridge envelope is the contract.** `window.__onceuponBridge.receive` and `window.ReactNativeWebView.postMessage` are fixed in `packages/shared/src/bridge.ts`; the shell appends `?shell=native` (also on the bundled `file://` copy) so `hasBridge()` is true offline too.
+- **Stories with voice replay in real time.** `replaySchedule(events, { realTime })` skips the gap squeeze when the record has clips so words, drawing and voice stay aligned; the mp4 exporter follows the same rule.
+- **`apps/mobile/app.config.ts` mirrors BRAND by hand.** The Expo config loader cannot import the shared TS; edit both when renaming. expo-iap 5.6 exposes the StoreKit 2 JWS as `purchase.purchaseToken`.
+- **The single-file build inlines everything** (fonts via @fontsource, no Google Fonts link): keep new assets importable by Vite so they inline too.
 
 ## Status
 
+- **Launch platform built (2026-09-22, `features/launch-platform.md`)**: hosted studio mode with device ledger, meter, sleepy paywall, grown-up gate, parent area, voice recording + replay + share, tutorial, share player; `apps/web` site + API + admin verified live on a local Postgres; `apps/mobile` Expo shell (EAS project `@quickgame/squiggletale`) typechecked and unit-tested, not yet built on a device. Next: `eas build --profile development`, real-iPad mic spike in the WebView, App Store Connect records, Drydock switch to ssr.
 - Drawing screen redesigned for iPad: stitched book, welcome illustration, separate mic dock, safe-area/portrait/compact layouts, optional typing, earlier-page tray, new-story confirmation, and finale actions. Backgrounding pauses listening and saves. Existing browser-direct keys/settings remain; this is the drawing UI, not the native/server launch milestone.
 
 - Default drawing language is `ops` (v3) since 2026-09-22. Side-by-side on Sonnet 5, same two sentences: json 2230 + 934 output tokens, 17.7s + 8.9s, $0.052; ops 649 + 293 tokens, 7.4s + 3.6s, $0.013, picture equal or better (mirrored pairs, true circles). `json` and `lines` stay selectable and saved stories replay in the dialect they were recorded with.
