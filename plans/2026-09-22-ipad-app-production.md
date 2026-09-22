@@ -91,7 +91,7 @@ Charts follow the dataviz rules already used by the calculator (one scale, thin 
 The replay system already plays a `StoryRecord` deterministically with narration captions, so the tutorial is a canned record plus timed coach moments, not a new engine feature.
 
 - Author one short story record once (dragon, castle, page turn, an effect, a bubble) and bundle it. Replay it through the `Replayer` with the real Stage so what the kid sees is exactly what the app does.
-- Four beats, each a short coach line (a five-year-old does not read, so a voice; whose voice is an open question below) with a matching on-canvas cue:
+- Four beats, each a short coach line spoken by a TTS narrator rendered once and bundled as audio (Sal, 2026-09-22; a five-year-old does not read), with a matching on-canvas cue:
   1. "Tell your story like you're telling a friend" while the mic sticker pulses and the caption shows words arriving.
   2. "When the crayon starts drawing, watch your creation" as the first strokes land; the caption highlights the yellow drawing state.
   3. "When it stops, tell more of your story" on the idle pause; the record continues with the next chunk.
@@ -136,5 +136,4 @@ Pages: landing (an embedded live replay is the hero, the pitch is the product), 
 
 1. Free tier: a one-time first story plus a small daily allowance, or daily only? What daily-active free count are you planning for?
 3. Ears vendor for launch: decide after the Deepgram A/B on a real kid.
-4. Tutorial coach lines: The End and the story narration are the child's own voice now, but the four coach lines in the tutorial ("tell your story like you're telling a friend") still need a voice or a parent reading captions. A recorded human, TTS rendered once, or captions only?
-   Settled: share links expire after 90 days; mp4 download exists in both the app and the website; the child's voice is recorded on the device for every story, plays in replay and the mp4, and goes on the share page only for paying accounts after a consent notice; no RevenueCat.
+   Settled: tutorial coach lines are TTS rendered once and bundled; share links expire after 90 days; mp4 download exists in both the app and the website; the child's voice is recorded on the device for every story, plays in replay and the mp4, and goes on the share page only for paying accounts after a consent notice; no RevenueCat.
