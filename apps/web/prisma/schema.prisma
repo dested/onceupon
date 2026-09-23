@@ -1,0 +1,318 @@
+// Prisma schema — https://pris.ly/d/prisma-schema
+//
+// better-auth models (User / Session / Account / Verification) are for the ADMIN login only
+// (allow-listed emails, see server/auth.ts). Everything else is the product ledger: anonymous
+// device accounts, minutes bought and spent, shares, call logs, flags.
+// Field names camelCase, columns snake_case via @map.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------- admin auth (better-auth)
+
+model User {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false) @map("email_verified")
+  image         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @map("updated_at")
+
+  sessions Session[]
+  accounts Account[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime @map("expires_at")
+  token     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  userId                String    @map("user_id")
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @default(now()) @map("updated_at")
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime  @map("expires_at")
+  createdAt  DateTime? @default(now()) @map("created_at")
+  updatedAt  DateTime? @default(now()) @map("updated_at")
+
+  @@map("verification")
+}
+
+// ---------------------------------------------------------------- device accounts + ledger
+
+/// An anonymous install. No sign-in, no child data. `code` is what a parent reads out to support or
+/// types on the website; `tokenHash` is sha256 of the opaque device token the client sends.
+model Device {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  installId     String    @unique @map("install_id")
+  tokenHash     String    @unique @map("token_hash")
+  platform      String // ios | android | web
+  appVersion    String?   @map("app_version")
+  storefront    String?
+  balanceSec    Int       @default(0) @map("balance_sec")
+  freeStoryUsed Boolean   @default(false) @map("free_story_used")
+  weeklyGrantAt DateTime? @map("weekly_grant_at")
+  paying        Boolean   @default(false)
+  shareVoice    Boolean   @default(false) @map("share_voice")
+  blocked       Boolean   @default(false)
+  blockedReason String?   @map("blocked_reason")
+  lastPack      String?   @map("last_pack")
+  attribution   Json?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  lastSeenAt    DateTime  @default(now()) @map("last_seen_at")
+
+  entries   LedgerEntry[]
+  sessions  StorySession[]
+  purchases Purchase[]
+  shares    Share[]
+  calls     CallLog[]
+
+  @@index([createdAt])
+  @@map("device")
+}
+
+/// Every change to a balance, append-only. `seconds` is signed (grants/credits +, debits -).
+model LedgerEntry {
+  id           String   @id @default(cuid())
+  deviceId     String   @map("device_id")
+  device       Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  kind         String // grant_first | grant_weekly | purchase | redeem | debit | refund | admin
+  seconds      Int
+  balanceAfter Int      @map("balance_after")
+  ref          String? // session id, purchase id, gift code id
+  note         String?
+  actor        String? // admin email for kind=admin
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([deviceId, createdAt])
+  @@index([createdAt])
+  @@map("ledger_entry")
+}
+
+/// One story being told: opened on the first mic tap, beats every 15 s while the mic is open.
+model StorySession {
+  id          String    @id @default(cuid())
+  deviceId    String    @map("device_id")
+  device      Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  storyId     String    @map("story_id")
+  earsVendor  String    @map("ears_vendor") // deepgram | openai | browser
+  status      String    @default("open") // open | closed | exhausted
+  endReason   String?   @map("end_reason") // the-end | sleepy | silence
+  chargedSec  Int       @default(0) @map("charged_sec")
+  listenedMs  Int       @default(0) @map("listened_ms")
+  startedAt   DateTime  @default(now()) @map("started_at")
+  lastBeatAt  DateTime  @default(now()) @map("last_beat_at")
+  endedAt     DateTime? @map("ended_at")
+
+  calls CallLog[]
+
+  @@index([deviceId, startedAt])
+  @@index([startedAt])
+  @@map("story_session")
+}
+
+/// Every relayed model call (the debug panel's stats across every user, and the cost of goods).
+model CallLog {
+  id            String        @id @default(cuid())
+  deviceId      String        @map("device_id")
+  device        Device        @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  sessionId     String?       @map("session_id")
+  session       StorySession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  model         String
+  dialect       String
+  inputTokens   Int           @default(0) @map("input_tokens")
+  cachedTokens  Int           @default(0) @map("cached_tokens")
+  cacheWrite    Int           @default(0) @map("cache_write_tokens")
+  outputTokens  Int           @default(0) @map("output_tokens")
+  costMicros    Int           @default(0) @map("cost_micros") // USD * 1e6
+  firstTokenMs  Int?          @map("first_token_ms")
+  totalMs       Int           @default(0) @map("total_ms")
+  lines         Int           @default(0)
+  restart       Boolean       @default(false)
+  skip          Boolean       @default(false)
+  /// Masked words the model skipped (kid-safety review), only when skip = true.
+  skipWords     String?       @map("skip_words")
+  error         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([deviceId, createdAt])
+  @@map("call_log")
+}
+
+/// A pack bought (IAP or Stripe) or a gift redeemed. `externalId` dedupes Apple transaction ids and Stripe sessions.
+model Purchase {
+  id                    String    @id @default(cuid())
+  deviceId              String    @map("device_id")
+  device                Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  channel               String // iap | stripe | gift
+  packId                String    @map("pack_id")
+  seconds               Int
+  grossCents            Int       @map("gross_cents")
+  feeCents              Int       @map("fee_cents")
+  netCents              Int       @map("net_cents")
+  currency              String    @default("usd")
+  externalId            String    @unique @map("external_id")
+  originalTransactionId String?   @map("original_transaction_id")
+  environment           String? // Sandbox | Production (Apple)
+  giftCodeId            String?   @map("gift_code_id")
+  refundedAt            DateTime? @map("refunded_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([deviceId, createdAt])
+  @@map("purchase")
+}
+
+/// Sold on the website with Stripe; redeemed once, in the app or on the site.
+model GiftCode {
+  id                 String    @id @default(cuid())
+  code               String    @unique // XXXX-XXXX-XXXX, no 0/O/1/I
+  packId             String    @map("pack_id")
+  seconds            Int
+  grossCents         Int       @map("gross_cents")
+  feeCents           Int       @default(0) @map("fee_cents")
+  stripeSessionId    String?   @unique @map("stripe_session_id")
+  buyerEmail         String?   @map("buyer_email")
+  fromName           String?   @map("from_name")
+  toName             String?   @map("to_name")
+  message            String?
+  redeemedAt         DateTime? @map("redeemed_at")
+  redeemedByDeviceId String?   @map("redeemed_by_device_id")
+  voidedAt           DateTime? @map("voided_at")
+  voidReason         String?   @map("void_reason")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("gift_code")
+}
+
+/// A published story: masked record + optional voice, unlisted, expires after 90 days.
+model Share {
+  id            String    @id // 12 url-safe chars
+  deviceId      String    @map("device_id")
+  device        Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  storyId       String    @map("story_id")
+  title         String
+  childName     String?   @map("child_name")
+  record        Json
+  cover         Bytes?
+  voice         Bytes?
+  voiceMime     String?   @map("voice_mime")
+  views         Int       @default(0)
+  downloads     Int       @default(0)
+  installs      Int       @default(0)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  expiresAt     DateTime  @map("expires_at")
+  unpublishedAt DateTime? @map("unpublished_at")
+
+  @@index([deviceId])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@map("share")
+}
+
+// ---------------------------------------------------------------- ops
+
+/// Feature flags the admin portal edits without a deploy; defaults live in server/flags.ts.
+model Flag {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @default(now()) @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("flag")
+}
+
+/// Extra masked words added from the admin portal (merged with src/story/clean.ts on the client).
+model MaskWord {
+  word      String   @id
+  addedBy   String?  @map("added_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("mask_word")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actor     String
+  action    String
+  target    String?
+  detail    Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+/// Something Sal should hear about (spend, caps, webhook failures, refunds). Emailed when RESEND_API_KEY is set.
+model Alert {
+  id        String    @id @default(cuid())
+  kind      String
+  message   String
+  detail    Json?
+  sentAt    DateTime? @map("sent_at")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("alert")
+}
+
+/// App Store Server Notifications v2, kept for idempotency and the admin log.
+model AppleNotification {
+  id               String   @id @default(cuid())
+  notificationUuid String   @unique @map("notification_uuid")
+  type             String
+  subtype          String?
+  payload          Json
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@map("apple_notification")
+}
+
+/// Stripe events, kept for idempotency.
+model StripeEvent {
+  id        String   @id // Stripe event id
+  type      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("stripe_event")
+}

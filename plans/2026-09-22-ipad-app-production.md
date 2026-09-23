@@ -1,4 +1,4 @@
-# Once Upon as a free iPad app with minute packs
+# Squiggletale (was Once Upon) as a free iPad app with minute packs
 
 - **Date:** 2026-09-22
 - **Status:** active

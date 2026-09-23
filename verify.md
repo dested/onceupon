@@ -73,7 +73,7 @@ Direct engine check without a model: `window.__onceupon.director.execute('{"op":
 1. Replay any saved story → download icon top-right → the "Making your video" card shows a yellow bar, a phase and "cancel"; the replay keeps playing. When it finishes the card says "Your video is in your downloads" and the browser downloads `<title-slug>.mp4`. The closing card after "The End" has the same action as "Download video".
 2. Cancel mid-way → the card closes and nothing downloads.
 3. `ffprobe -v error -show_entries format=duration:stream=codec_name,profile,width,height,r_frame_rate,sample_rate,channels -of compact <file>` → h264 1280x800 30/1 + aac 48000 2ch; duration ≈ replay length + settle + 1.5 s hold + 2 s end card.
-4. Look: storybook border and spine rings, caption pill, "Made by you" top-right, page number bottom-left, logo chip bottom-right on every frame, end card "Made with Once Upon".
+4. Look: storybook border and spine rings, caption pill, "Made by you" top-right, page number bottom-left, logo chip bottom-right on every frame, end card "Made with Squiggletale".
 
 Scripted (automated Chrome here exits on any real download, so this captures the Blob): `bx stop`, then `node scripts/export-check.mjs <outDir> <storyId> 2` → two .mp4s + per-frame hashes. Determinism: `hashes-1.txt` == `hashes-2.txt`, and `cmp -l a.mp4 b.mp4` shows only ~10 bytes (mvhd/tkhd/mdhd creation times); `ffmpeg -i f.mp4 -map 0 -c copy -f streamhash -hash md5 -` identical for both. `CANCEL=1` runs the cancel check first. Needs the 7710 dev server; if Vite restarts mid-run the script times out, just rerun.
 
@@ -126,3 +126,32 @@ case and `round.json` with means, `lab/campaign.json` status `done`, 3 lines in 
 Start again with maxRounds 2: `lab/prompts/v001.md` appears, `r001` runs on it, the rounds table
 shows kept or reverted with a verdict. Prompts tab: v001 diff shows the editor's edits; Promote
 rewrites only the template literal in `src/llm/ops-prompt.ts` (check `git diff`); promote v000 to undo.
+
+## Hosted studio + API [cheap, needs Postgres]
+
+```
+cd apps/web && bun run db:push && bun run dev        # http://localhost:7720 (site, /admin, /api/app/*, /app/ once built)
+bun scripts/smoke-api.ts                             # register → state → config → session start/beat/stop → draw stream (needs ANTHROPIC_API_KEY in apps/web/.env)
+bun scripts/smoke-money.ts                           # gift mint/redeem, share create/get/unpublish
+cd ../.. && bun run build:hosted                     # dist-hosted/index.html (single file, no external URLs)
+bun run dev:hosted                                   # studio in hosted mode on 7711; .env.hosted.local sets VITE_API_ORIGIN=http://localhost:7720
+```
+
+Click-path: open 7711 in hosted mode → the tutorial plays (skip with ×) → tap the mic (grown-up gate, then the browser mic prompt) or type a sentence → the minutes chip counts down → Grown-ups (gate) shows the family code and balance → "Send to grandma" after The End makes a `/s/<id>` link that opens on 7720.
+
+## Website [cheap]
+
+`/`, `/pricing`, `/gift`, `/s/<bad id>` render at 390 px and 1280 px; `curl -s localhost:7720/s/abc | grep og:title` shows the tag in raw SSR. `/shop` with a wrong family code shows the not-found message.
+
+## Admin [cheap]
+
+Sign up at `/admin/sign-up` with an email in `ADMIN_EMAILS`; every page renders with empty data; a flag change on Settings round-trips.
+
+## Expo shell [medium]
+
+```
+cd apps/mobile && bunx tsc --noEmit && bun test && bunx expo-doctor
+bun run sync-studio          # copies dist-hosted/index.html into assets/studio.html
+eas build --profile development --platform ios     # [heavy — Sal runs it] then on a real iPad: mic inside the WebView on the hosted origin, purchase in sandbox, share sheet
+eas update --channel production --message "..."    # ships shell JS; the studio itself ships with a web deploy
+```

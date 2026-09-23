@@ -1,0 +1,8 @@
+{
+  "name": "@onceupon/shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Dependency-free TypeScript contracts shared by the studio, the website/API and the Expo shell. Imported by relative path (no workspaces).",
+  "main": "src/index.ts"
+}

@@ -1,5 +1,6 @@
 import { makePaper } from '~/engine/paper'
 import { mulberry32 } from '~/engine/rng'
+import { BRAND } from '../../packages/shared/src/brand'
 
 /**
  * The video's picture: the home screen's storybook drawn on a canvas (warm tabletop, coral cloth
@@ -113,15 +114,15 @@ function drawBook(ctx: CanvasRenderingContext2D): void {
 }
 
 /**
- * The Once Upon mark, bottom-right of the paper on every frame (end card included). Placeholder
- * until there is a real logo: the home screen's wordmark (yellow star, "once upon", coral ✦) on a
+ * The Squiggletale mark, bottom-right of the paper on every frame (end card included). Placeholder
+ * until there is a real logo: the home screen's wordmark (yellow star, "squiggletale", coral ✦) on a
  * paper chip so it reads on dark skies. Swap this one function for an image when the logo exists.
  */
 function drawLogo(ctx: CanvasRenderingContext2D): void {
   ctx.save()
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.globalAlpha = 1
-  const word = 'once upon'
+  const word = BRAND.name.toLowerCase()
   ctx.font = `${20 * K}px ${SCRAWL}`
   const ww = ctx.measureText(word).width
   const star = 15 * K
@@ -299,7 +300,7 @@ export class BookFrame {
     ctx.restore()
   }
 
-  /** "Made with Once Upon" on fresh paper, paper-sized. */
+  /** "Made with Squiggletale" on fresh paper, paper-sized. */
   private endCard(): HTMLCanvasElement {
     if (this.end) return this.end
     const paper = makePaper(PAPER.w, PAPER.h, CPU)
@@ -311,11 +312,11 @@ export class BookFrame {
     ctx.textBaseline = 'middle'
     ctx.fillStyle = INK
     ctx.font = `${40 * K}px ${SCRAWL}`
-    ctx.fillText('Made with', cx, cy - 58 * K)
+    ctx.fillText(BRAND.madeWith.replace(BRAND.name, '').trim() || 'Made with', cx, cy - 58 * K)
     ctx.fillStyle = PURPLE
     ctx.font = `${76 * K}px ${SCRAWL}`
-    ctx.fillText('Once Upon', cx, cy + 20 * K)
-    const nameW = ctx.measureText('Once Upon').width
+    ctx.fillText(BRAND.name, cx, cy + 20 * K)
+    const nameW = ctx.measureText(BRAND.name).width
     // A lilac crayon swash under the name, seeded wobble.
     const rng = mulberry32(0x0ce0)
     ctx.strokeStyle = LILAC

@@ -3,9 +3,13 @@ import { ArrowLeft, Play, Trash2 } from 'lucide-react'
 import { appStore, useApp } from '~/story/store'
 import { deleteStory, listStories } from '~/story/storage'
 import { IconButton, StickerButton } from './bits'
+import { MinutesChip } from './MinutesChip'
+import { Offline } from './Offline'
+import { gate } from './hosted'
 
 export function Bookshelf() {
   const stories = useApp((s) => s.stories)
+  const hosted = useApp((s) => s.hosted)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [confirmEmpty, setConfirmEmpty] = useState(false)
   const empty = stories.filter((s) => s.words === 0)
@@ -35,24 +39,39 @@ export function Bookshelf() {
     appStore.set({ stories: listStories() })
   }
 
+  const openGrownUps = (): void => {
+    void gate().then((ok) => {
+      if (ok) appStore.set({ parentOpen: true })
+    })
+  }
+
   return (
-    <div className="h-full w-full overflow-y-auto p-6" data-testid="shelf">
+    <div className="relative h-full w-full overflow-x-hidden overflow-y-auto p-6" data-testid="shelf">
+      <Offline />
       <div className="mb-6 flex items-center gap-4">
         <IconButton label="Back to drawing" onClick={back}>
           <ArrowLeft size={24} strokeWidth={3} />
         </IconButton>
         <h1 className="font-scrawl text-4xl">Our stories</h1>
-        {empty.length > 0 && (
-          <StickerButton
-            tilt={0}
-            tone={confirmEmpty ? 'red' : 'paper'}
-            className="ml-auto !text-base"
-            onClick={clearEmpty}
-            onBlur={() => setConfirmEmpty(false)}
-            data-testid="clear-empty">
-            <Trash2 size={18} strokeWidth={2.5} /> {confirmEmpty ? `delete ${empty.length} empty ${empty.length === 1 ? 'story' : 'stories'}?` : `clear ${empty.length} empty`}
-          </StickerButton>
-        )}
+        <div className="ml-auto flex items-center gap-3">
+          {hosted && <MinutesChip />}
+          {hosted && (
+            <StickerButton tilt={0} tone="paper" className="!text-base" onClick={openGrownUps} data-testid="shelf-grown-ups">
+              Grown-ups
+            </StickerButton>
+          )}
+          {empty.length > 0 && (
+            <StickerButton
+              tilt={0}
+              tone={confirmEmpty ? 'red' : 'paper'}
+              className="!text-base"
+              onClick={clearEmpty}
+              onBlur={() => setConfirmEmpty(false)}
+              data-testid="clear-empty">
+              <Trash2 size={18} strokeWidth={2.5} /> {confirmEmpty ? `delete ${empty.length} empty ${empty.length === 1 ? 'story' : 'stories'}?` : `clear ${empty.length} empty`}
+            </StickerButton>
+          )}
+        </div>
       </div>
       {stories.length === 0 && (
         <p className="font-hand text-2xl text-ink-soft">No stories yet. Go back and tell one!</p>

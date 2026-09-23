@@ -11,10 +11,13 @@ import { PaperCard, StickerButton } from './bits'
 export function KeyGate() {
   const keys = useApp((s) => s.settings.keys)
   const dismissed = useApp((s) => s.keyGateDismissed)
+  const hosted = useApp((s) => s.hosted)
 
   const [anthropic, setAnthropic] = useState(keys.anthropic)
   const [openai, setOpenai] = useState(keys.openai)
 
+  // Hosted mode draws with the server relay, so there is no key to bring.
+  if (hosted) return null
   const needed = (!keys.anthropic || !keys.openai) && !dismissed
   if (needed === false) return null
 
@@ -44,7 +47,7 @@ export function KeyGate() {
       <PaperCard className="relative w-[34rem] max-w-[92vw]">
         <h2 className="mb-2 font-scrawl text-3xl">Bring your own crayons</h2>
         <p className="mb-5 font-hand text-lg text-ink-soft">
-          Once Upon draws with your own AI keys, straight from this browser. They stay on this device, nobody else
+          Squiggletale draws with your own AI keys, straight from this browser. They stay on this device, nobody else
           sees them, and you only ever pay for your own drawing
         </p>
 

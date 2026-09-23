@@ -7,6 +7,12 @@ import type { ClipResult } from '~/speech/clip-lab'
 import type { ApiKeys } from '~/llm/providers'
 import type { CallStat, DirectorStatus } from '~/llm/director'
 import type { StoryMeta } from './storage'
+import { HOSTED, NATIVE } from '~/backend/config'
+import type { ClientConfig, EndReason } from '../../packages/shared/src/api'
+import type { PackId } from '../../packages/shared/src/packs'
+
+// Re-exported so UI code can import these hosted-mode types straight from the store.
+export type { ClientConfig, EndReason, PackId }
 
 export const STT_MODES = ['auto', 'browser', 'openai', 'deepgram'] as const
 export type SttMode = (typeof STT_MODES)[number]
@@ -113,6 +119,37 @@ export interface AppState {
   sttLog: SttTrace[]
   clipResults: ClipResult[]
   clipBusy: boolean
+  // --- Hosted mode (all inert without VITE_HOSTED) ---
+  /** Build flag: the studio talks to the server relay/meter instead of a browser-direct key. */
+  hosted: boolean
+  /** Running inside the native shell (the bridge is present). */
+  native: boolean
+  /** Network reachable (navigator.onLine + bridge net events). */
+  online: boolean
+  /** Seconds of mic time on the device account. */
+  balanceSec: number
+  /** Seconds left in the current story session; null until a session starts. */
+  remainingSec: number | null
+  /** Has ever bought a pack or redeemed a gift (unlocks share-with-voice). */
+  paying: boolean
+  /** Parent turned on "share with voice". */
+  shareVoice: boolean
+  /** 8-char device code shown to the parent for the web shop / support. */
+  deviceCode: string
+  /** The pack most recently bought, for the paywall's default. */
+  lastPack: PackId | null
+  /** Server config (model, ears vendor, urls, silence timings); null until device init or offline. */
+  config: ClientConfig | null
+  /** How the last story ended, once the finale finished. */
+  endReason: EndReason | null
+  /** The crayon is running low (remaining <= SLEEPY_AT_SEC). */
+  sleepy: boolean
+  paywallOpen: boolean
+  parentOpen: boolean
+  shareOpen: boolean
+  tutorialOpen: boolean
+  /** Bumped to ask the UI to run the parent gate (a math challenge before parent-only actions). */
+  gateRequest: number
 }
 
 export interface SttTrace {
@@ -226,7 +263,8 @@ function loadSettings(): Settings {
         deepgram: d.keys.deepgram || envKeys.deepgram,
       },
       sound: d.sound,
-      moderation: d.moderation ?? true,
+      // Hosted mode always moderates; the toggle is a dev-only affordance in BYO builds.
+      moderation: HOSTED ? true : (d.moderation ?? true),
       stt: d.stt === 'browser' || d.stt === 'openai' || d.stt === 'deepgram' ? d.stt : 'auto',
       sttModel: d.sttModel && d.sttModel !== 'gpt-4o-transcribe' ? d.sttModel : DEFAULT_STT_MODEL,
       deepgramModel: d.deepgramModel || DEFAULT_DEEPGRAM_MODEL,
@@ -294,6 +332,23 @@ export const appStore = new Store<AppState>({
   sttLog: [],
   clipResults: [],
   clipBusy: false,
+  hosted: HOSTED,
+  native: NATIVE,
+  online: typeof navigator !== 'undefined' ? navigator.onLine : true,
+  balanceSec: 0,
+  remainingSec: null,
+  paying: false,
+  shareVoice: false,
+  deviceCode: '',
+  lastPack: null,
+  config: null,
+  endReason: null,
+  sleepy: false,
+  paywallOpen: false,
+  parentOpen: false,
+  shareOpen: false,
+  tutorialOpen: false,
+  gateRequest: 0,
 })
 
 export function useApp<S>(selector: (s: AppState) => S): S {

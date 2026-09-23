@@ -137,6 +137,13 @@ export interface PcmMic {
   stop(): void
 }
 
+/** The mic stream currently open through openPcmMic, so the voice recorder can tap it. Null when closed. */
+let currentStream: MediaStream | null = null
+
+export function currentMicStream(): MediaStream | null {
+  return currentStream
+}
+
 export interface PcmMicOptions {
   /** Input device id from listMics(); empty = system default. */
   deviceId: string
@@ -163,6 +170,7 @@ export async function openPcmMic(opts: PcmMicOptions): Promise<PcmMic> {
   }
 
   const mic = await takeMic(opts.deviceId)
+  currentStream = mic
   const audioCtx = new AudioContext()
   const url = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: 'application/javascript' }))
   await audioCtx.audioWorklet.addModule(url)
@@ -186,6 +194,7 @@ export async function openPcmMic(opts: PcmMicOptions): Promise<PcmMic> {
       node.port.close()
       node.disconnect()
       mic.getTracks().forEach((t) => t.stop())
+      if (currentStream === mic) currentStream = null
       void audioCtx.close()
     },
   }

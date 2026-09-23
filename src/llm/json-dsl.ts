@@ -121,7 +121,7 @@ export const operationSchema = z.discriminatedUnion('op', [
     keep: z.array(idSchema).max(12).default([]),
     title: z.string().max(80).default(''),
   }),
-  // Once Upon extensions to the contract.
+  // Squiggletale extensions to the contract.
   z.object({ op: z.literal('say'), id: idSchema, text: z.string().min(1).max(200) }),
   z.object({ op: z.literal('skip') }),
 ])

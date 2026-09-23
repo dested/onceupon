@@ -1,0 +1,58 @@
+@import 'tailwindcss';
+@import '@fontsource/patrick-hand';
+@import '@fontsource/gloria-hallelujah';
+
+/* The website wears the app's crayon picture-book language (root ui.md). Same tokens, same stickers. */
+@theme {
+  --font-hand: 'Patrick Hand', 'Comic Sans MS', cursive;
+  --font-scrawl: 'Gloria Hallelujah', 'Patrick Hand', cursive;
+  --color-paper: #fbf6ea;
+  --color-paper-deep: #efe6d2;
+  --color-table: #eee5d5;
+  --color-ink: #3b2f2f;
+  --color-ink-soft: #8a7a6a;
+  --color-crayon-red: #ef4444;
+  --color-crayon-blue: #3b82f6;
+  --color-crayon-yellow: #fbbf24;
+  --color-crayon-green: #22c55e;
+  --color-lilac: #e6ddec;
+  --color-purple: #7b5c91;
+  --color-sage: #dce7d5;
+  --color-coral: #d9937e;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-hand);
+  font-size: 18px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Warm textured tabletop behind the site (same noise as the studio). */
+.tabletop {
+  background-color: var(--color-table);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%2380694c' opacity='.12' filter='url(%23n)' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
+}
+
+/* Print: the gift card page. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+}

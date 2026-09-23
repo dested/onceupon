@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#ffffff" />
+    <!-- Applies the theme before first paint so there is no light→dark flash.
+         Mirrors src/lib/theme.ts; keep the two in sync. -->
+    <script>
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('theme')
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+          document.documentElement.classList.toggle('dark', theme === 'dark')
+          document
+            .querySelector('meta[name="theme-color"]')
+            .setAttribute('content', theme === 'dark' ? '#0a0a0a' : '#ffffff')
+        } catch (_) {}
+      })()
+    </script>
+    <link rel="icon" href="/icon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/icon.png" />
+    <!-- Stylesheet is linked here (not imported from JS) so it is render-blocking
+         in dev too — importing it from App.tsx made Vite inject it after the
+         module graph loaded, painting unstyled SSR HTML first. -->
+    <link rel="stylesheet" href="/src/styles/app.css" />
+    <!-- Static defaults; keep the name in sync with packages/shared/src/brand.ts (BRAND.name).
+         og:title / og:description are page-owned (src/app/seo.tsx renders them via React 19
+         metadata hoisting) so each document carries one authoritative value; only the
+         format-level tags live here. -->
+    <title>Squiggletale</title>
+    <meta
+      name="description"
+      content="Your child tells a story out loud and a crayon draws it as they talk." />
+    <meta property="og:site_name" content="Squiggletale" />
+    <meta property="og:type" content="website" />
+  </head>
+  <body>
+    <div id="app"><!--app-html--></div>
+    <!--app-state-->
+    <script type="module" src="/src/index.tsx"></script>
+  </body>
+</html>

@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+@import '@fontsource/patrick-hand';
+@import '@fontsource/gloria-hallelujah';
 
 @theme {
   --font-hand: 'Patrick Hand', 'Comic Sans MS', cursive;
@@ -819,6 +821,10 @@ button {
   .paper-topline {
     top: 9px;
   }
+  /* Short landscape: the finale footer grows so its message and actions never clip. */
+  .story-studio:has(.story-finished) {
+    grid-template-rows: 68px minmax(0, 1fr) auto;
+  }
 }
 @media (max-width: 599px) {
   .story-studio {
@@ -977,6 +983,21 @@ button {
   .finished-message > svg {
     width: 22px;
   }
+  /* The finale actions wrap to two rows on a phone; the footer grows to fit them. */
+  .story-studio:has(.story-finished) {
+    grid-template-rows: 70px minmax(0, 1fr) auto;
+  }
+  .finished-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  /* Share player: let the title header grow instead of clipping its pill under the book. */
+  .story-studio[data-testid='share-player'] {
+    grid-template-rows: auto minmax(0, 1fr) 132px;
+  }
+  .share-player-title {
+    font-size: 20px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .story-studio *,
@@ -984,5 +1005,346 @@ button {
   .story-studio *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* ============================================================================
+   Hosted-mode surfaces: the grown-up gate, minutes chip, paywall / rebuy,
+   share card, parent area helpers, sleepy + offline states. Appended for the
+   VITE_HOSTED build; inert without it. Tokens/colors reuse the studio palette.
+   ============================================================================ */
+
+/* The grown-up gate reuses the .new-story-dialog look with a tighter form. */
+.grown-dialog .grown-gate-question {
+  font-size: 27px;
+  color: var(--studio-purple);
+  margin: 4px 0 16px;
+}
+.grown-dialog form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.grown-dialog input {
+  width: 160px;
+}
+.grown-dialog .grown-gate-oops {
+  margin: 0;
+  color: var(--color-crayon-red);
+  font-size: 18px;
+}
+.grown-dialog form > div {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.grown-shake {
+  animation: grown-shake 0.42s ease-in-out;
+}
+@keyframes grown-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-9px); }
+  40% { transform: translateX(9px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+/* The public share player's title pill (sits in the studio header). */
+.share-player-title {
+  font-size: 28px;
+}
+
+/* The minutes tag beside the wordmark. */
+.studio-center {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.minutes-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 2px solid var(--color-ink);
+  border-radius: 11px 13px 10px 12px;
+  background: var(--color-paper);
+  box-shadow: 2px 3px 0 #3b2f2f22;
+  font: 19px var(--font-hand);
+  color: var(--color-ink);
+  transform: rotate(1.5deg);
+  transition: background 160ms, transform 140ms;
+}
+.minutes-chip:hover {
+  transform: rotate(0deg) translateY(-1px);
+}
+.minutes-chip.is-sleepy {
+  background: var(--studio-coral);
+  border-color: #6a453b;
+  color: #402a24;
+}
+.minutes-chip-z {
+  font: 16px var(--font-scrawl);
+  color: #6a453b;
+}
+
+/* Paywall + share card share a full-screen overlay on the tabletop texture. */
+.paywall-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow-y: auto;
+  background-color: #eee5d5;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%2380694c' opacity='.12' filter='url(%23n)' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
+  --studio-coral: #d9937e;
+  --studio-purple: #7b5c91;
+  --studio-sage: #dce7d5;
+  --studio-muted: #796d60;
+}
+.paywall-card {
+  position: relative;
+  width: min(44rem, 100%);
+  text-align: center;
+}
+.paywall-close,
+.share-card-card .paywall-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+.paywall-heading {
+  font-size: 30px;
+  margin: 4px 30px 6px;
+}
+.paywall-sub {
+  color: var(--studio-muted);
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+.paywall-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.paywall-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 18px 12px 14px;
+  border: 2px solid var(--color-ink);
+  border-radius: 16px 18px 15px 17px;
+  background: var(--color-paper);
+  box-shadow: 2px 3px 0 #3b2f2f1f;
+  transition: transform 140ms, background 140ms, border-color 140ms;
+}
+.paywall-tile.is-selected {
+  border-width: 3px;
+  background: #fdf1cf;
+  transform: rotate(-1deg);
+}
+.paywall-popular {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-3deg);
+  padding: 2px 10px;
+  border: 2px solid var(--color-ink);
+  border-radius: 9px;
+  background: var(--color-crayon-yellow);
+  font: 14px var(--font-hand);
+  white-space: nowrap;
+}
+.paywall-tile-name {
+  font-size: 23px;
+  line-height: 1.1;
+}
+.paywall-tile-minutes {
+  font-size: 17px;
+  color: var(--studio-muted);
+}
+.paywall-tile-price {
+  font-size: 26px;
+  font-weight: 600;
+}
+.paywall-tile-rate {
+  font-size: 14px;
+  color: var(--studio-muted);
+}
+.paywall-price-skeleton {
+  display: inline-block;
+  width: 64px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--color-paper-deep);
+  animation: paywall-pulse 1.2s ease-in-out infinite;
+}
+@keyframes paywall-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+.paywall-buy {
+  font-size: 22px;
+}
+.paywall-notice {
+  margin: 12px 0 0;
+  font-size: 17px;
+  color: var(--studio-muted);
+}
+.paywall-notice.is-error {
+  color: var(--color-crayon-red);
+}
+.paywall-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 22px;
+  margin-top: 18px;
+}
+.paywall-link {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  background: none;
+  border: none;
+  font: 18px var(--font-hand);
+  color: var(--color-crayon-blue);
+  text-decoration: underline;
+}
+.paywall-link:disabled {
+  opacity: 0.5;
+}
+.paywall-link-note {
+  font-size: 13px;
+  color: var(--studio-muted);
+  text-decoration: none;
+}
+.paywall-success,
+.share-card-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 8px 8px;
+}
+.paywall-success h2,
+.share-card-done h2 {
+  font-size: 30px;
+}
+.paywall-success-badge {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: var(--color-crayon-green);
+  color: #fff;
+  border: 3px solid var(--color-ink);
+  box-shadow: 3px 4px 0 #3b2f2f2a;
+}
+
+/* Share card. */
+.share-card-card {
+  position: relative;
+  width: min(34rem, 100%);
+  text-align: center;
+}
+.share-card-heading {
+  font-size: 28px;
+  margin: 2px 24px 16px;
+}
+.share-card-label {
+  display: block;
+  text-align: left;
+  margin-bottom: 6px;
+  font: 17px var(--font-hand);
+  color: var(--studio-muted);
+}
+.share-card-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 18px;
+  color: var(--color-ink);
+}
+.share-card-note {
+  margin: 14px 0 4px;
+  font-size: 16px;
+  color: var(--studio-muted);
+}
+.share-card-make {
+  margin-top: 14px;
+  font-size: 21px;
+}
+.share-card-pill {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 10px 16px;
+  border: 2px solid var(--color-ink);
+  border-radius: 13px;
+  background: var(--color-paper);
+  font: 18px var(--font-hand);
+}
+.share-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+
+/* Sleepy story-screen states. */
+.end-reminder.is-sleepy {
+  color: var(--studio-coral);
+}
+.end-reminder.is-sleepy strong {
+  color: #b96a52;
+}
+.sleepy-z {
+  display: inline-block;
+  margin-left: 4px;
+  font: 18px var(--font-scrawl);
+  color: var(--studio-coral);
+  vertical-align: super;
+}
+.sleepy-more {
+  background: var(--color-crayon-yellow);
+}
+
+/* Offline. */
+.offline-note {
+  max-width: 320px;
+  font-size: 18px;
+  line-height: 1.3;
+  color: var(--studio-muted);
+}
+.offline-banner {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 15px;
+  border: 2px solid var(--color-ink);
+  border-radius: 999px;
+  background: var(--color-paper);
+  box-shadow: 2px 3px 0 #3b2f2f22;
+  font: 17px var(--font-hand);
+  color: var(--color-ink);
+}
+
+@media (max-width: 640px) {
+  .paywall-tiles {
+    grid-template-columns: 1fr;
   }
 }

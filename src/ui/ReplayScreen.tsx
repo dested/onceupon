@@ -1,21 +1,28 @@
-import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Pause, Play, RotateCcw, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, Mic, Pause, Play, RotateCcw, Share2, Trash2 } from 'lucide-react'
 import { ReplaySession } from '~/story/session'
 import { appStore, useApp } from '~/story/store'
-import { deleteStory, listStories } from '~/story/storage'
+import { deleteStory, getStory, listStories } from '~/story/storage'
 import { IconButton, StickerButton } from './bits'
 import { Subtitles } from './Subtitles'
 import { Filmstrip } from './Filmstrip'
 import { VideoExportButton } from './VideoExport'
+import { gate } from './hosted'
+import { openShareCard } from './ShareCard'
 
 export function ReplayScreen({ storyId }: { storyId: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sessionRef = useRef<ReplaySession | null>(null)
+  const hosted = useApp((s) => s.hosted)
   const playing = useApp((s) => s.replayPlaying)
   const caption = useApp((s) => s.replayCaption)
   const pos = useApp((s) => s.replayPos)
   const len = useApp((s) => s.replayLen)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const hasVoice = useMemo(() => {
+    const r = getStory(storyId)
+    return r?.voice !== undefined && r.voice.clips.length > 0
+  }, [storyId])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -63,18 +70,33 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
             <Trash2 size={22} strokeWidth={2.5} />
           </IconButton>
         )}
-        <VideoExportButton variant="icon" getStoryId={() => storyId} />
+        {hosted && (
+          <IconButton
+            label="Share this story"
+            data-testid="share-story"
+            onClick={() => void gate().then((ok) => ok && openShareCard(storyId))}>
+            <Share2 size={22} strokeWidth={2.5} />
+          </IconButton>
+        )}
+        <VideoExportButton variant="icon" getRecord={() => getStory(storyId)} />
         <IconButton label="Back to bookshelf" onClick={() => appStore.set({ screen: 'shelf', replayId: null })}>
           <ArrowLeft size={24} strokeWidth={3} />
         </IconButton>
       </div>
       {caption && (
-        <div className="pointer-events-none absolute top-24 right-0 left-0 flex justify-center px-10" data-testid="narration">
+        <div className="pointer-events-none absolute top-24 right-0 left-0 flex flex-col items-center gap-2 px-10" data-testid="narration">
           <p
             key={caption}
             className="max-w-3xl rounded-2xl bg-paper/90 px-6 py-2 text-center font-scrawl text-2xl leading-snug text-ink shadow-[3px_4px_0_0_rgba(59,47,47,0.25)]">
             {caption}
           </p>
+          {hasVoice && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-paper/90 px-3 py-1 font-hand text-[16px] text-ink-soft shadow-[2px_3px_0_0_rgba(59,47,47,0.2)]"
+              data-testid="voice-indicator">
+              <Mic size={14} strokeWidth={2.5} /> in their own voice
+            </span>
+          )}
         </div>
       )}
       <Subtitles className="bottom-24 left-6 right-6 h-11" />

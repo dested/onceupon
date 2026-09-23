@@ -44,7 +44,23 @@ const BAD = [
   'naked',
 ]
 
-const RE = new RegExp(`\\b(${BAD.join('|')})\\b`, 'gi')
+let words: string[] = [...BAD]
+let RE = compile(words)
+
+function compile(list: string[]): RegExp {
+  return new RegExp(`\\b(${list.join('|')})\\b`, 'gi')
+}
+
+/** Extend the mask list with server-supplied words (deduped, lowercased) and rebuild the matcher. */
+export function addMaskWords(add: string[]): void {
+  const set = new Set(words)
+  for (const w of add) {
+    const t = w.trim().toLowerCase()
+    if (t) set.add(t)
+  }
+  words = [...set]
+  RE = compile(words)
+}
 
 let enabled = true
 

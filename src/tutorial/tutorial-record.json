@@ -1,0 +1,195 @@
+{
+  "id": "tutorial",
+  "title": "The little green dragon",
+  "createdAt": 1758585600000,
+  "updatedAt": 1758585600000,
+  "seed": 424242,
+  "cover": null,
+  "dialect": "ops",
+  "events": [
+    {
+      "k": "words",
+      "t": 0,
+      "text": "Once upon a time there was a little green dragon who lived in a castle on a hill"
+    },
+    {
+      "k": "cmd",
+      "t": 900,
+      "line": "scene skyblue \"hillside with a castle\""
+    },
+    {
+      "k": "cmd",
+      "t": 1030,
+      "line": "ent ground 600 525 \"grassy hill\" layer=-2"
+    },
+    {
+      "k": "cmd",
+      "t": 1160,
+      "line": "draw ground.grass darkgreen green rect -620 0 1240 110"
+    },
+    {
+      "k": "cmd",
+      "t": 1290,
+      "line": "ent castle 850 525 \"stone castle\" layer=-1"
+    },
+    {
+      "k": "cmd",
+      "t": 1420,
+      "line": "draw castle.wall black gray rect -150 -150 300 150"
+    },
+    {
+      "k": "cmd",
+      "t": 1550,
+      "line": "draw castle.towers black gray mirror rect 110 -260 60 260"
+    },
+    {
+      "k": "cmd",
+      "t": 1680,
+      "line": "draw castle.roofs black red mirror poly 105 -260 140 -330 175 -260"
+    },
+    {
+      "k": "cmd",
+      "t": 1810,
+      "line": "draw castle.gate brown brown M -40 0 L -40 -90 Q 0 -140 40 -90 L 40 0 Z"
+    },
+    {
+      "k": "cmd",
+      "t": 1940,
+      "line": "draw castle.flag red red poly 140 -330 190 -315 140 -300"
+    },
+    {
+      "k": "cmd",
+      "t": 2070,
+      "line": "ent dragon 350 525 \"little green dragon\" idle=breathe"
+    },
+    {
+      "k": "cmd",
+      "t": 2200,
+      "line": "draw dragon.tail darkgreen green poly -90 -80 -200 -30 -110 -130"
+    },
+    {
+      "k": "cmd",
+      "t": 2330,
+      "line": "draw dragon.body darkgreen green oval 0 -100 110 65"
+    },
+    {
+      "k": "cmd",
+      "t": 2460,
+      "line": "draw dragon.wings darkgreen darkgreen mirror poly 10 -150 40 -260 80 -150"
+    },
+    {
+      "k": "cmd",
+      "t": 2590,
+      "line": "draw dragon.legs darkgreen green mirror rect 30 -40 30 40"
+    },
+    {
+      "k": "cmd",
+      "t": 2720,
+      "line": "draw dragon.head darkgreen green oval 120 -170 55 40"
+    },
+    {
+      "k": "cmd",
+      "t": 2850,
+      "line": "face dragon head right happy"
+    },
+    {
+      "k": "cmd",
+      "t": 2980,
+      "line": "ent sun 1050 120 \"sun\" layer=-3"
+    },
+    {
+      "k": "cmd",
+      "t": 3110,
+      "line": "draw sun.disc gold yellow circle 0 0 50"
+    },
+    {
+      "k": "cmd",
+      "t": 3240,
+      "line": "draw sun.rays gold w=6 M -70 0 L -95 0 M 70 0 L 95 0 M 0 -70 L 0 -95 M 0 70 L 0 95"
+    },
+    {
+      "k": "words",
+      "t": 7000,
+      "text": "One day the dragon flew up into the sky and found a rainbow"
+    },
+    {
+      "k": "cmd",
+      "t": 7900,
+      "line": "move dragon 600 250 2 glide"
+    },
+    {
+      "k": "cmd",
+      "t": 8030,
+      "line": "ent rainbow 600 400 \"rainbow\" layer=-2"
+    },
+    {
+      "k": "cmd",
+      "t": 8160,
+      "line": "draw rainbow.red red w=16 M -300 0 Q 0 -400 300 0"
+    },
+    {
+      "k": "cmd",
+      "t": 8290,
+      "line": "draw rainbow.orange orange w=16 M -270 0 Q 0 -360 270 0"
+    },
+    {
+      "k": "cmd",
+      "t": 8420,
+      "line": "draw rainbow.yellow yellow w=16 M -240 0 Q 0 -320 240 0"
+    },
+    {
+      "k": "cmd",
+      "t": 8550,
+      "line": "draw rainbow.green green w=16 M -210 0 Q 0 -280 210 0"
+    },
+    {
+      "k": "cmd",
+      "t": 8680,
+      "line": "draw rainbow.blue blue w=16 M -180 0 Q 0 -240 180 0"
+    },
+    {
+      "k": "cmd",
+      "t": 8810,
+      "line": "say dragon wow a rainbow"
+    },
+    {
+      "k": "words",
+      "t": 14000,
+      "text": "The dragon slid down the rainbow and landed in a big pile of sparkly stars"
+    },
+    {
+      "k": "cmd",
+      "t": 14900,
+      "line": "move dragon 600 480 1.5 glide"
+    },
+    {
+      "k": "cmd",
+      "t": 15030,
+      "line": "move dragon 600 525 1"
+    },
+    {
+      "k": "cmd",
+      "t": 15160,
+      "line": "fx stars 600 500 200 gold"
+    },
+    {
+      "k": "cmd",
+      "t": 15290,
+      "line": "fx sparkles 600 500 150"
+    },
+    {
+      "k": "cmd",
+      "t": 15420,
+      "line": "say dragon wheee"
+    },
+    {
+      "k": "words",
+      "t": 17420,
+      "text": "The End"
+    },
+    {
+      "k": "end",
+      "t": 17520
+    }
+  ]
+}

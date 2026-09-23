@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import type { Provider, Usage } from './models'
+import { RelayProvider } from '~/backend/relay-provider'
 
 /** One text block of the user message. `cache: true` marks a prompt-cache breakpoint (Anthropic). */
 export interface PromptBlock {
@@ -131,7 +132,7 @@ class OpenAiCompatProvider implements LlmProvider {
     }
     if (this.kind === 'openrouter') {
       headers['HTTP-Referer'] = 'http://localhost:7710'
-      headers['X-Title'] = 'Once Upon'
+      headers['X-Title'] = 'Squiggletale'
     }
     const body: Record<string, unknown> = {
       model: this.model,
@@ -217,4 +218,9 @@ export function makeProvider(provider: Provider, model: string, keys: ApiKeys): 
     case 'openai':
       return keys.openai ? new OpenAiCompatProvider('openai', model, keys.openai) : null
   }
+}
+
+/** Hosted mode: draw through the server relay instead of a browser-direct provider. */
+export function makeHostedProvider(getSessionId: () => string | null): LlmProvider {
+  return new RelayProvider(getSessionId)
 }

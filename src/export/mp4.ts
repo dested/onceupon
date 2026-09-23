@@ -12,8 +12,9 @@ import { Scene } from '~/engine/scene'
 import { Stage } from '~/engine/stage'
 import { Director } from '~/llm/director'
 import { isDialectId, makeDialect } from '~/llm/dialect'
-import { replaySchedule } from '~/story/replay'
+import { recordClockOffset, replaySchedule } from '~/story/replay'
 import type { StoryRecord } from '~/story/storage'
+import { makeVoiceTrack } from '~/story/voice'
 import { BookFrame, CPU, loadVideoFonts, PAPER, VIDEO_H, VIDEO_W } from './frame'
 
 /**
@@ -203,6 +204,14 @@ export async function exportStoryVideo(
   await loadVideoFonts()
   throwIfAborted(signal)
 
+  // The child's voice. `opts.voice === undefined` means "figure it out"; an explicit null skips it.
+  // With voice the replay runs in real time (no squeezed gaps), so voice and drawing stay aligned;
+  // voice decode is deterministic for the same file, so the export stays deterministic.
+  const hasVoice = record.voice !== undefined && record.voice.clips.length > 0
+  let voice = opts.voice
+  if (voice === undefined && hasVoice) voice = await makeVoiceTrack(record)
+  throwIfAborted(signal)
+
   // The live engine on a virtual clock, drawing into a detached paper-sized canvas.
   const clock = new VirtualClock()
   const cues = new AudioCues(() => clock.now())
@@ -226,7 +235,7 @@ export async function exportStoryVideo(
   })
 
   const events = record.events
-  const times = replaySchedule(events)
+  const times = replaySchedule(events, { realTime: hasVoice })
   let caption = ''
   events.forEach((ev, i) => {
     clock.at(times[i] ?? 0, () => {
@@ -304,7 +313,11 @@ export async function exportStoryVideo(
 
     const seconds = frames / FPS
     report('audio', 0.92, true)
+    // Record time -> video time. With voice the timeline is real time (t - offset), so the mapping is
+    // exact; without it, follow the squeezed schedule (last event at/before recordMs, clamped to the next).
+    const offset = recordClockOffset(record)
     const videoSecondsOf = (recordMs: number): number => {
+      if (hasVoice) return Math.max(0, recordMs - offset) / 1000
       let i = 0
       while (i + 1 < events.length && (events[i + 1]?.t ?? Infinity) <= recordMs) i++
       const ev = events[i]
@@ -314,7 +327,6 @@ export async function exportStoryVideo(
       const into = Math.max(0, recordMs - ev.t)
       return (next === undefined ? base + into : Math.min(base + into, next)) / 1000
     }
-    const voice = opts.voice
     const audio = await renderAudioCues(
       cues.cues,
       seconds,

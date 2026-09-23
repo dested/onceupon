@@ -12,15 +12,17 @@ import {
   Play,
   Plus,
   Settings,
+  Share2,
   Sparkles,
   Star,
+  Users,
   Volume2,
   VolumeX,
   X,
 } from 'lucide-react'
 import { LiveSession } from '~/story/session'
 import { appStore, persistSettings, useApp } from '~/story/store'
-import { listStories } from '~/story/storage'
+import { getKv, getStory, listStories, setKv } from '~/story/storage'
 import { Subtitles } from './Subtitles'
 import { Filmstrip } from './Filmstrip'
 import { SettingsPanel } from './SettingsPanel'
@@ -29,6 +31,9 @@ import { DebugPanel } from './DebugPanel'
 import { SpendChip } from './SpendChip'
 import { StoryWelcome } from './StoryWelcome'
 import { VideoExportButton } from './VideoExport'
+import { MinutesChip } from './MinutesChip'
+import { formatMinutes, gate, openParentArea, startFreshStory } from './hosted'
+import { openShareCard } from './ShareCard'
 
 export function StoryScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -51,6 +56,13 @@ export function StoryScreen() {
   const words = useApp((s) => s.transcriptFinal)
   const interim = useApp((s) => s.transcriptInterim)
   const pages = useApp((s) => s.pages)
+  const hosted = useApp((s) => s.hosted)
+  const online = useApp((s) => s.online)
+  const endReason = useApp((s) => s.endReason)
+  const sleepy = useApp((s) => s.sleepy)
+  const remainingSec = useApp((s) => s.remainingSec)
+  const balanceSec = useApp((s) => s.balanceSec)
+  const offline = hosted && !online
   const [typed, setTyped] = useState('')
   const [typing, setTyping] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -101,30 +113,50 @@ export function StoryScreen() {
     }
   }, [menuOpen])
 
+  const startMic = (session: LiveSession): void => {
+    setTyping(false)
+    void session.startListening()
+  }
   const toggleMic = () => {
     const session = sessionRef.current
     if (!session) return
-    if (listening || micStarting) session.stopListening()
-    else {
-      setTyping(false)
-      void session.startListening()
+    if (listening || micStarting) {
+      session.stopListening()
+      return
     }
+    // Apple wants a grown-up gate before the first microphone permission prompt on a device.
+    if (hosted) {
+      void getKv('micGateDone').then((done) => {
+        if (done !== null) {
+          startMic(session)
+          return
+        }
+        void gate().then((ok) => {
+          if (!ok) return
+          void setKv('micGateDone', '1')
+          startMic(session)
+        })
+      })
+      return
+    }
+    startMic(session)
   }
   const newStory = () => {
     confirmRef.current?.close()
-    appStore.set((s) => ({
-      storyNonce: s.storyNonce + 1,
-      ending: false,
-      ended: false,
-      transcriptFinal: '',
-      transcriptInterim: '',
-      drawingWords: '',
-      queuedWords: '',
-      note: '',
-      pages: [],
-      lines: [],
-      calls: [],
-    }))
+    startFreshStory()
+  }
+  const openGrownUps = (): void => {
+    void gate().then((ok) => {
+      if (ok) openParentArea()
+    })
+  }
+  const shareStory = (): void => {
+    const session = sessionRef.current
+    if (!session) return
+    session.save()
+    void gate().then((ok) => {
+      if (ok) openShareCard(session.storyId)
+    })
   }
   const requestNewStory = () => {
     if (hasStory && !ended) confirmRef.current?.showModal()
@@ -186,11 +218,14 @@ export function StoryScreen() {
           <BookOpen size={23} />
           <span>My stories</span>
         </button>
-        <div className="studio-wordmark" aria-label="Once Upon">
-          <Star size={17} />
-          <span>
-            once upon<span className="wordmark-dot">✦</span>
-          </span>
+        <div className="studio-center">
+          <div className="studio-wordmark" aria-label="Squiggletale">
+            <Star size={17} />
+            <span>
+              squiggletale<span className="wordmark-dot">✦</span>
+            </span>
+          </div>
+          <MinutesChip />
         </div>
         <div className="header-actions">
           <button
@@ -216,15 +251,28 @@ export function StoryScreen() {
                   {sound ? 'Sound on' : 'Sound off'}
                   <span className="menu-check">{sound && <Check size={17} />}</span>
                 </button>
-                <button
-                  onClick={() => {
-                    sessionRef.current?.stopListening()
-                    appStore.set({ settingsOpen: true })
-                    setMenuOpen(false)
-                  }}>
-                  <Settings size={21} />
-                  Grown-up settings
-                </button>
+                {hosted ? (
+                  <button
+                    onClick={() => {
+                      sessionRef.current?.stopListening()
+                      setMenuOpen(false)
+                      openGrownUps()
+                    }}
+                    data-testid="menu-grown-ups">
+                    <Users size={21} />
+                    Grown-ups
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      sessionRef.current?.stopListening()
+                      appStore.set({ settingsOpen: true })
+                      setMenuOpen(false)
+                    }}>
+                    <Settings size={21} />
+                    Grown-up settings
+                  </button>
+                )}
                 {import.meta.env.DEV && (
                   <button
                     onClick={() => {
@@ -322,34 +370,67 @@ export function StoryScreen() {
 
       <footer className="story-controls">
         {finished ? (
-          <div className="story-finished" data-testid={ended ? 'the-end-card' : 'story-ending'}>
+          <div
+            className={`story-finished ${ended && endReason === 'sleepy' ? 'is-sleepy' : ''}`}
+            data-testid={ended ? 'the-end-card' : 'story-ending'}>
             <div className="finished-message">
               <Star size={28} />
               <div>
-                <strong>{ended ? 'Look what you imagined!' : 'A lovely ending…'}</strong>
+                <strong>
+                  {!ended
+                    ? 'A lovely ending…'
+                    : endReason === 'sleepy'
+                      ? 'The crayon fell asleep'
+                      : endReason === 'silence'
+                        ? 'All quiet…'
+                        : 'Look what you imagined!'}
+                </strong>
                 <span>
-                  {ended
-                    ? 'Your story is tucked away in My stories'
-                    : 'The crayon is finishing your story'}
+                  {!ended
+                    ? 'The crayon is finishing your story'
+                    : endReason === 'sleepy'
+                      ? 'Ask a grown-up for more minutes'
+                      : endReason === 'silence'
+                        ? 'The crayon finished your story'
+                        : 'Your story is tucked away in My stories'}
                 </span>
               </div>
             </div>
             {ended && (
               <div className="finished-actions">
+                {endReason === 'sleepy' && (
+                  <button
+                    className="studio-button sleepy-more"
+                    onClick={() => void gate().then((ok) => ok && appStore.set({ paywallOpen: true }))}
+                    data-testid="more-minutes">
+                    <Plus size={21} />
+                    More minutes
+                  </button>
+                )}
                 <button className="studio-button replay-button" onClick={playAgain}>
                   <Play size={21} fill="currentColor" />
                   Play it again
                 </button>
+                {hosted && endReason === 'the-end' && (
+                  <button className="studio-button" onClick={shareStory} data-testid="send-to-grandma">
+                    <Share2 size={21} />
+                    Send to grandma
+                  </button>
+                )}
                 <VideoExportButton
                   variant="studio"
-                  getStoryId={() => {
-                    const session = sessionRef.current
-                    if (!session) return null
-                    session.save()
-                    return session.storyId
+                  getRecord={() => {
+                    const s = sessionRef.current
+                    if (!s) return null
+                    s.save()
+                    return getStory(s.storyId)
                   }}
                 />
-                <button className="studio-button" onClick={newStory}>
+                <button
+                  className="studio-button"
+                  onClick={newStory}
+                  disabled={hosted && endReason === 'sleepy' && balanceSec === 0}
+                  title={hosted && endReason === 'sleepy' && balanceSec === 0 ? 'no minutes left' : undefined}>
                   <Plus size={21} />
                   New story
                 </button>
@@ -358,18 +439,29 @@ export function StoryScreen() {
           </div>
         ) : (
           <>
-            <div className="end-reminder">
+            <div className={`end-reminder ${sleepy ? 'is-sleepy' : ''}`}>
               <Star size={19} />
-              <span>
-                All done? Just say
-                <br />
-                <strong>“The End”</strong>
-              </span>
+              {sleepy ? (
+                <span>
+                  The crayon is getting sleepy…
+                  <br />
+                  <strong>{formatMinutes(remainingSec ?? balanceSec)} left</strong>
+                  <span className="sleepy-z" aria-hidden="true">
+                    z
+                  </span>
+                </span>
+              ) : (
+                <span>
+                  All done? Just say
+                  <br />
+                  <strong>“The End”</strong>
+                </span>
+              )}
             </div>
             <div className="mic-dock">
               <button
                 onClick={toggleMic}
-                disabled={!micSupported}
+                disabled={!micSupported || offline}
                 aria-label={
                   listening
                     ? 'Stop listening'
@@ -387,28 +479,36 @@ export function StoryScreen() {
                   <Mic size={37} strokeWidth={2.3} />
                 )}
               </button>
-              <div className="mic-copy">
-                <strong data-testid="status">{micTitle}</strong>
-                <span>{micHint}</span>
-                {listening && (
-                  <div className="voice-wave" aria-label="Microphone level" data-testid="mic-level">
-                    {[0.4, 0.7, 1, 0.6, 0.85, 0.5, 0.9, 0.65, 0.35].map((height, i) => (
-                      <i key={i} style={{ height: `${4 + height * micLevel * 19}px` }} />
-                    ))}
-                  </div>
-                )}
-              </div>
+              {offline ? (
+                <div className="offline-note" role="status" data-testid="offline-note">
+                  The crayon needs the internet to draw new stories. Your saved stories still play.
+                </div>
+              ) : (
+                <div className="mic-copy">
+                  <strong data-testid="status">{micTitle}</strong>
+                  <span>{micHint}</span>
+                  {listening && (
+                    <div className="voice-wave" aria-label="Microphone level" data-testid="mic-level">
+                      {[0.4, 0.7, 1, 0.6, 0.85, 0.5, 0.9, 0.65, 0.35].map((height, i) => (
+                        <i key={i} style={{ height: `${4 + height * micLevel * 19}px` }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <button
-              className={`studio-button keyboard-button ${typing ? 'is-selected' : ''}`}
-              onClick={() => setTyping(!typing)}
-              aria-expanded={typing}
-              aria-controls="story-type-form"
-              aria-label={typing ? 'Close keyboard' : 'Type a story'}>
-              <Keyboard size={24} />
-              <span>Or type</span>
-            </button>
-            {typing && (
+            {!offline && (
+              <button
+                className={`studio-button keyboard-button ${typing ? 'is-selected' : ''}`}
+                onClick={() => setTyping(!typing)}
+                aria-expanded={typing}
+                aria-controls="story-type-form"
+                aria-label={typing ? 'Close keyboard' : 'Type a story'}>
+                <Keyboard size={24} />
+                <span>Or type</span>
+              </button>
+            )}
+            {!offline && typing && (
               <form
                 id="story-type-form"
                 className="story-type-form"

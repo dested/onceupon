@@ -41,7 +41,7 @@ export function buildDebugReport(s: AppState, h: DebugHandle | null): string {
   const tracker = trackerOptionsFor(settings)
   const out: string[] = []
 
-  out.push('# Once Upon debug report')
+  out.push('# Squiggletale debug report')
   out.push(
     `generated ${new Date().toISOString()} · session age ${secs(now - t0)} · listening ${listenT0 ? `since ${ms(listenT0 - t0)}` : 'never started'} · status ${s.status}`
   )

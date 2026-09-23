@@ -1,4 +1,6 @@
-# Once Upon go-to-market
+# Squiggletale go-to-market
+
+> Name locked 2026-09-22: **Squiggletale**, squiggletale.app + squiggletale.com (plans/2026-09-22-app-name.md). "Once Upon" below was the placeholder; listing copy updated.
 
 - **Date:** 2026-09-22
 - **Status:** active
@@ -25,7 +27,7 @@ No subscription (Sal, 2026-09-22). Minutes are the product, bought outright, nev
 2. **Story pack, 40 minutes, $9.99.** The default buy. About eight stories.
 3. **Big pack, 120 minutes, $19.99.** The "we're going to use this" buy, positioned as the value pick on the paywall (per-minute price shown: 17¢ vs 25¢).
 4. **Family pack, 400 minutes, $39.99.** The gift SKU and the road-trip SKU; 10¢ a minute. Restore Purchases keeps a balance across reinstalls (the ledger lives on the server, keyed to the device account, credited only from validated receipts or redeemed codes).
-5. **Gifting is a web product (decided 2026-09-22).** Apple has no IAP gifting, so gift codes are sold on onceupon.app with Stripe: grandma buys 40, 120 or 400 minutes, gets a code and a printable card, texts it; the parent redeems it in the app's parent area behind the parental gate (or on the website, signed in to the same device account via a link). Apple's multiplatform rule (3.1.3(b)) allows redeeming consumables bought elsewhere as long as the same packs are sold in-app, which they are. A web sale nets ~97% of price instead of 85%.
+5. **Gifting is a web product (decided 2026-09-22).** Apple has no IAP gifting, so gift codes are sold on squiggletale.app with Stripe: grandma buys 40, 120 or 400 minutes, gets a code and a printable card, texts it; the parent redeems it in the app's parent area behind the parental gate (or on the website, signed in to the same device account via a link). Apple's multiplatform rule (3.1.3(b)) allows redeeming consumables bought elsewhere as long as the same packs are sold in-app, which they are. A web sale nets ~97% of price instead of 85%.
 6. **Web checkout for packs, US storefront.** Since the 2025 Epic ruling, US apps may link out to external purchase without commission; the paywall's "buy on the web" link sits behind the parental gate and goes to the same Stripe shop. IAP stays the default button; the web link is the cheaper path for parents who take it.
 7. **The rebuy screen.** Zero balance looks like the finale card, not an error: "the crayon needs more minutes", the pack bought last time pre-selected, Restore Purchases and "redeem a gift" underneath. Packs per buyer is the number that makes ads work; this screen is where it is earned.
 
@@ -49,14 +51,14 @@ Audience in order: parents of 3 to 7 year olds on iPad (buyer and gatekeeper), g
 
 ## App Store listing (this is the ad; Apple Ads render from it)
 
-- **Name (30):** `Once Upon: Tell It, Watch It` or `Once Upon – Story Crayon`. The first tests better on the promise; the second on the mechanic.
-- **Subtitle (30):** `Say a story. Watch it draw.`
+- **Name (30):** `Squiggletale` (brand only; the keywords go in the subtitle, which is what the durable kids brands do).
+- **Subtitle (30):** `Say a story, the crayon draws` (29). `crayon` is near-uncontested in Kids titles.
 - **Promotional text (170):** `Your child tells a story out loud and a crayon draws it as they talk. Say "The End" and share the picture book with grandma. First story free, then buy minutes, no subscription.`
 - **Keywords (100):** `story,stories,bedtime,kids,drawing,crayon,storytelling,imagination,creative,toddler,preschool,talk,book`
 - **Category:** Kids (age band 5 and under; test 6 to 8), secondary Education. Made for Kids on.
 - **Screenshots, in order** (iPad 13", landscape, each a real story frame with a short hand-lettered caption): (1) a dragon half drawn with the caption words along the bottom, "Tell your story out loud"; (2) the same page finished, "Watch the crayon draw it"; (3) a page turn with the filmstrip, "Every idea is a new page"; (4) The End finale, "Say The End"; (5) the share card and an iMessage bubble with the link, "Send it to grandma"; (6) the bookshelf, "Every story saved".
 - **App preview (30 s):** the first 3 seconds must show a child's voice line appearing as words and the crayon starting to draw. Cut from a real replay (the export pipeline makes this). No narrator; the kid's words are the audio (a family member's child, with consent, or a recorded adult playing a kid).
-- **Description opening:** `Once Upon listens while your child tells a story and draws it on the screen with a crayon, as they talk. A dragon, a castle, a rocket to the moon: whatever they say, it appears. When they say "The End", the story is saved as a picture book you can replay, download as a video, or send to family with a link.`
+- **Description opening:** `Squiggletale listens while your child tells a story and draws it on the screen with a crayon, as they talk. A dragon, a castle, a rocket to the moon: whatever they say, it appears. When they say "The End", the story is saved as a picture book you can replay, download as a video, or send to family with a link.`
 - **Review notes:** explain the safety layers (the drawing model refuses unsuitable ideas, the word masker, moderation on in production, no audio stored, no accounts, no third-party analytics), the parental gate before purchases and the mic prompt, and that the AI generates drawings only from the child's own words.
 
 ## Apple Ads plan
@@ -67,7 +69,7 @@ Apple Ads Advanced, cost per tap, no minimum spend. Search results campaigns are
 
 | Campaign | Match | Budget share | Purpose |
 | --- | --- | --- | --- |
-| Brand | exact: `once upon`, `once upon app`, `once upon story` | 10% | Defend the name cheaply |
+| Brand | exact: `squiggletale`, `squiggle tale`, `squiggletale app` | 10% | Defend the name cheaply |
 | Generic, high intent | exact: `story maker for kids`, `kids storytelling app`, `make your own story`, `story creator kids`, `bedtime story app`, `bedtime stories for kids`, `drawing app for kids`, `kids drawing app`, `talking story app`, `interactive stories kids`, `story app for toddlers`, `imagination app` | 45% | The buyers |
 | Competitor | exact: `pok pok`, `sago mini`, `toca boca`, `epic kids books`, `lingokids`, `khan kids`, `storybook`, `pinkfong` | 20% | Parents already paying for kids apps |
 | Discovery | Search Match on, broad match of the generic terms | 25% | Harvest new terms weekly into exact; add negatives |
@@ -89,9 +91,9 @@ Apple Ads have no headline field; the ad is the product page. So the copy that m
 - Grandparents: `Your child tells a story, the crayon draws it, you send the link. Grandma watches it come to life. First story free.`
 - Competitor: `Not another video to watch. Your child makes the story out loud and a crayon draws it live. Say "The End" and share it.`
 
-**Share page (the organic ad):** headline `Ellie made this story` (the first name only if the parent typed one; otherwise `A story by a 5-year-old`), the replay in the child's own voice, then `Made with Once Upon. Your kid's turn: get it on the App Store.` Video download button. Nothing else. The voice is what makes grandma forward it.
+**Share page (the organic ad):** headline `Ellie made this story` (the first name only if the parent typed one; otherwise `A story by a 5-year-old`), the replay in the child's own voice, then `Made with Squiggletale. Your kid's turn: get it on the App Store.` Video download button. Nothing else. The voice is what makes grandma forward it.
 
-**MP4 end card (2 s):** `Made with Once Upon` in the crayon hand, the app icon, `onceupon.app`.
+**MP4 end card (2 s):** `Made with Squiggletale` in the crayon hand, the app icon, `squiggletale.app`.
 
 **Reels / TikTok, 15 s, three scripts** (parent-filmed, phone pointed at the iPad, kid's voice audible):
 1. Kid says "the dragon ate a giant ice cream", the crayon draws it, parent laughs off camera. Caption: `she said it, it drew it`.

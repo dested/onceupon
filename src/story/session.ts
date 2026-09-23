@@ -2,26 +2,31 @@ import { CrayonAudio } from '~/engine/audio'
 import { Scene } from '~/engine/scene'
 import { Stage } from '~/engine/stage'
 import { Director, type DirectorEvent } from '~/llm/director'
-import { makeProvider, type LlmProvider } from '~/llm/providers'
+import { makeHostedProvider, makeProvider, type LlmProvider } from '~/llm/providers'
 import {
   CHROME_TRACKER,
   createRecognizer,
+  DEEPGRAM_TRACKER,
+  LIVE_TRACKER,
+  PHRASE_TRACKER,
   speechSupported,
   TranscriptTracker,
   type Recognizer,
-  type RecResult,
+  type RecognizerHandlers,
   type SttTraceKind,
+  type TrackerOptions,
 } from '~/speech/recognition'
 import { trackerOptionsFor, VOICE_HOLD_MS, VOICE_LEVEL } from '~/speech/beat-rules'
 import { buildDebugReport } from './debug-report'
-import { appStore, resolveStt } from './store'
-import { createOpenAiRealtimeRecognizer } from '~/speech/openai-realtime'
+import { appStore, resolveStt, type SttKind } from './store'
+import { createOpenAiRealtimeRecognizer, isLiveModel } from '~/speech/openai-realtime'
 import { createDeepgramRecognizer } from '~/speech/deepgram'
-import { warmMic } from '~/speech/pcm-mic'
+import { currentMicStream, warmMic } from '~/speech/pcm-mic'
 import {
   getStory,
   listStories,
   newStoryId,
+  putVoiceClip,
   saveStory,
   titleFromWords,
   type StoryEvent,
@@ -32,6 +37,13 @@ import { exposeDebugHandle, type DebugHandle } from '~/debug-handle'
 import { isDialectId, makeDialect } from '~/llm/dialect'
 import { cleanText, setModeration } from './clean'
 import { splitTheEnd } from './the-end'
+import { HOSTED } from '~/backend/config'
+import { ApiError } from '~/backend/api'
+import { StoryMeter, type MeterHandlers } from '~/backend/meter'
+import { VoicePlayer, VoiceRecorder } from '~/story/voice'
+import { playCoachLine } from '~/tutorial/coach'
+import { SLEEPY_AT_SEC } from '../../packages/shared/src/packs'
+import type { EarsToken, EarsVendor, EndReason, SessionStart } from '../../packages/shared/src/api'
 
 let lineCounter = 0
 let traceCounter = 0
@@ -85,9 +97,21 @@ function pushDirectorEvent(e: DirectorEvent): void {
   }
 }
 
+/** The meter of the live session, read lazily by the relay provider so it always has the session id. */
+let activeMeter: StoryMeter | null = null
+const relayProvider = makeHostedProvider(() => activeMeter?.sessionId ?? null)
+
 function currentProvider(): LlmProvider | null {
+  if (HOSTED) return relayProvider
   const { settings } = appStore.get()
   return makeProvider(settings.provider, settings.model, settings.keys)
+}
+
+/** Tracker rules for the ears the relay handed us (hosted mode; the vendor is not in settings). */
+function hostedTrackerOptions(ears: EarsToken | null): TrackerOptions {
+  if (!ears) return CHROME_TRACKER
+  if (ears.vendor === 'openai') return isLiveModel(ears.model) ? LIVE_TRACKER : PHRASE_TRACKER
+  return DEEPGRAM_TRACKER
 }
 
 /** A live storytelling session bound to one canvas: mic in, crayon out, story log saved as it goes. */
@@ -112,10 +136,19 @@ export class LiveSession {
   private ended = false
   private directorIdle = true
   private pendingFinale = false
+  /** Hosted metering (null in bring-your-own-key builds). */
+  private readonly meter: StoryMeter | null
+  private readonly voice = new VoiceRecorder()
+  private voiceClipIndex = 0
+  /** When words last arrived; drives the silence nudge and auto-end. */
+  private lastWordsAt = performance.now()
+  private nudged = false
+  private endReason: EndReason = 'the-end'
 
   constructor(canvas: HTMLCanvasElement) {
     const seed = Math.floor(Math.random() * 1e9)
-    const dialect = appStore.get().settings.dialect
+    // Hosted mode may override the drawing language via server config; else the local setting.
+    const dialect = appStore.get().config?.dialect ?? appStore.get().settings.dialect
     setModeration(appStore.get().settings.moderation)
     this.story = {
       id: newStoryId(),
@@ -156,6 +189,8 @@ export class LiveSession {
       },
       CHROME_TRACKER
     )
+    this.meter = HOSTED ? new StoryMeter(this.story.id, this.meterHandlers()) : null
+    activeMeter = this.meter
     appStore.set({
       micSupported: speechSupported() || resolveStt(appStore.get().settings) !== 'browser',
       status: 'idle',
@@ -165,6 +200,9 @@ export class LiveSession {
       transcriptInterim: '',
       pages: [],
       warnings: [],
+      endReason: null,
+      remainingSec: null,
+      sleepy: false,
     })
     this.stage.start()
     this.audio.setEnabled(appStore.get().settings.sound)
@@ -288,28 +326,52 @@ export class LiveSession {
     if (this.ended) return
     const { before, ended } = splitTheEnd(cleanText(raw))
     if (before) {
+      this.lastWordsAt = performance.now()
       this.record({ k: 'words', t: this.now(), text: before })
       appStore.set((s) => ({
         transcriptFinal: s.transcriptFinal ? `${s.transcriptFinal} ${before}` : before,
       }))
       this.director.feed(before)
     }
-    if (ended) this.endStory()
+    if (ended) this.endStory('the-end')
+  }
+
+  private meterHandlers(): MeterHandlers {
+    return {
+      onRemaining: (sec) => {
+        const wasSleepy = appStore.get().sleepy
+        const sleepy = sec <= SLEEPY_AT_SEC
+        appStore.set({ remainingSec: sec, sleepy })
+        if (sleepy && !wasSleepy) this.showNote('the crayon is getting sleepy…', 5000)
+      },
+      onExhausted: () => this.endStory('sleepy'),
+      onError: (code, message) =>
+        appStore.set((s) => ({ warnings: [...s.warnings.slice(-9), `meter: ${message} (${code})`] })),
+    }
+  }
+
+  private showNote(text: string, ms: number): void {
+    appStore.set({ note: text })
+    clearTimeout(this.noteTimer)
+    this.noteTimer = window.setTimeout(() => appStore.set({ note: '' }), ms)
   }
 
   /**
-   * The child said "The End". Stop listening, let the current drawing finish, then play the finale
-   * and show the closing card. Words that arrive afterward are ignored (feed returns early).
+   * End the story. `the-end` records the phrase; `sleepy` (out of minutes) and `silence` (no words for
+   * a long time) do not. All three record the `end` event, play the finale, then settle the meter.
    */
-  private endStory(): void {
+  private endStory(reason: EndReason = 'the-end'): void {
     if (this.ended) return
     this.ended = true
     this.stopListening()
-    this.record({ k: 'words', t: this.now(), text: 'The End' })
-    appStore.set((s) => ({
-      ending: true,
-      transcriptFinal: s.transcriptFinal ? `${s.transcriptFinal} The End` : 'The End',
-    }))
+    if (reason === 'the-end') {
+      this.record({ k: 'words', t: this.now(), text: 'The End' })
+      appStore.set((s) => ({
+        transcriptFinal: s.transcriptFinal ? `${s.transcriptFinal} The End` : 'The End',
+      }))
+    }
+    this.endReason = reason
+    appStore.set({ ending: true })
     this.pendingFinale = true
     if (this.directorIdle) this.playFinale()
   }
@@ -320,9 +382,25 @@ export class LiveSession {
     this.record({ k: 'end', t: this.now() })
     this.audio.pageFlip()
     void this.stage.finale(this.story.seed).then(() => {
-      appStore.set({ ending: false, ended: true })
+      appStore.set({ ending: false, ended: true, endReason: this.endReason })
       this.save()
+      if (this.endReason === 'sleepy')
+        this.showNote('the crayon fell asleep… ask a grown-up for more minutes', 6000)
+      void this.meter?.stop(this.endReason)
     })
+  }
+
+  /** Stop the voice recorder and save the finished clip beside the record. */
+  private async captureVoice(): Promise<void> {
+    const clip = await this.voice.stop()
+    if (!clip) return
+    const file = await putVoiceClip(this.story.id, ++this.voiceClipIndex, clip.blob, clip.blob.type)
+    this.story.voice = {
+      mime: clip.blob.type,
+      clips: [...(this.story.voice?.clips ?? []), { t: clip.t, ms: clip.ms, file }],
+    }
+    clearTimeout(this.saveTimer)
+    this.saveTimer = window.setTimeout(() => this.save(), 1500)
   }
 
   /** The id of the story being told, so the closing card can open its replay. */
@@ -353,91 +431,169 @@ export class LiveSession {
     this.audio.setEnabled(on)
   }
 
-  /** Typed words behave exactly like spoken ones. */
+  /** Typed words behave exactly like spoken ones (and never count as listening time). */
   typeWords(text: string): void {
     void this.audio.start()
+    if (HOSTED && this.meter) {
+      void this.meter
+        .ensureStarted('browser')
+        .then(() => this.feed(text))
+        .catch((e: unknown) => this.handleStartError(e))
+      return
+    }
     this.feed(text)
   }
 
-  private sttKind: 'browser' | 'openai' | 'deepgram' | null = null
+  private sttKind: SttKind | null = null
 
-  async startListening(): Promise<void> {
-    void this.audio.start()
-    const settings = appStore.get().settings
-    const kind = resolveStt(settings)
+  private recognizerHandlers(streaming: boolean): RecognizerHandlers {
+    return {
+      onResult: (results) => {
+        this.tracker.onResult(results, performance.now())
+        appStore.set({ transcriptInterim: cleanText(this.tracker.interim) })
+      },
+      onEnd: () => {
+        if (this.wantListening) {
+          this.tracker.reset()
+          window.setTimeout(
+            () => {
+              if (this.wantListening) this.safeStart()
+            },
+            streaming ? 800 : 120
+          )
+        } else appStore.set({ listening: false, micStarting: false, micLevel: 0 })
+      },
+      onReady: () => {
+        if (this.wantListening) appStore.set({ listening: true, micStarting: false })
+        this.meter?.setListening(true)
+        const stream = currentMicStream()
+        if (stream) this.voice.start(stream, this.now())
+        this.lastWordsAt = performance.now()
+        this.nudged = false
+      },
+      onAudio: (ms) => {
+        appStore.set((s) => ({ spend: { ...s.spend, audioMs: s.spend.audioMs + ms } }))
+      },
+      onLevel: (level) => {
+        if (level >= VOICE_LEVEL) this.lastLoudAt = performance.now()
+        appStore.set({ micLevel: level })
+      },
+      onTrace: (kind: SttTraceKind, text: string) => {
+        const t = Math.round(performance.now() - this.listenT0)
+        appStore.set((s) => ({
+          sttLog: [...s.sttLog.slice(-59), { id: ++traceCounter, t, kind, text }],
+        }))
+      },
+      onError: (err) => {
+        if (
+          err === 'not-allowed' ||
+          err === 'service-not-allowed' ||
+          /permission|NotAllowed/i.test(err)
+        ) {
+          this.wantListening = false
+          appStore.set((s) => ({
+            listening: false,
+            warnings: [...s.warnings, 'microphone permission denied'],
+          }))
+        } else if (streaming) {
+          appStore.set((s) => ({ warnings: [...s.warnings, `speech: ${err}`] }))
+        }
+      },
+    }
+  }
+
+  /** Build (or reuse) the recognizer for `kind`, aborting the previous one if the kind changed. */
+  private setRecognizer(kind: SttKind, make: () => Recognizer | null, tracker: TrackerOptions): void {
     if (this.recognizer && this.sttKind !== kind) {
       this.recognizer.abort()
       this.recognizer = null
     }
-    if (!this.recognizer) {
-      const handlers = {
-        onResult: (results: RecResult[]) => {
-          this.tracker.onResult(results, performance.now())
-          appStore.set({ transcriptInterim: cleanText(this.tracker.interim) })
-        },
-        onEnd: () => {
-          if (this.wantListening) {
-            this.tracker.reset()
-            window.setTimeout(
-              () => {
-                if (this.wantListening) this.safeStart()
-              },
-              kind === 'browser' ? 120 : 800
-            )
-          } else appStore.set({ listening: false, micStarting: false, micLevel: 0 })
-        },
-        onReady: () => {
-          if (this.wantListening) appStore.set({ listening: true, micStarting: false })
-        },
-        onAudio: (ms: number) => {
-          appStore.set((s) => ({ spend: { ...s.spend, audioMs: s.spend.audioMs + ms } }))
-        },
-        onLevel: (level: number) => {
-          if (level >= VOICE_LEVEL) this.lastLoudAt = performance.now()
-          appStore.set({ micLevel: level })
-        },
-        onTrace: (kind: SttTraceKind, text: string) => {
-          const t = Math.round(performance.now() - this.listenT0)
-          appStore.set((s) => ({
-            sttLog: [...s.sttLog.slice(-59), { id: ++traceCounter, t, kind, text }],
-          }))
-        },
-        onError: (err: string) => {
-          if (
-            err === 'not-allowed' ||
-            err === 'service-not-allowed' ||
-            /permission|NotAllowed/i.test(err)
-          ) {
-            this.wantListening = false
-            appStore.set((s) => ({
-              listening: false,
-              warnings: [...s.warnings, 'microphone permission denied'],
-            }))
-          } else if (kind === 'openai' || kind === 'deepgram') {
-            appStore.set((s) => ({ warnings: [...s.warnings, `speech: ${err}`] }))
-          }
-        },
+    if (this.recognizer) return
+    this.recognizer = make()
+    if (!this.recognizer) return
+    this.tracker.configure(tracker)
+    this.sttKind = kind
+  }
+
+  private handleStartError(e: unknown): void {
+    if (e instanceof ApiError && e.code === 'exhausted') {
+      appStore.set({ paywallOpen: true })
+    } else if (e instanceof ApiError && (e.code === 'paused' || e.code === 'read_only')) {
+      this.showNote('the crayon is taking a nap, try again soon', 5000)
+    } else {
+      const msg = e instanceof Error ? e.message : String(e)
+      appStore.set((s) => ({ warnings: [...s.warnings.slice(-9), `session: ${msg}`] }))
+    }
+  }
+
+  async startListening(): Promise<void> {
+    void this.audio.start()
+    const settings = appStore.get().settings
+    if (HOSTED && this.meter) {
+      let start: SessionStart
+      try {
+        start = await this.meter.ensureStarted(appStore.get().config?.earsVendor ?? 'browser')
+      } catch (e) {
+        this.handleStartError(e)
+        return
       }
-      this.recognizer =
-        kind === 'openai'
-          ? createOpenAiRealtimeRecognizer(handlers, {
-              apiKey: settings.keys.openai,
-              model: settings.sttModel,
+      const ears = start.ears
+      const kind: SttKind = ears ? ears.vendor : 'browser'
+      this.setRecognizer(
+        kind,
+        () => {
+          const handlers = this.recognizerHandlers(kind !== 'browser')
+          if (kind === 'openai')
+            return createOpenAiRealtimeRecognizer(handlers, {
+              apiKey: ears?.token ?? '',
+              model: ears?.model || settings.sttModel,
               prompt: '',
               silenceMs: 350,
               maxTurnMs: 2500,
               deviceId: settings.micDeviceId,
             })
-          : kind === 'deepgram'
-            ? createDeepgramRecognizer(handlers, {
-                apiKey: settings.keys.deepgram,
-                model: settings.deepgramModel,
-                deviceId: settings.micDeviceId,
-              })
-            : createRecognizer(handlers)
-      this.tracker.configure(trackerOptionsFor(settings))
-      this.sttKind = kind
+          if (kind === 'deepgram')
+            return createDeepgramRecognizer(handlers, {
+              auth: { kind: 'bearer', value: ears?.token ?? '' },
+              model: ears?.model || settings.deepgramModel,
+              deviceId: settings.micDeviceId,
+            })
+          return createRecognizer(handlers)
+        },
+        hostedTrackerOptions(ears)
+      )
+      if (!this.recognizer) {
+        appStore.set((s) => ({ warnings: [...s.warnings, 'speech recognition needs Chrome'] }))
+        return
+      }
+      this.beginListening()
+      return
     }
+
+    const kind = resolveStt(settings)
+    this.setRecognizer(
+      kind,
+      () => {
+        const handlers = this.recognizerHandlers(kind === 'openai' || kind === 'deepgram')
+        if (kind === 'openai')
+          return createOpenAiRealtimeRecognizer(handlers, {
+            apiKey: settings.keys.openai,
+            model: settings.sttModel,
+            prompt: '',
+            silenceMs: 350,
+            maxTurnMs: 2500,
+            deviceId: settings.micDeviceId,
+          })
+        if (kind === 'deepgram')
+          return createDeepgramRecognizer(handlers, {
+            auth: { kind: 'token', value: settings.keys.deepgram },
+            model: settings.deepgramModel,
+            deviceId: settings.micDeviceId,
+          })
+        return createRecognizer(handlers)
+      },
+      trackerOptionsFor(settings)
+    )
     if (!this.recognizer) {
       appStore.set((s) => ({
         warnings: [
@@ -447,18 +603,35 @@ export class LiveSession {
       }))
       return
     }
+    this.beginListening()
+  }
+
+  private beginListening(): void {
     this.wantListening = true
     this.tracker.reset()
     this.listenT0 = performance.now()
     appStore.set({ micStarting: true, sttLog: [], micLevel: 0 })
     this.safeStart()
     clearInterval(this.tickTimer)
-    this.tickTimer = window.setInterval(() => {
-      const now = performance.now()
-      // The mic was loud a moment ago: the child is still talking, hold the quiet-window release.
-      this.tracker.tick(now, now - this.lastLoudAt < VOICE_HOLD_MS)
-      appStore.set({ transcriptInterim: cleanText(this.tracker.interim) })
-    }, 250)
+    this.tickTimer = window.setInterval(() => this.tick(), 250)
+  }
+
+  private tick(): void {
+    const now = performance.now()
+    // The mic was loud a moment ago: the child is still talking, hold the quiet-window release.
+    this.tracker.tick(now, now - this.lastLoudAt < VOICE_HOLD_MS)
+    appStore.set({ transcriptInterim: cleanText(this.tracker.interim) })
+    if (!this.wantListening) return
+    const cfg = appStore.get().config
+    const nudgeMs = cfg?.silenceNudgeMs ?? 90000
+    const endMs = cfg?.silenceEndMs ?? 210000
+    const silent = now - this.lastWordsAt
+    if (!this.nudged && silent > nudgeMs) {
+      this.nudged = true
+      this.showNote('all done? just say "The End"', 8000)
+      void playCoachLine(4)
+    }
+    if (silent > endMs) this.endStory('silence')
   }
 
   private safeStart(): void {
@@ -473,6 +646,8 @@ export class LiveSession {
     this.wantListening = false
     clearInterval(this.tickTimer)
     this.recognizer?.stop()
+    this.meter?.setListening(false)
+    void this.captureVoice()
     appStore.set({ listening: false, micStarting: false, transcriptInterim: '' })
   }
 
@@ -483,6 +658,8 @@ export class LiveSession {
     this.stage.stop()
     clearTimeout(this.saveTimer)
     this.save()
+    if (!this.ended) void this.meter?.stop(null)
+    if (activeMeter === this.meter) activeMeter = null
   }
 }
 
@@ -492,12 +669,22 @@ export class ReplaySession {
   private director: Director
   private replayer: Replayer | null = null
   private record: StoryRecord | null
+  /** The child's recorded voice for this story, loaded once; null when there is none. */
+  private voice: Promise<VoicePlayer | null>
+  private voicePlayer: VoicePlayer | null = null
+  private disposed = false
+  /** Bumped by every play/pause/resume/seek so a pending async voice-load play doesn't override intent. */
+  private playToken = 0
 
   constructor(canvas: HTMLCanvasElement, storyId: string) {
     this.record = getStory(storyId)
     const seed = this.record?.seed ?? 1
     this.stage = new Stage(canvas, { seed, audio: null })
     this.director = this.freshDirector()
+    this.voice = this.record ? VoicePlayer.load(this.record) : Promise.resolve(null)
+    void this.voice.then((v) => {
+      this.voicePlayer = v
+    })
     this.stage.start()
     appStore.set({
       transcriptFinal: '',
@@ -530,29 +717,43 @@ export class ReplaySession {
   }
 
   private makeReplayer(record: StoryRecord): Replayer {
-    return new Replayer(record, this.director, {
-      onWords: (final, chunk) => appStore.set({ transcriptFinal: final, replayCaption: chunk }),
-      onProgress: (i) => appStore.set({ replayPos: i }),
-      onEnd: (seed) => void this.stage.finale(seed),
-      onDone: () => appStore.set({ replayPlaying: false }),
-    })
+    return new Replayer(
+      record,
+      this.director,
+      {
+        onWords: (final, chunk) => appStore.set({ transcriptFinal: final, replayCaption: chunk }),
+        onProgress: (i) => appStore.set({ replayPos: i }),
+        onEnd: (seed) => void this.stage.finale(seed),
+        onDone: () => appStore.set({ replayPlaying: false }),
+      },
+      { voice: this.voicePlayer }
+    )
   }
 
   play(): void {
     if (!this.record) return
+    const record = this.record
+    const token = ++this.playToken
     this.replayer?.stop()
-    this.replayer = this.makeReplayer(this.record)
     appStore.set({ replayPlaying: true })
-    this.replayer.play()
+    // Wait for the recorded voice before the first play so it is heard; guard unmount / pause races.
+    void this.voice.then((voice) => {
+      if (this.disposed || token !== this.playToken) return
+      this.voicePlayer = voice
+      this.replayer = this.makeReplayer(record)
+      this.replayer.play()
+    })
   }
 
   pause(): void {
+    this.playToken++
     this.replayer?.stop()
     appStore.set({ replayPlaying: false })
   }
 
   resume(): void {
     if (!this.record) return
+    this.playToken++
     if (!this.replayer) this.replayer = this.makeReplayer(this.record)
     if (this.replayer.position >= this.replayer.length) this.seek(0)
     appStore.set({ replayPlaying: true })
@@ -565,6 +766,7 @@ export class ReplaySession {
    */
   seek(i: number): void {
     if (!this.record) return
+    this.playToken++
     const playing = appStore.get().replayPlaying
     this.replayer?.stop()
     this.director.stop()
@@ -600,8 +802,11 @@ export class ReplaySession {
   }
 
   destroy(): void {
+    this.disposed = true
+    this.playToken++
     this.replayer?.stop()
     this.stage.stop()
+    void this.voice.then((v) => v?.dispose())
     appStore.set({ replayPlaying: false })
   }
 }

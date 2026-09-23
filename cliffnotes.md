@@ -244,7 +244,7 @@ scripts/                   one-off dev scripts (author-tutorial.ts + render-coac
 - **The bridge envelope is the contract.** `window.__onceuponBridge.receive` and `window.ReactNativeWebView.postMessage` are fixed in `packages/shared/src/bridge.ts`; the shell appends `?shell=native` (also on the bundled `file://` copy) so `hasBridge()` is true offline too.
 - **Stories with voice replay in real time.** `replaySchedule(events, { realTime })` skips the gap squeeze when the record has clips so words, drawing and voice stay aligned; the mp4 exporter follows the same rule.
 - **`apps/mobile/app.config.ts` mirrors BRAND by hand.** The Expo config loader cannot import the shared TS; edit both when renaming. expo-iap 5.6 exposes the StoreKit 2 JWS as `purchase.purchaseToken`.
-- **The single-file build inlines everything** (fonts via @fontsource, no Google Fonts link): keep new assets importable by Vite so they inline too.
+- **The single-file build inlines everything** (fonts via @fontsource, no Google Fonts link): keep new assets importable by Vite so they inline too. **It must never inline keys:** Vite bakes every exposed env var into the bundle and `.env.local` holds the BYO keys, so `--mode hosted` sets `envPrefix` to only `VITE_HOSTED`/`VITE_API_ORIGIN` (a build once shipped the Anthropic and OpenAI keys inside `studio.html`; GitHub push protection caught it). Grep `dist-hosted/index.html` for `sk-` if you touch the env plumbing.
 
 ## Status
 

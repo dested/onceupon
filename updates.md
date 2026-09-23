@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-22 — Phone layout pass (studio hosted surfaces + website at 390x844 / 844x390)
+Sal: "it has to work on phone too, not just tablet." Audited every hosted studio surface and site page through an iframe phone harness in bx. Fixed: finale/sleepy action rows wrapped off-screen (now two rows, 48 px targets, auto footer row), share-player title clipped (class + phone size + auto header), embed player rendered blank (wrapper is flex so the paper fills), bookshelf horizontal scroll from tilted cards, parent area/settings modals now 92dvh with 16 px gutters. Everything else already fit. Hosted build rebuilt and synced into the app.
+Touched: src/styles/app.css, src/ui/{SharePlayer,Bookshelf,ParentArea,SettingsPanel}.tsx
+
 ## 2026-09-22 — App icon and splash (GPT Image)
 Sal: "generate me an app icon using OpenAI image gen." Two low drafts (crayon squiggle mascot; crayon drawing a dragon sticker); Sal picked the dragon. High-quality render installed as apps/mobile/assets/icon.png (1024²), a 2048² splash rendered in headless Chrome with the icon centered on its own sampled paper tone (#f9f0d0, also the splash plugin background so nothing letterboxes visibly), and the same PNG as favicon/apple-touch-icon for the website and studio. SVG placeholders removed.
 Touched: apps/mobile/{assets/icon.png,assets/splash.png,app.config.ts,README.md}, apps/web/{public/icon.png,index.html}, public/icon.png, index.html

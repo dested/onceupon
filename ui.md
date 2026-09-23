@@ -1,4 +1,4 @@
-# Once Upon — UI / visual language
+# Squiggletale — UI / visual language
 
 > Source of truth for how this looks. Follow it for anything visual. Last updated: 2026-09-22
 

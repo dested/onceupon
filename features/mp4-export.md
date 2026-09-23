@@ -7,7 +7,7 @@
 
 "Download video" turns a saved story into an .mp4 the family keeps: the replay, frame by frame,
 inside the storybook from the drawing screen, with the crayon sounds and the narration captions,
-ending on a "Made with Once Upon" card. Made entirely in the browser; nothing is uploaded.
+ending on a "Made with Squiggletale" card. Made entirely in the browser; nothing is uploaded.
 
 ## Behavior spec
 
@@ -17,8 +17,8 @@ ending on a "Made with Once Upon" card. Made entirely in the browser; nothing is
 - When done the browser downloads `<story-title-slug>.mp4` and the card says "Your video is in your downloads" with the size, then disappears after 3 s.
 - A browser without WebCodecs H.264 gets "This browser cannot make videos yet"; any other failure gets "The video got stuck. Try again?" (details in the console).
 - The video: 1280x800, 30 fps, H.264 (High, Main or Baseline, whichever the browser can encode; hardware encoder preferred, see Design notes), AAC 128 kbps stereo 48 kHz (Opus if AAC is not encodable, no audio track if neither). About 6.4 MB for 15 s, 13.8 MB for 34 s.
-- Picture: the drawing screen's book (warm tabletop, coral cover with the stitched spine rings, cream paper), the 160x100 world filling the paper exactly, a "Made by you" tag top-right, the page number bottom-left, the Once Upon logo bottom-right on every frame (a placeholder wordmark until there is a real logo; the idle crayon rests left of it), the replay's paper caption pill with the latest words chunk near the top of the page.
-- Timing matches replay: events play at the replay's capped-gap times (`replaySchedule`); page turns, effects, bubbles, idle motion, the crayon cursor and The End finale all appear as in replay. After the last event the video runs until the page is still, holds 1.5 s, then crossfades (0.35 s) into a 2 s end card: "Made with Once Upon" in the scrawl hand on fresh paper, inside the same book.
+- Picture: the drawing screen's book (warm tabletop, coral cover with the stitched spine rings, cream paper), the 160x100 world filling the paper exactly, a "Made by you" tag top-right, the page number bottom-left, the Squiggletale logo bottom-right on every frame (a placeholder wordmark until there is a real logo; the idle crayon rests left of it), the replay's paper caption pill with the latest words chunk near the top of the page.
+- Timing matches replay: events play at the replay's capped-gap times (`replaySchedule`); page turns, effects, bubbles, idle motion, the crayon cursor and The End finale all appear as in replay. After the last event the video runs until the page is still, holds 1.5 s, then crossfades (0.35 s) into a 2 s end card: "Made with Squiggletale" in the scrawl hand on fresh paper, inside the same book.
 - Audio: the engine's own crayon scratch (loudness follows the reveal, as live) and a page-flip whoosh per page turn, rendered offline with the story's seed.
 - Deterministic: the same record renders the same frames and audio every time (virtual clock, seeded noise, no `Math.random`, CPU canvases). Two exports differ only in the container's creation times (~10 bytes).
 

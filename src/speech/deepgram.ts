@@ -11,7 +11,12 @@ import { openPcmMic, rms, SAMPLE_RATE, type PcmMic } from './pcm-mic'
  */
 
 export interface DeepgramOptions {
-  apiKey: string
+  /**
+   * WebSocket subprotocol auth: `token` + a raw Deepgram API key (bring-your-own), or `bearer` + a
+   * short-lived grant token from the relay (hosted). An empty value throws at construction, which the
+   * caller surfaces as a `speech:` warning.
+   */
+  auth: { kind: 'token' | 'bearer'; value: string }
   model: string
   deviceId: string
 }
@@ -152,7 +157,7 @@ export function createDeepgramRecognizer(
     const pending: ArrayBuffer[] = []
 
     // Socket auth via subprotocol; the browser cannot set an Authorization header on a WebSocket.
-    const socket = new WebSocket(url, ['token', opts.apiKey])
+    const socket = new WebSocket(url, [opts.auth.kind, opts.auth.value])
     ws = socket
 
     const send = (buf: ArrayBuffer): void => {

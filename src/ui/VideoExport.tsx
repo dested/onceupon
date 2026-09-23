@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download } from 'lucide-react'
 import { exportStoryVideo, ExportUnsupportedError, videoFileName } from '~/export/mp4'
-import { getStory } from '~/story/storage'
+import { shareVideo } from '~/backend/share'
+import type { StoryRecord } from '~/story/storage'
 import { appStore } from '~/story/store'
 import { IconButton, PaperCard, StickerButton } from './bits'
 
 type ExportState =
   | { k: 'idle' }
   | { k: 'running'; fraction: number; phase: 'frames' | 'audio' | 'mux' }
-  | { k: 'done'; mb: number }
+  | { k: 'done'; mb: number; how: 'shared' | 'downloaded' }
   | { k: 'error'; message: string }
 
 const PHASE_WORDS = {
@@ -17,28 +18,21 @@ const PHASE_WORDS = {
   mux: 'wrapping it up',
 } as const
 
-function download(blob: Blob, name: string): void {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  document.body.append(a)
-  a.click()
-  a.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
-}
-
 /**
- * "Download video": renders the saved story to an .mp4 in the browser and hands it to the
- * browser's downloads. `icon` sits in the replay toolbar; `studio` is the closing card's button.
+ * "Download video": renders the saved story to an .mp4 in the browser, then hands it to the native
+ * share sheet on iPad or the browser's downloads on the web (`shareVideo`). `icon` sits in the replay
+ * toolbar; `studio` is the closing card's button; `player` is the share page's sticker.
  */
 export function VideoExportButton({
-  getStoryId,
+  getRecord,
   variant,
+  onExported,
 }: {
-  /** Called on click; save first if the story is live. */
-  getStoryId: () => string | null
-  variant: 'icon' | 'studio'
+  /** Called on click; the caller saves the live story first if needed. Null = nothing to export. */
+  getRecord: () => StoryRecord | null
+  variant: 'icon' | 'studio' | 'player'
+  /** After the video is shared or downloaded (share page counts a download). */
+  onExported?: () => void
 }) {
   const [state, setState] = useState<ExportState>({ k: 'idle' })
   const abortRef = useRef<AbortController | null>(null)
@@ -52,8 +46,7 @@ export function VideoExportButton({
 
   const start = async (): Promise<void> => {
     if (state.k === 'running') return
-    const id = getStoryId()
-    const record = id ? getStory(id) : null
+    const record = getRecord()
     if (!record || record.events.length === 0) {
       setState({ k: 'error', message: 'There is no story to make a video of yet' })
       return
@@ -67,8 +60,9 @@ export function VideoExportButton({
         moderation: appStore.get().settings.moderation,
         onProgress: (p) => setState({ k: 'running', fraction: p.fraction, phase: p.phase }),
       })
-      download(res.blob, videoFileName(record.title))
-      setState({ k: 'done', mb: res.blob.size / 1e6 })
+      const how = await shareVideo(res.blob, videoFileName(record.title))
+      setState({ k: 'done', mb: res.blob.size / 1e6, how })
+      onExported?.()
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') setState({ k: 'idle' })
       else if (e instanceof ExportUnsupportedError) setState({ k: 'error', message: e.message })
@@ -92,6 +86,15 @@ export function VideoExportButton({
           data-testid="download-video">
           <Download size={22} strokeWidth={2.5} />
         </IconButton>
+      ) : variant === 'player' ? (
+        <StickerButton
+          tone="yellow"
+          tilt={-2}
+          onClick={() => void start()}
+          disabled={running}
+          data-testid="download-video">
+          <Download size={21} strokeWidth={2.5} /> Download video
+        </StickerButton>
       ) : (
         <button
           className="studio-button"
@@ -141,7 +144,9 @@ export function VideoExportButton({
             {state.k === 'done' && (
               <div className="flex items-center justify-between gap-3">
                 <span className="font-scrawl text-xl leading-tight">
-                  Your video is in your downloads
+                  {state.how === 'shared'
+                    ? 'Your video is ready'
+                    : 'Your video is in your downloads'}
                 </span>
                 <span className="text-ink-soft text-lg">{state.mb.toFixed(1)} MB</span>
               </div>
