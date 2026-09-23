@@ -3,13 +3,15 @@
 # the portal (portal writes win on the next "Re-commit"). Secrets live in the
 # portal (SSM), never in this file.
 name: onceupon
-kind: static          # ssr | static
+kind: ssr          # ssr | static
 runtime: bun        # bun | node
 port: 3000
-size: xs          # xs | s | m | l — memory reservation
-build: bun run build
-outputDir: dist    # built assets served as static files
-database: false      # provision Postgres + DATABASE_URL
-prisma: false        # prisma generate on build, db push predeploy
+size: s          # xs | s | m | l — memory reservation
+rootDir: apps/web       # app lives in this repo subdirectory
+build: cd ../.. && bun install --frozen-lockfile && bun run build:hosted && cd apps/web && bun run build
+start: bun run start
+database: true      # provision Postgres + DATABASE_URL
+prisma: true        # prisma generate on build, db push predeploy
+predeploy: bunx prisma db push --accept-data-loss
 domains:
   - onceupon.dested.com
