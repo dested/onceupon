@@ -149,6 +149,7 @@ function DeviceDetail({ data, onDone }: { data: DeviceData; onDone: () => void }
     { header: 'End', cell: (r) => r.endReason ?? '' },
     { header: 'Charged', align: 'right', cell: (r) => clock(r.chargedSec) },
     { header: 'Heard', align: 'right', cell: (r) => `${(r.listenedMs / 1000).toFixed(0)}s` },
+    { header: 'Typed', align: 'right', cell: (r) => `${r.typedSec}s` },
   ]
   const buyCols: Column<DeviceData['purchases'][number]>[] = [
     { header: 'When', cell: (r) => dateTime(r.createdAt) },

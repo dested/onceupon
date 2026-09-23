@@ -431,13 +431,22 @@ export class LiveSession {
     this.audio.setEnabled(on)
   }
 
-  /** Typed words behave exactly like spoken ones (and never count as listening time). */
+  /**
+   * Typed words draw exactly like spoken ones. They never count as listening time; in hosted mode each
+   * message is charged as talking time by the server from its words (a lone "The End" is free).
+   */
   typeWords(text: string): void {
     void this.audio.start()
-    if (HOSTED && this.meter) {
-      void this.meter
+    const meter = HOSTED ? this.meter : null
+    if (meter) {
+      void meter
         .ensureStarted('browser')
-        .then(() => this.feed(text))
+        .then(() => {
+          if (this.ended) return
+          const { before } = splitTheEnd(cleanText(text))
+          this.feed(text)
+          if (before) void meter.typed(before)
+        })
         .catch((e: unknown) => this.handleStartError(e))
       return
     }

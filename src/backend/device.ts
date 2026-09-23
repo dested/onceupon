@@ -8,14 +8,21 @@ import type { DeviceState, Platform } from '../../packages/shared/src/api'
 
 /**
  * The device account: an opaque token minted once at first launch and stored in kv (native storage
- * on the shell, localStorage on the web). Hosted mode only. Boot calls initDevice(); everything else
- * runs after the app has already opened, so a failure here just leaves the app offline, never stuck.
+ * on the shell, localStorage on the web). Hosted mode only. Boot starts initDevice() without waiting
+ * for it (first paint never waits on the network); api() waits on deviceTokenSettled() so no call
+ * goes out tokenless while registration is in flight. A failure just leaves the app offline.
  */
 
 const INSTALL_ID_KEY = 'onceupon.installId'
 const INIT_TIMEOUT_MS = 8000
 
 let deviceToken: string | null = null
+let tokenStep: Promise<void> = Promise.resolve()
+
+/** Resolves once the device token is known or registration gave up (capped by INIT_TIMEOUT_MS). */
+export function deviceTokenSettled(): Promise<void> {
+  return tokenStep
+}
 
 /** The in-memory device token, or null before registration / when offline. */
 export function getDeviceToken(): string | null {
@@ -56,7 +63,7 @@ async function installInfo(): Promise<InstallInfo> {
   return { installId, platform: 'web', appVersion: null, storefront: null }
 }
 
-async function run(): Promise<void> {
+async function ensureToken(): Promise<void> {
   let token = await getKv('deviceToken')
   if (!token) {
     const info = await installInfo()
@@ -65,6 +72,11 @@ async function run(): Promise<void> {
     await setKv('deviceToken', token)
   }
   deviceToken = token
+}
+
+async function run(): Promise<void> {
+  await tokenStep
+  if (deviceToken === null) throw new Error('no device token')
   const [state, config, masks] = await Promise.all([
     api('device.state', {}),
     api('config', {}),
@@ -87,6 +99,12 @@ async function run(): Promise<void> {
  */
 export async function initDevice(): Promise<void> {
   const timeout = new Promise<void>((resolve) => window.setTimeout(resolve, INIT_TIMEOUT_MS))
+  tokenStep = Promise.race([
+    ensureToken().catch(() => {
+      appStore.set({ online: false })
+    }),
+    timeout,
+  ])
   await Promise.race([
     run().catch(() => {
       appStore.set({ online: false })

@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client'
 import { App } from './app'
 import { boot } from './boot'
 import { SharePlayer } from './ui/SharePlayer'
+import { installViewport } from './ui/viewport'
 
+installViewport()
 const root = document.getElementById('app')
 if (!root) throw new Error('#app missing')
 // `?player=<shareId>` turns the same single-file build into the public story player (share pages).

@@ -12,7 +12,7 @@ import { Scene } from '~/engine/scene'
 import { Stage } from '~/engine/stage'
 import { Director } from '~/llm/director'
 import { isDialectId, makeDialect } from '~/llm/dialect'
-import { recordClockOffset, replaySchedule } from '~/story/replay'
+import { recordClockOffset, replaySchedule, voiceLeadMs } from '~/story/replay'
 import type { StoryRecord } from '~/story/storage'
 import { makeVoiceTrack } from '~/story/voice'
 import { BookFrame, CPU, loadVideoFonts, PAPER, VIDEO_H, VIDEO_W } from './frame'
@@ -235,7 +235,7 @@ export async function exportStoryVideo(
   })
 
   const events = record.events
-  const times = replaySchedule(events, { realTime: hasVoice })
+  const times = replaySchedule(events, { realTime: hasVoice, leadMs: voiceLeadMs(record) })
   let caption = ''
   events.forEach((ev, i) => {
     clock.at(times[i] ?? 0, () => {

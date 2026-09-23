@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SHELL_QUERY } from '../../packages/shared/src/bridge'
 import { hasBridge } from './bridge'
 
 /**
@@ -23,5 +24,17 @@ export function apiUrl(path: string): string {
   return `${API_ORIGIN}${p}`
 }
 
-/** True inside the native shell (the WebView bridge is present and the shell said so in the query). */
+/**
+ * True inside the native shell. Evaluated once at module load, which is safe: `hasBridge()` keys off
+ * the query flag plus `window.__onceuponShell`, which the shell injects before any page script runs,
+ * so a `ReactNativeWebView` that shows up a moment later cannot freeze this false (requests wait for it).
+ */
 export const NATIVE: boolean = hasBridge()
+
+/**
+ * The page was opened by the native shell (its URL carries `shell=native`), even if the bridge
+ * failed to come up. Use it for App Store rules that must hold regardless: never send the WebView to
+ * the web shop, never show web purchase links.
+ */
+export const APP_SHELL: boolean =
+  NATIVE || (typeof window !== 'undefined' && window.location.search.includes(SHELL_QUERY))

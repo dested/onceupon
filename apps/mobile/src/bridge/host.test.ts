@@ -14,6 +14,10 @@ function makeHost() {
   const sent: string[] = []
   const handlers: Partial<Handlers> = {
     'net.state': async () => ({ online: true }),
+    'speech.stop': async (_input, handlerCtx) => {
+      handlerCtx.emit('speech.end', {})
+      return {}
+    },
   }
   const host = new BridgeHost((js) => sent.push(js), handlers, ctx)
   return { host, sent }
@@ -68,4 +72,14 @@ test('escapes a script-closing sequence in the injected payload', async () => {
   const injected = sent[0] ?? ''
   expect(injected).not.toContain('</script>')
   expect(injected).toContain('\\u003c/script>')
+})
+
+test('a handler can push an event through its context before replying', async () => {
+  const { host, sent } = makeHost()
+  const request: BridgeRequest = { v: 1, id: 'req-9', type: 'speech.stop', input: {} }
+  host.handle(JSON.stringify(request))
+  await flush()
+  expect(sent.length).toBe(2)
+  expect(sent[0] ?? '').toContain('"event":"speech.end"')
+  expect(sent[1] ?? '').toContain('"id":"req-9"')
 })

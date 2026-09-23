@@ -15,16 +15,89 @@
   --color-crayon-green: #22c55e;
 }
 
+/* Safe area + keyboard. --sa* = env() or the native shell's --shell-inset-* backstop, whichever is larger;
+   src/ui/viewport.ts sets --kb / --vv-top; dev `__viewport.fakeInsets` overrides --sa*.
+   Paper and backgrounds bleed full-screen; chrome and content pad by these. */
+:root {
+  --sat: max(env(safe-area-inset-top, 0px), var(--shell-inset-top, 0px));
+  --sar: max(env(safe-area-inset-right, 0px), var(--shell-inset-right, 0px));
+  --sab: max(env(safe-area-inset-bottom, 0px), var(--shell-inset-bottom, 0px));
+  --sal: max(env(safe-area-inset-left, 0px), var(--shell-inset-left, 0px));
+  --kb: 0px;
+  --vv-top: 0px;
+  /* Visible bottom edge: the keyboard when it is up, else the home indicator. */
+  --safe-bottom: max(var(--sab), var(--kb));
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 html,
 body,
 #app {
   height: 100%;
   margin: 0;
   overflow: hidden;
+  overscroll-behavior: none;
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-hand);
   -webkit-font-smoothing: antialiased;
+}
+
+/* iOS zooms into any focused field under 16px; utilities may raise it, never lower it below 16. */
+@layer base {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* A full-screen modal layer: backdrop bleeds edge to edge, the card lives inside the safe, visible,
+   above-the-keyboard box and scrolls inside itself. Components set z-index and the backdrop colour. */
+.modal-overlay,
+.paywall-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--sat) + var(--vv-top) + 16px) calc(var(--sar) + 16px) calc(var(--safe-bottom) + 16px)
+    calc(var(--sal) + 16px);
+  overflow: hidden;
+  transition: padding 180ms ease-out;
+}
+.modal-card {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 0;
+  flex: 0 1 auto;
+  margin: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 599px) {
+  .modal-overlay,
+  .paywall-overlay {
+    padding-left: calc(var(--sal) + 10px);
+    padding-right: calc(var(--sar) + 10px);
+  }
+  .modal-card {
+    padding: 20px 18px;
+  }
+}
+
+/* A plain full-screen page (bookshelf): content padded clear of every inset, background to the edges. */
+.screen-safe {
+  padding: calc(24px + var(--sat)) calc(24px + var(--sar)) calc(24px + var(--sab)) calc(24px + var(--sal));
+}
+@media (max-width: 599px) {
+  .screen-safe {
+    padding: calc(14px + var(--sat)) calc(12px + var(--sar)) calc(14px + var(--sab)) calc(12px + var(--sal));
+  }
 }
 
 button {
@@ -44,8 +117,7 @@ button {
   width: 100%;
   display: grid;
   grid-template-rows: 86px minmax(0, 1fr) 130px;
-  padding: env(safe-area-inset-top, 0px) max(30px, env(safe-area-inset-right, 0px))
-    env(safe-area-inset-bottom, 0px) max(30px, env(safe-area-inset-left, 0px));
+  padding: var(--sat) max(30px, var(--sar)) var(--sab) max(30px, var(--sal));
   background-color: #eee5d5;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%2380694c' opacity='.12' filter='url(%23n)' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
   color: var(--color-ink);
@@ -648,8 +720,15 @@ button {
   background: var(--studio-sage);
 }
 .new-story-dialog {
+  /* Centered inside the safe, above-the-keyboard box; scrolls inside itself when that box is short. */
+  position: fixed;
+  inset: calc(var(--sat) + var(--vv-top)) var(--sar) var(--safe-bottom) var(--sal);
   margin: auto;
-  width: min(540px, calc(100vw - 36px));
+  max-height: calc(100% - var(--sat) - var(--vv-top) - var(--safe-bottom) - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  width: min(540px, calc(100vw - 36px - var(--sal) - var(--sar)));
   border: 3px solid var(--color-ink);
   border-radius: 25px;
   padding: 32px;
@@ -703,15 +782,15 @@ button {
 }
 @media (min-width: 1400px) {
   .story-studio {
-    padding-left: max(42px, calc((100vw - 1600px) / 2));
-    padding-right: max(42px, calc((100vw - 1600px) / 2));
+    padding-left: max(42px, var(--sal), calc((100vw - 1600px) / 2));
+    padding-right: max(42px, var(--sar), calc((100vw - 1600px) / 2));
   }
 }
 @media (max-width: 1050px) {
   .story-studio {
     grid-template-rows: 76px minmax(0, 1fr) 122px;
-    padding-left: max(20px, env(safe-area-inset-left));
-    padding-right: max(20px, env(safe-area-inset-right));
+    padding-left: max(20px, var(--sal));
+    padding-right: max(20px, var(--sar));
   }
   .studio-wordmark {
     font-size: 23px;
@@ -829,8 +908,8 @@ button {
 @media (max-width: 599px) {
   .story-studio {
     grid-template-rows: 70px minmax(0, 1fr) 132px;
-    padding-left: max(10px, env(safe-area-inset-left));
-    padding-right: max(10px, env(safe-area-inset-right));
+    padding-left: max(10px, var(--sal));
+    padding-right: max(10px, var(--sar));
   }
   .studio-header {
     gap: 6px;
@@ -999,6 +1078,19 @@ button {
     font-size: 20px;
   }
 }
+/* Keyboard up: the typing tray leaves the footer and rides on top of the keyboard. */
+.kb-open .story-type-form {
+  position: fixed;
+  z-index: 40;
+  bottom: calc(var(--kb) + 12px);
+  right: calc(var(--sar) + 16px);
+}
+@media (max-width: 599px) {
+  .kb-open .story-type-form {
+    right: calc(var(--sar) + 10px);
+    width: calc(100vw - 20px - var(--sal) - var(--sar));
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .story-studio *,
   .story-studio *::before,
@@ -1091,14 +1183,9 @@ button {
 }
 
 /* Paywall + share card share a full-screen overlay on the tabletop texture. */
+/* Layout (fixed, safe + keyboard padding, centering) comes from the shared .modal-overlay rule above. */
 .paywall-overlay {
-  position: fixed;
-  inset: 0;
   z-index: 45;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  overflow-y: auto;
   background-color: #eee5d5;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%2380694c' opacity='.12' filter='url(%23n)' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
   --studio-coral: #d9937e;
@@ -1327,7 +1414,7 @@ button {
 }
 .offline-banner {
   position: absolute;
-  top: 14px;
+  top: calc(14px + var(--sat));
   left: 50%;
   transform: translateX(-50%);
   z-index: 5;

@@ -327,6 +327,7 @@ export async function ledgerDevice(deviceId: string) {
       endReason: s.endReason,
       chargedSec: s.chargedSec,
       listenedMs: s.listenedMs,
+      typedSec: s.typedSec,
       startedAt: s.startedAt.toISOString(),
       endedAt: s.endedAt?.toISOString() ?? null,
     })),

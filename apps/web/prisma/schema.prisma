@@ -137,6 +137,8 @@ model StorySession {
   endReason   String?   @map("end_reason") // the-end | sleepy | silence
   chargedSec  Int       @default(0) @map("charged_sec")
   listenedMs  Int       @default(0) @map("listened_ms")
+  /// Seconds charged for typed messages (part of chargedSec; listenedMs stays mic time only).
+  typedSec    Int       @default(0) @map("typed_sec")
   startedAt   DateTime  @default(now()) @map("started_at")
   lastBeatAt  DateTime  @default(now()) @map("last_beat_at")
   endedAt     DateTime? @map("ended_at")

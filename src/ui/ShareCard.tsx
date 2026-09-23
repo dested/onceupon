@@ -73,7 +73,7 @@ export function ShareCard() {
 
   return (
     <div className="paywall-overlay" data-testid="share-card">
-      <PaperCard className="share-card-card">
+      <PaperCard className="modal-card share-card-card">
         <IconButton label="Close" className="paywall-close" onClick={close} data-testid="share-close">
           <X size={22} strokeWidth={3} />
         </IconButton>

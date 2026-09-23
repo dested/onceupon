@@ -45,13 +45,16 @@ export class VoiceRecorder {
     if (this.rec || !stream) return
     const mimeType = VoiceRecorder.mime()
     if (!mimeType) return
-    this.chunks = []
+    // Chunks belong to this recorder: a stop() whose last dataavailable lands after the next span
+    // has started must not mix (or lose) the two clips' data.
+    const chunks: Blob[] = []
+    this.chunks = chunks
     this.tRecord = tRecord
     this.startedAt = performance.now()
     this.mimeBase = mimeType.split(';')[0] ?? mimeType
     const rec = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 48000 })
     rec.ondataavailable = (e) => {
-      if (e.data.size > 0) this.chunks.push(e.data)
+      if (e.data.size > 0) chunks.push(e.data)
     }
     this.rec = rec
     // A timeslice so a crash or a forced stop still keeps most of what was said.
@@ -65,10 +68,11 @@ export class VoiceRecorder {
     const ms = Math.round(performance.now() - this.startedAt)
     const t = this.tRecord
     const mime = this.mimeBase
+    const chunks = this.chunks
+    this.chunks = []
     return new Promise((resolve) => {
       const finish = (): void => {
-        const blob = new Blob(this.chunks, { type: mime })
-        this.chunks = []
+        const blob = new Blob(chunks, { type: mime })
         resolve(blob.size > 0 ? { t, ms, blob } : null)
       }
       if (rec.state === 'inactive') {
@@ -90,9 +94,59 @@ interface LoadedClip {
   ms: number
   el: HTMLAudioElement
   url: string
+  /** A seek asked for before the element had metadata: the clip offset (s) and when it was asked. */
+  pending: { want: number; at: number } | null
+  /** A play() promise is in flight (don't stack them; WebKit aborts the earlier one). */
+  starting: boolean
 }
 
-/** Plays a record's voice clips in step with replay. The Replayer drives `sync` on every step. */
+/** How long load() waits for a clip's metadata before handing the player over anyway. */
+const METADATA_WAIT_MS = 3000
+/** Drift (s) that re-seeks a paused clip before play, and a clip that is already playing. */
+const SEEK_WHEN_PAUSED = 0.25
+const SEEK_WHEN_PLAYING = 0.75
+
+function makeClip(t: number, ms: number, url: string): LoadedClip {
+  const el = new Audio()
+  el.preload = 'auto'
+  const clip: LoadedClip = { t, ms, el, url, pending: null, starting: false }
+  // A seek asked for too early is applied once the element can seek (WebKit drops or mangles seeks
+  // on an element with no metadata, and iOS ignores preload so nothing loads until asked).
+  el.addEventListener('loadedmetadata', () => {
+    const p = clip.pending
+    if (!p) return
+    clip.pending = null
+    const want = p.want + (el.paused ? 0 : (performance.now() - p.at) / 1000)
+    if (want > 0.05) {
+      try {
+        el.currentTime = want
+      } catch {
+        // still not seekable; the next sync will try again
+      }
+    }
+  })
+  el.src = url
+  el.load()
+  return clip
+}
+
+/** Resolve when the element has metadata (or failed, or after a timeout), so the first sync can seek. */
+function whenLoaded(el: HTMLAudioElement): Promise<void> {
+  if (el.readyState >= HTMLMediaElement.HAVE_METADATA) return Promise.resolve()
+  return new Promise((resolve) => {
+    const done = (): void => {
+      window.clearTimeout(timer)
+      el.removeEventListener('loadedmetadata', done)
+      el.removeEventListener('error', done)
+      resolve()
+    }
+    const timer = window.setTimeout(done, METADATA_WAIT_MS)
+    el.addEventListener('loadedmetadata', done)
+    el.addEventListener('error', done)
+  })
+}
+
+/** Plays a record's voice clips in step with replay. The Replayer drives `sync` on every step and every 200 ms. */
 export class VoicePlayer {
   private constructor(private clips: LoadedClip[]) {}
 
@@ -103,41 +157,54 @@ export class VoicePlayer {
     for (const clip of voice.clips) {
       const blob = await getVoiceClip(clip.file)
       if (!blob) continue
-      const url = URL.createObjectURL(blob)
-      const el = new Audio()
-      el.preload = 'auto'
-      el.src = url
-      loaded.push({ t: clip.t, ms: clip.ms, el, url })
+      loaded.push(makeClip(clip.t, clip.ms, URL.createObjectURL(blob)))
     }
     if (loaded.length === 0) return null
+    // Load every element up front: WKWebView ignores preload, and a play()/seek on an element with no
+    // metadata at replay start is exactly what lost the first clip.
+    await Promise.all(loaded.map((c) => whenLoaded(c.el)))
     return new VoicePlayer(loaded)
   }
 
   /** One file that starts at record t = 0 (share pages serve the whole timeline as one clip). */
   static fromUrl(url: string, mime: string, totalMs: number): VoicePlayer {
-    const el = new Audio()
-    el.preload = 'auto'
     // The mime is advisory; the server sends the real content type. Kept for a caller that needs it.
     void mime
-    el.src = url
-    return new VoicePlayer([{ t: 0, ms: totalMs, el, url }])
+    return new VoicePlayer([makeClip(0, totalMs, url)])
   }
 
   sync(recordMs: number, playing: boolean): void {
     for (const clip of this.clips) {
       const within = playing && recordMs >= clip.t && recordMs < clip.t + clip.ms
-      if (within) {
-        const want = (recordMs - clip.t) / 1000
-        if (Math.abs(clip.el.currentTime - want) > 0.25) {
+      const el = clip.el
+      if (!within) {
+        clip.pending = null
+        if (!el.paused) el.pause()
+        continue
+      }
+      const want = (recordMs - clip.t) / 1000
+      // The file can be a little shorter than the span's measured ms; past its end, never restart it.
+      if (Number.isFinite(el.duration) && want >= el.duration - 0.05) continue
+      if (el.readyState < HTMLMediaElement.HAVE_METADATA) {
+        clip.pending = { want, at: performance.now() }
+      } else if (!el.seeking) {
+        const tolerance = el.paused ? SEEK_WHEN_PAUSED : SEEK_WHEN_PLAYING
+        if (Math.abs(el.currentTime - want) > tolerance) {
           try {
-            clip.el.currentTime = want
+            el.currentTime = want
           } catch {
             // not seekable yet; the next sync will catch it
           }
         }
-        if (clip.el.paused) void clip.el.play().catch(() => undefined)
-      } else if (!clip.el.paused) {
-        clip.el.pause()
+      }
+      // An ended element that was not sought back stays ended (play() would restart it from 0).
+      if (el.paused && !clip.starting && !(el.ended && !el.seeking)) {
+        clip.starting = true
+        el.play()
+          .catch(() => undefined)
+          .finally(() => {
+            clip.starting = false
+          })
       }
     }
   }

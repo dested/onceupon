@@ -60,7 +60,7 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
     <div className="relative h-full w-full select-none" data-testid="replay">
       <canvas ref={canvasRef} className="block h-full w-full" />
       <Filmstrip />
-      <div className="absolute top-4 right-4 flex items-center gap-3">
+      <div className="absolute top-[calc(1rem+var(--sat))] right-[calc(1rem+var(--sar))] flex items-center gap-3">
         {confirmDelete ? (
           <StickerButton tilt={0} tone="red" className="!text-base" onClick={remove} onBlur={() => setConfirmDelete(false)} data-testid="delete-story">
             <Trash2 size={18} strokeWidth={2.5} /> delete this story?
@@ -84,7 +84,7 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
         </IconButton>
       </div>
       {caption && (
-        <div className="pointer-events-none absolute top-24 right-0 left-0 flex flex-col items-center gap-2 px-10" data-testid="narration">
+        <div className="pointer-events-none absolute top-[calc(8.5rem+var(--sat))] right-[var(--sar)] left-[var(--sal)] flex flex-col items-center gap-2 px-10" data-testid="narration">
           <p
             key={caption}
             className="max-w-3xl rounded-2xl bg-paper/90 px-6 py-2 text-center font-scrawl text-2xl leading-snug text-ink shadow-[3px_4px_0_0_rgba(59,47,47,0.25)]">
@@ -99,8 +99,8 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
           )}
         </div>
       )}
-      <Subtitles className="bottom-24 left-6 right-6 h-11" />
-      <div className="absolute right-6 bottom-6 left-6 flex items-center gap-4" data-testid="scrubber">
+      <Subtitles className="bottom-[calc(6rem+var(--sab))] left-[calc(1.5rem+var(--sal))] right-[calc(1.5rem+var(--sar))] h-11" />
+      <div className="absolute right-[calc(1.5rem+var(--sar))] bottom-[calc(1.5rem+var(--sab))] left-[calc(1.5rem+var(--sal))] flex items-center gap-4" data-testid="scrubber">
         {ended ? (
           <StickerButton tone="yellow" tilt={0} onClick={again} className="shrink-0">
             <RotateCcw size={22} strokeWidth={3} /> again

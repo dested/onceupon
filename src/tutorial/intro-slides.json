@@ -1,0 +1,591 @@
+[
+  {
+    "id": "intro-1",
+    "title": "Once upon a time a little purple dragon with big green wings flew over a castle",
+    "createdAt": 1758585600000,
+    "updatedAt": 1758585600000,
+    "seed": 5247,
+    "cover": null,
+    "dialect": "ops",
+    "events": [
+      {
+        "k": "words",
+        "t": 0,
+        "text": "Once upon a time a little purple dragon with big green wings flew over a castle"
+      },
+      {
+        "k": "cmd",
+        "t": 500,
+        "line": "scene skyblue \"sky over a castle\""
+      },
+      {
+        "k": "cmd",
+        "t": 590,
+        "line": "ent castle 600 525 \"castle\" layer=-1"
+      },
+      {
+        "k": "cmd",
+        "t": 680,
+        "line": "draw castle.wall black gray rect -150 -150 300 150"
+      },
+      {
+        "k": "cmd",
+        "t": 770,
+        "line": "draw castle.towers black gray mirror rect 110 -260 60 260"
+      },
+      {
+        "k": "cmd",
+        "t": 860,
+        "line": "draw castle.roofs black red mirror poly 105 -260 140 -330 175 -260"
+      },
+      {
+        "k": "cmd",
+        "t": 950,
+        "line": "draw castle.gate brown brown M -40 0 L -40 -90 Q 0 -140 40 -90 L 40 0 Z"
+      },
+      {
+        "k": "cmd",
+        "t": 1040,
+        "line": "draw castle.flag red red poly 140 -330 190 -315 140 -300"
+      },
+      {
+        "k": "cmd",
+        "t": 1130,
+        "line": "ent dragon 600 200 \"purple dragon\" idle=float scale=1"
+      },
+      {
+        "k": "cmd",
+        "t": 1220,
+        "line": "draw dragon.tail purple purple poly -90 -80 -200 -30 -110 -130"
+      },
+      {
+        "k": "cmd",
+        "t": 1310,
+        "line": "draw dragon.body purple purple oval 0 -100 110 65"
+      },
+      {
+        "k": "cmd",
+        "t": 1400,
+        "line": "draw dragon.wings purple green poly -20 -140 -150 -250 -110 -210 -70 -235 -40 -195 30 -150"
+      },
+      {
+        "k": "cmd",
+        "t": 1490,
+        "line": "draw dragon.legs purple purple mirror rect 30 -40 30 40"
+      },
+      {
+        "k": "cmd",
+        "t": 1580,
+        "line": "draw dragon.head purple purple oval 120 -170 55 40"
+      },
+      {
+        "k": "cmd",
+        "t": 1670,
+        "line": "face dragon head right happy"
+      },
+      {
+        "k": "cmd",
+        "t": 1760,
+        "line": "ent sun 1050 120 \"sun\" layer=-3"
+      },
+      {
+        "k": "cmd",
+        "t": 1850,
+        "line": "draw sun.disc gold yellow circle 0 0 50"
+      },
+      {
+        "k": "cmd",
+        "t": 1940,
+        "line": "draw sun.rays gold w=6 M -70 0 L -95 0 M 70 0 L 95 0 M 0 -70 L 0 -95 M 0 70 L 0 95"
+      }
+    ]
+  },
+  {
+    "id": "intro-2",
+    "title": "A happy orange cat flew a big red rocket all the way up to the moon",
+    "createdAt": 1758585600000,
+    "updatedAt": 1758585600000,
+    "seed": 5344,
+    "cover": null,
+    "dialect": "ops",
+    "events": [
+      {
+        "k": "words",
+        "t": 0,
+        "text": "A happy orange cat flew a big red rocket all the way up to the moon"
+      },
+      {
+        "k": "cmd",
+        "t": 500,
+        "line": "scene navy \"outer space\""
+      },
+      {
+        "k": "cmd",
+        "t": 590,
+        "line": "ent moon 900 150 \"moon\" layer=-3"
+      },
+      {
+        "k": "cmd",
+        "t": 680,
+        "line": "draw moon.disc gold #fff2b3 stamp moon 0 0 60"
+      },
+      {
+        "k": "cmd",
+        "t": 770,
+        "line": "fx stars 600 120 250"
+      },
+      {
+        "k": "cmd",
+        "t": 860,
+        "line": "ent rocket 600 300 \"big red rocket\" idle=float scale=1.5"
+      },
+      {
+        "k": "cmd",
+        "t": 950,
+        "line": "draw rocket.body black red rect -50 -160 100 160"
+      },
+      {
+        "k": "cmd",
+        "t": 1040,
+        "line": "draw rocket.nose black red poly -50 -160 50 -160 0 -230"
+      },
+      {
+        "k": "cmd",
+        "t": 1130,
+        "line": "draw rocket.fin black orange poly -50 0 -90 40 -50 -40"
+      },
+      {
+        "k": "cmd",
+        "t": 1220,
+        "line": "draw rocket.fin2 black orange poly 50 0 90 40 50 -40"
+      },
+      {
+        "k": "cmd",
+        "t": 1310,
+        "line": "draw rocket.window black skyblue circle 0 -90 24"
+      },
+      {
+        "k": "cmd",
+        "t": 1400,
+        "line": "ent cat 600 260 \"happy orange cat\" idle=breathe scale=1"
+      },
+      {
+        "k": "cmd",
+        "t": 1490,
+        "line": "draw cat.body brown orange oval 0 -20 40 30"
+      },
+      {
+        "k": "cmd",
+        "t": 1580,
+        "line": "draw cat.head brown orange circle 0 -70 32"
+      },
+      {
+        "k": "cmd",
+        "t": 1670,
+        "line": "draw cat.ear1 brown orange poly -24 -95 -30 -130 -8 -100"
+      },
+      {
+        "k": "cmd",
+        "t": 1760,
+        "line": "draw cat.ear2 brown orange poly 24 -95 30 -130 8 -100"
+      },
+      {
+        "k": "cmd",
+        "t": 1850,
+        "line": "draw cat.whiskers black M -30 -65 L -60 -70 M -30 -60 L -60 -60 M 30 -65 L 60 -70 M 30 -60 L 60 -60"
+      },
+      {
+        "k": "cmd",
+        "t": 1940,
+        "line": "draw cat.tail brown orange M -35 -10 Q -70 20 -50 40"
+      },
+      {
+        "k": "cmd",
+        "t": 2030,
+        "line": "face cat head front happy"
+      },
+      {
+        "k": "cmd",
+        "t": 2120,
+        "line": "fx sparkles 600 250 100"
+      }
+    ]
+  },
+  {
+    "id": "intro-3",
+    "title": "A little red car drove down the road",
+    "createdAt": 1758585600000,
+    "updatedAt": 1758585600000,
+    "seed": 5441,
+    "cover": null,
+    "dialect": "ops",
+    "events": [
+      {
+        "k": "words",
+        "t": 0,
+        "text": "A little red car drove down the road"
+      },
+      {
+        "k": "cmd",
+        "t": 500,
+        "line": "scene #faf5ec \"on the road\""
+      },
+      {
+        "k": "cmd",
+        "t": 590,
+        "line": "ent road 600 525 \"road\" layer=-2"
+      },
+      {
+        "k": "cmd",
+        "t": 680,
+        "line": "draw road.ground darkgreen green rect -620 0 1240 110"
+      },
+      {
+        "k": "cmd",
+        "t": 770,
+        "line": "draw road.strip gray gray rect -620 -20 1240 40"
+      },
+      {
+        "k": "cmd",
+        "t": 860,
+        "line": "draw road.line yellow yellow rect -620 -2 1240 4"
+      },
+      {
+        "k": "cmd",
+        "t": 950,
+        "line": "ent car 350 525 \"little red car\" scale=1.5"
+      },
+      {
+        "k": "cmd",
+        "t": 1040,
+        "line": "draw car.body black red M -120 0 L 120 0 L 120 -60 Q 90 -130 40 -130 L -40 -130 Q -90 -130 -120 -60 Z"
+      },
+      {
+        "k": "cmd",
+        "t": 1130,
+        "line": "draw car.window black skyblue poly -35 -120 35 -120 45 -70 -45 -70"
+      },
+      {
+        "k": "cmd",
+        "t": 1220,
+        "line": "draw car.wheels black black mirror circle 70 0 28"
+      },
+      {
+        "k": "cmd",
+        "t": 1310,
+        "line": "ent sun 1050 120 \"sun\" layer=-3"
+      },
+      {
+        "k": "cmd",
+        "t": 1400,
+        "line": "draw sun.disc gold yellow circle 0 0 50"
+      },
+      {
+        "k": "cmd",
+        "t": 1490,
+        "line": "draw sun.rays gold w=6 M -70 0 L -95 0 M 70 0 L 95 0 M 0 -70 L 0 -95 M 0 70 L 0 95"
+      },
+      {
+        "k": "cmd",
+        "t": 1580,
+        "line": "move car 900 525 2.5 walk"
+      },
+      {
+        "k": "words",
+        "t": 2980,
+        "text": "No wait, the car is blue and it can fly over the trees"
+      },
+      {
+        "k": "cmd",
+        "t": 3480,
+        "line": "recolor car red blue"
+      },
+      {
+        "k": "cmd",
+        "t": 3570,
+        "line": "ent tree1 300 525 \"tree\" layer=-1"
+      },
+      {
+        "k": "cmd",
+        "t": 3660,
+        "line": "draw tree1.trunk brown brown rect -22 -130 44 130"
+      },
+      {
+        "k": "cmd",
+        "t": 3750,
+        "line": "draw tree1.crown darkgreen green circle 0 -210 100"
+      },
+      {
+        "k": "cmd",
+        "t": 3840,
+        "line": "ent tree2 500 525 \"tree\" layer=-1"
+      },
+      {
+        "k": "cmd",
+        "t": 3930,
+        "line": "draw tree2.trunk brown brown rect -22 -130 44 130"
+      },
+      {
+        "k": "cmd",
+        "t": 4020,
+        "line": "draw tree2.crown darkgreen green circle 0 -210 100"
+      },
+      {
+        "k": "cmd",
+        "t": 4110,
+        "line": "move car 900 200 2 glide"
+      },
+      {
+        "k": "cmd",
+        "t": 4200,
+        "line": "fx sparkles 900 200 80"
+      }
+    ]
+  },
+  {
+    "id": "intro-4",
+    "title": "The bunny and the bear had a picnic under the stars",
+    "createdAt": 1758585600000,
+    "updatedAt": 1758585600000,
+    "seed": 5538,
+    "cover": null,
+    "dialect": "ops",
+    "events": [
+      {
+        "k": "words",
+        "t": 0,
+        "text": "The bunny and the bear had a picnic under the stars"
+      },
+      {
+        "k": "cmd",
+        "t": 500,
+        "line": "scene navy \"outside under the stars\" \"picnic at night\""
+      },
+      {
+        "k": "cmd",
+        "t": 590,
+        "line": "ent ground 600 525 \"grass\" layer=-2"
+      },
+      {
+        "k": "cmd",
+        "t": 680,
+        "line": "draw ground.grass darkgreen green rect -620 0 1240 110"
+      },
+      {
+        "k": "cmd",
+        "t": 770,
+        "line": "ent blanket 600 520 \"picnic blanket\" layer=-1"
+      },
+      {
+        "k": "cmd",
+        "t": 860,
+        "line": "draw blanket.cloth red white rect -140 -15 280 35"
+      },
+      {
+        "k": "cmd",
+        "t": 950,
+        "line": "draw blanket.stripe1 red red rect -140 -15 40 35"
+      },
+      {
+        "k": "cmd",
+        "t": 1040,
+        "line": "draw blanket.stripe2 red red rect -60 -15 40 35"
+      },
+      {
+        "k": "cmd",
+        "t": 1130,
+        "line": "draw blanket.stripe3 red red rect 20 -15 40 35"
+      },
+      {
+        "k": "cmd",
+        "t": 1220,
+        "line": "draw blanket.stripe4 red red rect 100 -15 40 35"
+      },
+      {
+        "k": "cmd",
+        "t": 1310,
+        "line": "ent bunny 470 525 \"white bunny\" idle=breathe"
+      },
+      {
+        "k": "cmd",
+        "t": 1400,
+        "line": "draw bunny.body brown white oval 0 -70 60 70"
+      },
+      {
+        "k": "cmd",
+        "t": 1490,
+        "line": "draw bunny.head brown white circle 0 -170 48"
+      },
+      {
+        "k": "cmd",
+        "t": 1580,
+        "line": "draw bunny.ears brown white mirror oval 22 -250 14 45"
+      },
+      {
+        "k": "cmd",
+        "t": 1670,
+        "line": "draw bunny.feet brown white mirror oval 30 -8 26 12"
+      },
+      {
+        "k": "cmd",
+        "t": 1760,
+        "line": "draw bunny.nose pink pink circle 0 -165 6"
+      },
+      {
+        "k": "cmd",
+        "t": 1850,
+        "line": "face bunny head front happy"
+      },
+      {
+        "k": "cmd",
+        "t": 1940,
+        "line": "ent bear 750 525 \"brown bear\" idle=breathe"
+      },
+      {
+        "k": "cmd",
+        "t": 2030,
+        "line": "draw bear.body brown brown oval 0 -85 65 75"
+      },
+      {
+        "k": "cmd",
+        "t": 2120,
+        "line": "draw bear.head brown brown circle 0 -175 48"
+      },
+      {
+        "k": "cmd",
+        "t": 2210,
+        "line": "draw bear.ears brown brown mirror circle 34 -218 14"
+      },
+      {
+        "k": "cmd",
+        "t": 2300,
+        "line": "draw bear.feet brown brown mirror oval 30 -8 26 12"
+      },
+      {
+        "k": "cmd",
+        "t": 2390,
+        "line": "draw bear.snout brown tan oval 0 -165 20 14"
+      },
+      {
+        "k": "cmd",
+        "t": 2480,
+        "line": "face bear head front happy"
+      },
+      {
+        "k": "cmd",
+        "t": 2570,
+        "line": "ent basket 610 500 \"picnic basket\" layer=-1"
+      },
+      {
+        "k": "cmd",
+        "t": 2660,
+        "line": "draw basket.body brown tan rect -35 -30 70 30"
+      },
+      {
+        "k": "cmd",
+        "t": 2750,
+        "line": "draw basket.handle brown M -25 -30 Q 0 -60 25 -30"
+      },
+      {
+        "k": "cmd",
+        "t": 2840,
+        "line": "fx stars 600 120 250"
+      },
+      {
+        "k": "cmd",
+        "t": 2930,
+        "line": "say bunny yay picnic"
+      },
+      {
+        "k": "cmd",
+        "t": 3020,
+        "line": "say bear yum"
+      },
+      {
+        "k": "words",
+        "t": 4420,
+        "text": "The End"
+      },
+      {
+        "k": "end",
+        "t": 4520
+      }
+    ]
+  },
+  {
+    "id": "intro-5",
+    "title": "A pirate ship with a big red sail sailed across the sea under a smiling sun",
+    "createdAt": 1758585600000,
+    "updatedAt": 1758585600000,
+    "seed": 5635,
+    "cover": null,
+    "dialect": "ops",
+    "events": [
+      {
+        "k": "words",
+        "t": 0,
+        "text": "A pirate ship with a big red sail sailed across the sea under a smiling sun"
+      },
+      {
+        "k": "cmd",
+        "t": 500,
+        "line": "scene skyblue \"the open sea\""
+      },
+      {
+        "k": "cmd",
+        "t": 590,
+        "line": "ent water 600 525 \"sea\" layer=-2"
+      },
+      {
+        "k": "cmd",
+        "t": 680,
+        "line": "draw water.wave blue skyblue rect -620 -180 1240 290"
+      },
+      {
+        "k": "cmd",
+        "t": 770,
+        "line": "ent ship 600 525 \"pirate ship\" idle=breathe"
+      },
+      {
+        "k": "cmd",
+        "t": 860,
+        "line": "draw ship.hull brown #8b5a2b poly -180 -35 180 -35 140 30 -140 30"
+      },
+      {
+        "k": "cmd",
+        "t": 950,
+        "line": "draw ship.mast black M 0 -35 L 0 -260"
+      },
+      {
+        "k": "cmd",
+        "t": 1040,
+        "line": "draw ship.sail black red poly 0 -260 150 -140 0 -140"
+      },
+      {
+        "k": "cmd",
+        "t": 1130,
+        "line": "draw ship.flag black black poly 0 -260 50 -245 0 -230"
+      },
+      {
+        "k": "cmd",
+        "t": 1220,
+        "line": "ent sun 1050 120 \"sun\" layer=-3"
+      },
+      {
+        "k": "cmd",
+        "t": 1310,
+        "line": "draw sun.disc gold yellow circle 0 0 60"
+      },
+      {
+        "k": "cmd",
+        "t": 1400,
+        "line": "draw sun.rays gold w=6 M -80 0 L -105 0 M 80 0 L 105 0 M 0 -80 L 0 -105 M 0 80 L 0 105"
+      },
+      {
+        "k": "cmd",
+        "t": 1490,
+        "line": "face sun disc front happy"
+      }
+    ]
+  }
+]

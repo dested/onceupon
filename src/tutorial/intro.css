@@ -1,0 +1,129 @@
+/* First-launch intro (src/tutorial/IntroScreen.tsx). Sits on the .story-studio layout; only its own bits here. */
+
+.intro .intro-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 4px 12px;
+}
+.intro .intro-title {
+  margin: 0;
+  justify-self: center;
+  max-width: 40ch;
+  font-family: var(--font-scrawl);
+  font-size: clamp(24px, 3.3vw, 40px);
+  line-height: 1.15;
+  text-align: center;
+  color: var(--color-ink);
+  text-wrap: balance;
+  animation: intro-title-in 520ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.intro .intro-spoken {
+  position: absolute;
+  bottom: clamp(12px, 3%, 28px);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0 28px;
+  pointer-events: none;
+  animation: intro-fade-in 320ms ease-out both;
+}
+.intro .intro-spoken p {
+  max-width: 44ch;
+  margin: 0;
+  padding: 6px 18px;
+  border-radius: 16px;
+  background: rgba(251, 246, 234, 0.88);
+  box-shadow: 0 0 18px 6px rgba(251, 246, 234, 0.7);
+  font-family: var(--font-hand);
+  font-size: clamp(19px, 2.3vw, 26px);
+  line-height: 1.25;
+  text-align: center;
+  color: var(--studio-muted, #796d60);
+}
+
+.intro .intro-controls {
+  display: flex;
+  justify-content: center;
+}
+.intro .intro-nav {
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 3vw, 34px);
+  padding: 6px 0 4px;
+}
+.intro .intro-dots {
+  display: flex;
+  gap: 10px;
+}
+.intro .intro-dots button {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 3px solid var(--color-ink);
+  border-radius: 999px;
+  background: var(--color-paper);
+  transition: transform 160ms ease, background 160ms ease;
+}
+.intro .intro-dots button.is-on {
+  background: var(--studio-coral, #d9937e);
+  transform: scale(1.25);
+}
+.intro .intro-next {
+  min-width: 150px;
+  font-size: 26px;
+}
+.intro .intro-next.is-ready {
+  animation: intro-nudge 1.6s ease-in-out infinite;
+}
+
+@keyframes intro-title-in {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes intro-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes intro-nudge {
+  0%,
+  70%,
+  100% {
+    transform: rotate(-2deg) scale(1);
+  }
+  80% {
+    transform: rotate(-4deg) scale(1.07);
+  }
+  90% {
+    transform: rotate(0deg) scale(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro .intro-title,
+  .intro .intro-spoken,
+  .intro .intro-next.is-ready {
+    animation: none;
+  }
+}
+
+.story-studio.intro {
+  /* .story-studio is position: relative (unlayered), which beats Tailwind's `fixed`; pin it here. */
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}

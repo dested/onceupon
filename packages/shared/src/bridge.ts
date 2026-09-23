@@ -4,7 +4,9 @@
  * Down (native -> studio): the shell injects
  *   `window.__onceuponBridge.receive(<JSON of BridgeResponse | BridgeEvent>); true;`
  * The studio installs `window.__onceuponBridge` before its first request. The shell is detected by
- * `window.ReactNativeWebView` being present AND `shell=native` in the page query.
+ * `shell=native` in the page query AND either `window.__onceuponShell` (the shell's
+ * injectedJavaScriptBeforeContentLoaded) or `window.ReactNativeWebView` being present; a request
+ * made before ReactNativeWebView appears waits briefly for it.
  */
 export interface BridgeApi {
   /** The studio has rendered its first screen: hide the native splash. */
@@ -21,6 +23,10 @@ export interface BridgeApi {
       online: boolean
       /** 'remote' when the WebView loaded the hosted studio, 'local' for the bundled copy. */
       source: 'remote' | 'local'
+      /** BCP-47 tag of the device's first preferred language, e.g. `en-US`. */
+      locale: string
+      /** ISO region of the device (settings region), null when the OS does not say. */
+      region: string | null
     }
   }
   'kv.get': { input: { key: string }; output: { value: string | null } }
@@ -53,6 +59,42 @@ export interface BridgeApi {
   /** Apple AdServices attribution token, null off-iOS or when unavailable. */
   'attribution.token': { input: Record<string, never>; output: { token: string | null } }
   'net.state': { input: Record<string, never>; output: { online: boolean } }
+  /**
+   * Saves an mp4 to the camera roll (add-only Photos permission). `saved: false` means the grown-up
+   * denied Photos access; any other failure rejects.
+   */
+  'media.saveVideo': { input: { base64: string; filename: string }; output: { saved: boolean } }
+  /** The shell's audio session: `playsInSilent` lets story sounds play with the silent switch on. */
+  'audio.mode': { input: { playsInSilent: boolean }; output: Record<string, never> }
+  /** Keep the screen awake (live story, replay, export). */
+  'awake.set': { input: { on: boolean }; output: Record<string, never> }
+  'orientation.lock': { input: { mode: 'any' | 'landscape' | 'portrait' }; output: Record<string, never> }
+  /** The system review prompt; iOS decides whether it actually shows, so `shown` means "asked". */
+  'review.request': { input: Record<string, never>; output: { shown: boolean } }
+  /** Never prompts unless `request` is true (kids app: a grown-up action only). */
+  'notify.permission': {
+    input: { request: boolean }
+    output: { status: 'granted' | 'denied' | 'undetermined' }
+  }
+  /**
+   * On-device speech recognition (SFSpeechRecognizer). Results arrive as `speech.result` events,
+   * then `speech.end`; failures as `speech.error`. `available: false` when the OS cannot do it.
+   */
+  'speech.start': { input: { locale: string; onDevice: boolean }; output: { available: boolean } }
+  'speech.stop': { input: Record<string, never>; output: Record<string, never> }
+}
+
+/** Event payloads pushed by the shell (`BridgeEvent.data`), per event name. */
+export interface BridgeEventMap {
+  net: { online: boolean }
+  foreground: Record<string, never>
+  background: Record<string, never>
+  /** Safe-area insets in CSS px, also written as `--shell-inset-*` vars on <html>. */
+  insets: { top: number; right: number; bottom: number; left: number }
+  /** Same shape as the studio's RecResult list: every segment so far, the last may be interim. */
+  'speech.result': { results: Array<{ transcript: string; isFinal: boolean }>; isFinal: boolean }
+  'speech.end': Record<string, never>
+  'speech.error': { code: string; message: string }
 }
 
 export type BridgeName = keyof BridgeApi
@@ -72,14 +114,37 @@ export type BridgeResponse =
   | { v: 1; id: string; ok: true; output: unknown }
   | { v: 1; id: string; ok: false; error: { code: BridgeErrorCode; message: string } }
 
-export type BridgeEventName = 'net' | 'foreground' | 'background'
+export type BridgeEventName = keyof BridgeEventMap
+
+/** Every event name, for runtime validation on the studio side. */
+export const BRIDGE_EVENT_NAMES = [
+  'net',
+  'foreground',
+  'background',
+  'insets',
+  'speech.result',
+  'speech.end',
+  'speech.error',
+] as const satisfies readonly BridgeEventName[]
+// Fails to compile if BridgeEventMap gains an event missing from BRIDGE_EVENT_NAMES.
+type MissingEvent = Exclude<BridgeEventName, (typeof BRIDGE_EVENT_NAMES)[number]>
+const _allEventsCovered: MissingEvent extends never ? true : never = true
+void _allEventsCovered
 
 export interface BridgeEvent {
   v: 1
   event: BridgeEventName
-  /** net: { online: boolean }; foreground/background: {} */
+  /** See BridgeEventMap for the shape per event. */
   data: unknown
 }
+
+/** CSS custom properties the shell writes on <html>; the studio uses max(env(safe-area-inset-*), var). */
+export const SHELL_INSET_VARS = {
+  top: '--shell-inset-top',
+  right: '--shell-inset-right',
+  bottom: '--shell-inset-bottom',
+  left: '--shell-inset-left',
+} as const
 
 export type BridgeDown = BridgeResponse | BridgeEvent
 

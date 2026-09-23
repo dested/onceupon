@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { appStore, persistSettings, useApp } from '~/story/store'
-import { openExternal, redeemGift, restorePurchases, webShopUrl } from '~/backend/purchases'
+import { openExternal, redeemGift, restorePurchases } from '~/backend/purchases'
+import { APP_SHELL } from '~/backend/config'
 import { listShares, unpublishShare } from '~/backend/share'
 import { refreshDevice, setShareVoice } from '~/backend/device'
 import { ApiError } from '~/backend/api'
@@ -11,7 +12,7 @@ import type { ShareSummary } from '../../packages/shared/src/api'
 
 /**
  * The grown-up area (always reached through the parental gate): minutes and buying, gift codes, the
- * family code for the web shop, share-with-voice consent and the list of shared stories, replaying the
+ * family code (a web-shop pointer on the web only), share-with-voice consent and the list of shared stories, replaying the
  * tutorial, sound, and the privacy links. Hosted mode only.
  */
 
@@ -34,7 +35,6 @@ function formatGiftInput(raw: string): string {
 export function ParentArea() {
   const open = useApp((s) => s.parentOpen)
   const hosted = useApp((s) => s.hosted)
-  const native = useApp((s) => s.native)
   const balanceSec = useApp((s) => s.balanceSec)
   const paying = useApp((s) => s.paying)
   const shareVoice = useApp((s) => s.shareVoice)
@@ -50,7 +50,6 @@ export function ParentArea() {
   const [giftMsg, setGiftMsg] = useState('')
   const [giftError, setGiftError] = useState('')
   const [copied, setCopied] = useState(false)
-  const [webBusy, setWebBusy] = useState(false)
   const [consentOpen, setConsentOpen] = useState(false)
   const [voiceBusy, setVoiceBusy] = useState(false)
   const [voiceError, setVoiceError] = useState('')
@@ -181,8 +180,8 @@ export function ParentArea() {
   const linkBtn = 'font-hand text-lg text-crayon-blue underline'
 
   return (
-    <div className="bg-ink/30 absolute inset-0 z-30 grid place-items-center" onClick={close} data-testid="parent-area">
-      <PaperCard className="relative max-h-[92dvh] w-[38rem] max-w-[calc(100vw-32px)] overflow-y-auto">
+    <div className="modal-overlay bg-ink/30 z-30" onClick={close} data-testid="parent-area">
+      <PaperCard className="modal-card w-[38rem]">
         <div onClick={(e) => e.stopPropagation()}>
           <button onClick={close} aria-label="Close" className="text-ink absolute top-4 right-4" data-testid="parent-close">
             <X size={26} strokeWidth={3} />
@@ -241,21 +240,11 @@ export function ParentArea() {
                 {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
-            <p className="mt-2 font-hand text-base text-ink-soft">
-              Use it to buy minutes on the web{config?.shopUrl ? ` at ${config.shopUrl}` : ''}
-            </p>
-            {native && config?.shopUrl && (
-              <StickerButton
-                tone="paper"
-                tilt={-1}
-                className="mt-3"
-                disabled={webBusy}
-                onClick={() => {
-                  setWebBusy(true)
-                  void openExternal(webShopUrl()).finally(() => setWebBusy(false))
-                }}>
-                {webBusy ? 'Opening…' : 'Open the web shop'}
-              </StickerButton>
+            {/* In the app purchases are StoreKit only: no pointer to the web shop (App Store rules). */}
+            {!APP_SHELL && (
+              <p className="mt-2 font-hand text-base text-ink-soft">
+                Use it to buy minutes on the web{config?.shopUrl ? ` at ${config.shopUrl}` : ''}
+              </p>
             )}
           </div>
 
@@ -337,7 +326,7 @@ export function ParentArea() {
               className="mt-2"
               onClick={() => appStore.set({ parentOpen: false, tutorialOpen: true })}
               data-testid="replay-tutorial">
-              Play the tutorial again
+              Watch the intro again
             </StickerButton>
           </div>
 

@@ -10,6 +10,7 @@ import { resolveAttribution } from '../attribution'
 import { prisma } from '../prisma'
 import { env } from '../env'
 import type { AppApi, ClientConfig } from '../../../../packages/shared/src/api'
+import { TYPED_MAX_CHARS } from '../../../../packages/shared/src/typed'
 
 // No-input handlers: an empty object. `{}` is assignable to Record<string, never>.
 const noInput: z.ZodType<Record<string, never>> = z.object({})
@@ -51,6 +52,11 @@ const sessionStartInput: z.ZodType<AppApi['session.start']['input']> = z.object(
 const sessionBeatInput: z.ZodType<AppApi['session.beat']['input']> = z.object({
   sessionId: z.string().min(1),
   listeningMs: z.number().min(0),
+})
+
+const sessionTypedInput: z.ZodType<AppApi['session.typed']['input']> = z.object({
+  sessionId: z.string().min(1),
+  text: z.string().trim().min(1).max(TYPED_MAX_CHARS),
 })
 
 const sessionStopInput: z.ZodType<AppApi['session.stop']['input']> = z.object({
@@ -125,6 +131,10 @@ export const coreHandlers: Handlers = {
 
   'session.beat': deviceHandler<'session.beat'>(sessionBeatInput, async (input, ctx) =>
     sessions.beat(ctx.device, input.sessionId, input.listeningMs)
+  ),
+
+  'session.typed': deviceHandler<'session.typed'>(sessionTypedInput, async (input, ctx) =>
+    sessions.typed(ctx.device, input.sessionId, input.text)
   ),
 
   'session.stop': deviceHandler<'session.stop'>(sessionStopInput, async (input, ctx) =>

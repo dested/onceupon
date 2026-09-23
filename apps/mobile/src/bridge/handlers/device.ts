@@ -1,6 +1,7 @@
 import * as Application from 'expo-application'
 import * as Crypto from 'expo-crypto'
 import { getStorefront } from 'expo-iap'
+import { getLocales } from 'expo-localization'
 import * as SecureStore from 'expo-secure-store'
 import { Platform } from 'react-native'
 import { type Handler } from '../host'
@@ -24,6 +25,11 @@ async function storefront(): Promise<string | null> {
   }
 }
 
+function localeInfo(): { locale: string; region: string | null } {
+  const [first] = getLocales()
+  return { locale: first.languageTag, region: first.regionCode ?? null }
+}
+
 export const deviceInfo: Handler<'device.info'> = async (_input, ctx) => ({
   installId: await installId(),
   platform: ctx.platform,
@@ -34,4 +40,5 @@ export const deviceInfo: Handler<'device.info'> = async (_input, ctx) => ({
   storefront: await storefront(),
   online: ctx.getOnline(),
   source: ctx.getSource(),
+  ...localeInfo(),
 })

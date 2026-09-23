@@ -24,7 +24,7 @@ engineering shape: `plans/2026-09-22-launch-build.md`.
 | `/` (root)            | the studio: engine, dialects, story loop, UI, lab                                                               | `bun run dev` 7710 (lab session), `bun run dev:hosted` 7711, `bun run build:hosted` → `dist-hosted/index.html`                      |
 | `apps/web`            | sal-starter: website, `/api/app/*` for the studio, `/api/share/*`, `/admin`, serves the studio at `/app/`       | `cd apps/web && bun run dev` 7720; `bun run db:push`; `.env` from `.env.example` (DATABASE_URL, keys, ADMIN_EMAILS, Stripe, Apple) |
 | `apps/mobile`         | Expo shell (iPad first): WebView on the hosted studio, bridge, StoreKit 2, EAS Update                            | `bunx tsc --noEmit`, `bun test`, `bun run sync-studio`, `eas build` / `eas update` (EAS project `@quickgame/squiggletale`)          |
-| `packages/shared/src` | dependency-free contracts: `brand.ts` (name, origin, bundle id), `packs.ts`, `api.ts` (studio ↔ server), `bridge.ts` (studio ↔ shell) | imported by relative path from all three                                                                                    |
+| `packages/shared/src` | dependency-free contracts: `brand.ts` (name, origin, bundle id), `packs.ts`, `api.ts` (studio ↔ server), `typed.ts` (typed-words charge rule), `bridge.ts` (studio ↔ shell) | imported by relative path from all three                                                                                    |
 
 Deploy: root `Dockerfile` + `drydock.yaml` (kind ssr, Postgres) build the studio then `apps/web`; the Drydock project must be switched from the old static one.
 
@@ -50,15 +50,16 @@ src/
   main.tsx                 React root; `?player=<id>` mounts the public SharePlayer instead of the app
   boot.ts                  before first render: bridge, storage backend, device registration (hosted), online/offline events
   backend/                 hosted mode only (inert without VITE_HOSTED)
-    config.ts              HOSTED / NATIVE / API_ORIGIN flags
+    config.ts              HOSTED / NATIVE / APP_SHELL / API_ORIGIN flags
+    awake.ts               setAwake(on): shell keep-awake, Screen Wake Lock on the web
     bridge.ts              studio side of the native bridge (postMessage up, injected receive() down), blob/base64 helpers
     api.ts                 typed client for packages/shared api.ts (`api(name, input)`, `drawStream` NDJSON)
     device.ts              register/restore the device account, pull state + config + mask words, consent, attribution
-    meter.ts               StoryMeter: session start, 15 s beats of mic-open ms, stop; exhausted → sleepy end
+    meter.ts               StoryMeter: session start, 15 s beats of mic-open ms, typed messages (server-priced), stop; reopens a stale session; exhausted → sleepy end
     relay-provider.ts      LlmProvider over POST /api/app/draw
     purchases.ts           prices, buyPack (StoreKit via bridge / web shop), restore, redeemGift, webShopUrl
     share.ts               createShare/unpublish/list, shareLink (share sheet / Web Share / clipboard), shareVideo
-  tutorial/                first-launch tutorial: tutorial-record.json (scripts/author-tutorial.ts), coach/*.mp3 (scripts/render-coach.ts), cues.ts, coach.ts, Tutorial.tsx
+  tutorial/                first-launch intro: IntroScreen.tsx (5 voiced picture-book pages, swipe/Next, `tutorialOpen` + kv `tutorialDone`; `?intro=1` in dev; menu "How it works" and Grown-ups "Watch the intro again"), intro-copy.ts (titles + voice lines), intro.ts (+ intro/*.mp3), intro-slides.json (scripts/author-intro.ts, Sonnet 5 through the ops dialect, `bun scripts/author-intro.ts <n>` re-rolls one page), intro.css; tutorial-record.json (share-player demo, scripts/author-tutorial.ts), coach.ts + coach/*.mp3 (the live "say The End" hint)
   app.tsx                  screen switch: story | shelf | replay; backtick toggles debug
   styles/app.css           Tailwind v4 theme tokens (paper, ink, crayon colors, hand fonts)
   debug-handle.ts          window.__onceupon (scene, stage, director, story(), t0, listenT0(), report()) for bx and the debug report
@@ -119,6 +120,7 @@ src/
     ReplayScreen.tsx       replay canvas + play again + download video
     VideoExport.tsx        VideoExportButton (replay toolbar icon / closing-card button) + progress PaperCard with cancel; blob -> browser download
     bits.tsx               StickerButton, IconButton, PaperCard
+    viewport.ts            safe-area + keyboard: visualViewport -> --kb/--vv-top/html.kb-open, reveals the focused field; dev __viewport.fakeKeyboard/fakeInsets
     SharePlayer.tsx        public player behind share links (`?player=<id>`; `&embed=1` = paper only, inside the website's book; `player=tutorial` = the bundled demo)
     ParentGate.tsx         grown-up gate (spoken-number sum) before purchases, link-outs, first mic use
     ParentArea.tsx         balance, buy, restore, gift redeem, family code, share-with-voice consent, shares list, tutorial, links
@@ -140,7 +142,7 @@ lab.html                   second Vite entry -> src/lab/main.tsx (http://localho
 lab/                       lab data: cases.json, campaign.json, history.jsonl, prompts/vNNN.md+json (tracked); runs/rNNN/*.jpg|.ops.txt|.json (gitignored)
 features/                  feature specs
 plans/                     dated working docs; 2026-09-22-pricing-model.html is the interactive cost calculator (open in a browser)
-scripts/                   one-off dev scripts (author-tutorial.ts + render-coach.ts: regenerate the tutorial record and coach mp3s; sync-studio.ts: copy dist-hosted/index.html into apps/mobile/assets/studio.html; probe-deepgram.ts: stream a WAV to Deepgram with a key; tracker-check.ts: `bun scripts/tracker-check.ts`, tracker dedupe/correction regression, no framework; lab-plugin.ts: the Vite dev plugin behind /__lab/* (file API confined to lab/, promote rewrites OPS_SYSTEM_PROMPT); lab-agent.ts + lab-render-round.sh + lab-record-judges.sh: agent-mode lab rounds without an API key (`plan`/`record-draw`/`record-judge`/`finish`/`save-prompt`/`worst`; Claude Code agents draw and judge, the page hook window.__lab.renderFromFile renders); export-check.mjs: `node scripts/export-check.mjs <outDir> <storyId>`, headless mp4 export + determinism check, see verify.md)
+scripts/                   one-off dev scripts (author-intro.ts: intro page drawings; render-coach.ts [intro]: coach / intro voice mp3s via OpenAI TTS; author-tutorial.ts: the share-player demo record; sync-studio.ts: copy dist-hosted/index.html into apps/mobile/assets/studio.html; probe-deepgram.ts: stream a WAV to Deepgram with a key; tracker-check.ts: `bun scripts/tracker-check.ts`, tracker dedupe/correction regression, no framework; lab-plugin.ts: the Vite dev plugin behind /__lab/* (file API confined to lab/, promote rewrites OPS_SYSTEM_PROMPT); lab-agent.ts + lab-render-round.sh + lab-record-judges.sh: agent-mode lab rounds without an API key (`plan`/`record-draw`/`record-judge`/`finish`/`save-prompt`/`worst`; Claude Code agents draw and judge, the page hook window.__lab.renderFromFile renders); export-check.mjs: `node scripts/export-check.mjs <outDir> <storyId>`, headless mp4 export + determinism check, see verify.md)
 ```
 
 ## File map (concept -> where)
@@ -241,8 +243,8 @@ scripts/                   one-off dev scripts (author-tutorial.ts + render-coac
 - The only `as` cast in the app is the constructor boundary in `speech/recognition.ts`.
 - Web Speech only exists in Chrome/Edge. The typed-sentence input at bottom-right is the mic-free path (also what `bx` tests use).
 - **Hosted mode never trusts the client for money or minutes.** Only the server credits (verified JWS, paid Stripe session, gift code) and debits (beats). The studio's `remainingSec` is a display value; the relay refuses once the session is exhausted.
-- **The bridge envelope is the contract.** `window.__onceuponBridge.receive` and `window.ReactNativeWebView.postMessage` are fixed in `packages/shared/src/bridge.ts`; the shell appends `?shell=native` (also on the bundled `file://` copy) so `hasBridge()` is true offline too.
-- **Stories with voice replay in real time.** `replaySchedule(events, { realTime })` skips the gap squeeze when the record has clips so words, drawing and voice stay aligned; the mp4 exporter follows the same rule.
+- **The bridge envelope is the contract.** `window.__onceuponBridge.receive` and `window.ReactNativeWebView.postMessage` are fixed in `packages/shared/src/bridge.ts`; the shell appends `?shell=native` (also on the bundled `file://` copy) and injects `window.__onceuponShell` before any page script, and `hasBridge()` needs the flag plus either marker. Never add `WKAppBoundDomains` back: it silently kills the injected bridge (decisions.md). Only `/app` loads in the WebView; other links open in an in-app Safari sheet. The shell writes safe-area insets as `--shell-inset-{top,right,bottom,left}` on <html> and emits an `insets` event. Info.plist changes and new native modules need a native build; everything else ships by web deploy / EAS Update.
+- **Stories with voice replay in real time.** `replaySchedule(events, { realTime })` skips the gap squeeze when the record has clips so words, drawing and voice stay aligned; the mp4 exporter follows the same rule. A voiced replay starts up to 8 s before the first event (`voiceLeadMs`: the first clip begins when the mic opens, the first words event only after recognition), so clip 1 plays from its start instead of being sought into.
 - **`apps/mobile/app.config.ts` mirrors BRAND by hand.** The Expo config loader cannot import the shared TS; edit both when renaming. expo-iap 5.6 exposes the StoreKit 2 JWS as `purchase.purchaseToken`.
 - **The single-file build inlines everything** (fonts via @fontsource, no Google Fonts link): keep new assets importable by Vite so they inline too. **It must never inline keys:** Vite bakes every exposed env var into the bundle and `.env.local` holds the BYO keys, so `--mode hosted` sets `envPrefix` to only `VITE_HOSTED`/`VITE_API_ORIGIN` (a build once shipped the Anthropic and OpenAI keys inside `studio.html`; GitHub push protection caught it). Grep `dist-hosted/index.html` for `sk-` if you touch the env plumbing.
 

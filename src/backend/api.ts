@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { apiUrl } from './config'
-import { getDeviceToken } from './device'
+import { deviceTokenSettled, getDeviceToken } from './device'
 import type {
   ApiErrorCode,
   ApiInput,
@@ -63,6 +63,8 @@ function headers(): Record<string, string> {
 }
 
 export async function api<K extends ApiName>(name: K, input: ApiInput<K>): Promise<ApiOutput<K>> {
+  // Boot no longer waits for registration, so early calls wait for the token instead of going out bare.
+  if (name !== 'device.register') await deviceTokenSettled()
   let res: Response
   try {
     res = await fetch(apiUrl(`/api/app/${name}`), {
@@ -97,6 +99,7 @@ const drawChunkSchema = z.discriminatedUnion('k', [
 
 /** `POST /api/app/draw`: an NDJSON stream of DrawChunk lines. Malformed lines are skipped. */
 export async function* drawStream(req: DrawRequest, signal: AbortSignal): AsyncGenerator<DrawChunk> {
+  await deviceTokenSettled()
   let res: Response
   try {
     res = await fetch(apiUrl('/api/app/draw'), {

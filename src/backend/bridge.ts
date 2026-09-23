@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  BRIDGE_EVENT_NAMES,
   SHELL_QUERY,
   type BridgeDown,
   type BridgeErrorCode,
@@ -18,6 +19,19 @@ import {
  */
 
 const REQUEST_TIMEOUT_MS = 20_000
+/** Calls that wait on a person (StoreKit sheet, share sheet, Photos prompt) get a generous timeout. */
+const INTERACTIVE_TIMEOUT_MS = 10 * 60_000
+const INTERACTIVE: ReadonlySet<BridgeName> = new Set<BridgeName>([
+  'iap.purchase',
+  'iap.restore',
+  'share.url',
+  'share.file',
+  'media.saveVideo',
+  'notify.permission',
+  'speech.start',
+])
+/** How long a request waits for `window.ReactNativeWebView` if the shell flagged itself but the handler is late. */
+const HANDLER_WAIT_MS = 3_000
 
 export class BridgeError extends Error {
   constructor(
@@ -42,7 +56,7 @@ const responseSchema = z.discriminatedUnion('ok', [
 ])
 const eventSchema = z.object({
   v: z.literal(1),
-  event: z.enum(['net', 'foreground', 'background']),
+  event: z.enum(BRIDGE_EVENT_NAMES),
   data: z.unknown(),
 })
 
@@ -56,9 +70,15 @@ const pending = new Map<string, Pending>()
 const listeners = new Map<BridgeEventName, Set<(data: unknown) => void>>()
 let counter = 0
 
+interface NativePort {
+  postMessage: (msg: string) => void
+}
+
 interface ShellWindow {
-  ReactNativeWebView?: { postMessage: (msg: string) => void }
+  ReactNativeWebView?: NativePort
   __onceuponBridge?: { receive: (msg: unknown) => void }
+  /** Set by the shell's injectedJavaScriptBeforeContentLoaded, before any studio script runs. */
+  __onceuponShell?: unknown
 }
 
 function shell(): ShellWindow {
@@ -66,10 +86,32 @@ function shell(): ShellWindow {
   return typeof w === 'object' && w !== null ? (w as ShellWindow) : {}
 }
 
-/** True inside the native shell: the WebView bridge exists and the shell said so in the query. */
+/**
+ * True inside the native shell: the shell flagged the URL (`shell=native`) and one of its injected
+ * markers is present. `__onceuponShell` is set before any page script, so detection does not depend
+ * on the order in which WebKit installs `ReactNativeWebView`; a request waits briefly for that.
+ */
 export function hasBridge(): boolean {
   if (typeof window === 'undefined') return false
-  return Boolean(shell().ReactNativeWebView) && window.location.search.includes(SHELL_QUERY)
+  if (!window.location.search.includes(SHELL_QUERY)) return false
+  const w = shell()
+  return w.ReactNativeWebView !== undefined || w.__onceuponShell !== undefined
+}
+
+function nativePort(): Promise<NativePort | null> {
+  const now = shell().ReactNativeWebView
+  if (now) return Promise.resolve(now)
+  if (!hasBridge()) return Promise.resolve(null)
+  return new Promise((resolve) => {
+    const started = Date.now()
+    const tick = () => {
+      const port = shell().ReactNativeWebView
+      if (port) resolve(port)
+      else if (Date.now() - started >= HANDLER_WAIT_MS) resolve(null)
+      else window.setTimeout(tick, 25)
+    }
+    tick()
+  })
 }
 
 function receive(msg: unknown): void {
@@ -96,18 +138,18 @@ export function installBridge(): void {
   if (!w.__onceuponBridge) w.__onceuponBridge = { receive }
 }
 
-export function bridgeCall<K extends BridgeName>(type: K, input: BridgeInput<K>): Promise<BridgeOutput<K>> {
-  const w = shell()
-  const rn = w.ReactNativeWebView
-  if (!rn) return Promise.reject(new BridgeError('unsupported', 'no native shell'))
+export async function bridgeCall<K extends BridgeName>(type: K, input: BridgeInput<K>): Promise<BridgeOutput<K>> {
+  const rn = await nativePort()
+  if (!rn) throw new BridgeError('unsupported', 'no native shell')
   installBridge()
   const id = `${Date.now().toString(36)}-${++counter}`
   const req: BridgeRequest = { v: 1, id, type, input }
+  const timeoutMs = INTERACTIVE.has(type) ? INTERACTIVE_TIMEOUT_MS : REQUEST_TIMEOUT_MS
   return new Promise<BridgeOutput<K>>((resolve, reject) => {
     const timer = window.setTimeout(() => {
       pending.delete(id)
       reject(new BridgeError('failed', `${type} timed out`))
-    }, REQUEST_TIMEOUT_MS)
+    }, timeoutMs)
     pending.set(id, {
       // The shell is typed against the same BridgeApi map; the envelope was checked above.
       resolve: (output) => resolve(output as BridgeOutput<K>),

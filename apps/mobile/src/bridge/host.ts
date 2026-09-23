@@ -3,6 +3,7 @@ import {
   type BridgeDown,
   type BridgeErrorCode,
   type BridgeEvent,
+  type BridgeEventMap,
   type BridgeEventName,
   type BridgeName,
   type BridgeOutput,
@@ -22,11 +23,19 @@ export interface HostContext {
   getOnline(): boolean
 }
 
+/** Pushes a typed event down to the studio. */
+export type Emit = <E extends BridgeEventName>(event: E, data: BridgeEventMap[E]) => void
+
+/** What a handler sees: the host facts plus a way to push events (speech results) later. */
+export interface HandlerContext extends HostContext {
+  readonly emit: Emit
+}
+
 /**
  * A single bridge handler. Input is `unknown` because it crosses the postMessage boundary; each
  * handler validates its own input with zod. The output is typed per bridge method.
  */
-export type Handler<K extends BridgeName> = (input: unknown, ctx: HostContext) => Promise<BridgeOutput<K>>
+export type Handler<K extends BridgeName> = (input: unknown, ctx: HandlerContext) => Promise<BridgeOutput<K>>
 
 export type Handlers = { [K in BridgeName]: Handler<K> }
 
@@ -63,6 +72,14 @@ export const BRIDGE_NAMES = [
   'haptic',
   'attribution.token',
   'net.state',
+  'media.saveVideo',
+  'audio.mode',
+  'awake.set',
+  'orientation.lock',
+  'review.request',
+  'notify.permission',
+  'speech.start',
+  'speech.stop',
 ] as const satisfies readonly BridgeName[]
 
 // Fails to compile if bridge.ts adds a method that is missing from BRIDGE_NAMES.
@@ -97,11 +114,20 @@ function toError(err: unknown): { code: BridgeErrorCode; message: string } {
 }
 
 export class BridgeHost {
+  private readonly ctx: HandlerContext
+
   constructor(
     private readonly send: (js: string) => void,
     private readonly handlers: Partial<Handlers>,
-    private readonly ctx: HostContext
-  ) {}
+    host: HostContext
+  ) {
+    this.ctx = {
+      platform: host.platform,
+      getSource: () => host.getSource(),
+      getOnline: () => host.getOnline(),
+      emit: (event, data) => this.emit(event, data),
+    }
+  }
 
   /** Handle one raw postMessage payload from the studio. Never throws. */
   handle(raw: string): void {
@@ -117,8 +143,8 @@ export class BridgeHost {
     void this.dispatch(id, type, input)
   }
 
-  /** Push an unsolicited event (net/foreground/background) down to the studio. */
-  emit(event: BridgeEventName, data: Record<string, unknown>): void {
+  /** Push an unsolicited event (net, lifecycle, insets, speech) down to the studio. */
+  emit<E extends BridgeEventName>(event: E, data: BridgeEventMap[E]): void {
     const message: BridgeEvent = { v: 1, event, data }
     this.inject(message)
   }

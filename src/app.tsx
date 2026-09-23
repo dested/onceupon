@@ -4,7 +4,7 @@ import { getKv } from './story/storage'
 import { StoryScreen } from './ui/StoryScreen'
 import { Bookshelf } from './ui/Bookshelf'
 import { ReplayScreen } from './ui/ReplayScreen'
-import { Tutorial } from './tutorial/Tutorial'
+import { Intro } from './tutorial/IntroScreen'
 import { ParentGate } from './ui/ParentGate'
 import { Paywall } from './ui/Paywall'
 import { ParentArea } from './ui/ParentArea'
@@ -27,8 +27,12 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // First launch in hosted mode plays the tutorial once; a dev-only `?demo=sleepy` shows the sleepy end card.
+  // First launch in hosted mode plays the intro once; dev-only `?intro=1` opens it in any mode and
+  // `?demo=sleepy` shows the sleepy end card.
   useEffect(() => {
+    if (import.meta.env.DEV && new URLSearchParams(location.search).get('intro') === '1') {
+      appStore.set({ tutorialOpen: true })
+    }
     if (!hosted) return
     void getKv('tutorialDone').then((done) => {
       if (done === null) appStore.set({ tutorialOpen: true })
@@ -54,7 +58,7 @@ export function App() {
       <Paywall />
       <ParentArea />
       <ShareCard />
-      {tutorialOpen && <Tutorial onDone={() => appStore.set({ tutorialOpen: false })} />}
+      {tutorialOpen && <Intro onDone={() => appStore.set({ tutorialOpen: false })} />}
     </>
   )
 }

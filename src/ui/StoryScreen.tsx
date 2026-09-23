@@ -251,6 +251,16 @@ export function StoryScreen() {
                   {sound ? 'Sound on' : 'Sound off'}
                   <span className="menu-check">{sound && <Check size={17} />}</span>
                 </button>
+                <button
+                  onClick={() => {
+                    sessionRef.current?.stopListening()
+                    setMenuOpen(false)
+                    appStore.set({ tutorialOpen: true })
+                  }}
+                  data-testid="menu-intro">
+                  <Sparkles size={21} />
+                  How it works
+                </button>
                 {hosted ? (
                   <button
                     onClick={() => {

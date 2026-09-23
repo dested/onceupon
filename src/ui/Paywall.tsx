@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, X } from 'lucide-react'
 import { useApp, appStore } from '~/story/store'
-import { buyPack, loadPrices, openExternal, restorePurchases, webShopUrl, type PriceInfo } from '~/backend/purchases'
+import { buyPack, loadPrices, restorePurchases, type PriceInfo } from '~/backend/purchases'
 import { centsPerMinute, packById, PACKS, type PackId } from '../../packages/shared/src/packs'
 import { IconButton, PaperCard, StickerButton } from './bits'
 import { gate, openParentArea, startFreshStory } from './hosted'
@@ -13,12 +13,12 @@ type Notice = { kind: 'info' | 'error'; text: string } | null
 /**
  * The sleepy-crayon paywall / rebuy screen. Every pack is a one-time minute purchase (no subscription).
  * Opened from the minutes chip, the parent area, or when the crayon runs out mid-story. Buying goes
- * through the grown-up gate; on the web the buy button hands off to the website shop. Hosted only.
+ * through the grown-up gate; on the web the buy button hands off to the website shop. In the app it is
+ * StoreKit only, with no link to the web shop (App Store rules). Hosted only.
  */
 export function Paywall() {
   const open = useApp((s) => s.paywallOpen)
   const hosted = useApp((s) => s.hosted)
-  const native = useApp((s) => s.native)
   const lastPack = useApp((s) => s.lastPack)
   const sleepy = useApp((s) => s.sleepy)
   const ended = useApp((s) => s.ended)
@@ -29,7 +29,6 @@ export function Paywall() {
   const [selected, setSelected] = useState<PackId>(lastPack ?? FEATURED?.id ?? 'pack_120')
   const [busyPack, setBusyPack] = useState<PackId | null>(null)
   const [restoreBusy, setRestoreBusy] = useState(false)
-  const [webBusy, setWebBusy] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
   const [success, setSuccess] = useState<{ minutes: number } | null>(null)
 
@@ -41,7 +40,6 @@ export function Paywall() {
     setSelected(appStore.get().lastPack ?? FEATURED?.id ?? 'pack_120')
     setBusyPack(null)
     setRestoreBusy(false)
-    setWebBusy(false)
     setNotice(null)
     setSuccess(null)
   }, [open])
@@ -109,21 +107,9 @@ export function Paywall() {
     })
   }
 
-  const buyOnWeb = (): void => {
-    void gate().then(async (ok) => {
-      if (!ok) return
-      setWebBusy(true)
-      try {
-        await openExternal(webShopUrl(selected))
-      } finally {
-        setWebBusy(false)
-      }
-    })
-  }
-
   return (
     <div className="paywall-overlay" data-testid="paywall">
-      <PaperCard className="paywall-card">
+      <PaperCard className="modal-card paywall-card">
         <IconButton label="Close" className="paywall-close" onClick={close} data-testid="paywall-close">
           <X size={22} strokeWidth={3} />
         </IconButton>
@@ -197,12 +183,6 @@ export function Paywall() {
               <button type="button" className="paywall-link" onClick={openRedeem}>
                 Redeem a gift code
               </button>
-              {native && config?.shopUrl && (
-                <button type="button" className="paywall-link" onClick={buyOnWeb} disabled={webBusy}>
-                  {webBusy ? 'Opening…' : 'Buy on the web'}
-                  <span className="paywall-link-note">a little cheaper, opens in Safari</span>
-                </button>
-              )}
             </div>
           </>
         )}

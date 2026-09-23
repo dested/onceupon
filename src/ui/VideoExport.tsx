@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download } from 'lucide-react'
 import { exportStoryVideo, ExportUnsupportedError, videoFileName } from '~/export/mp4'
-import { shareVideo } from '~/backend/share'
+import { NATIVE } from '~/backend/config'
+import { saveVideo, shareVideo } from '~/backend/share'
 import type { StoryRecord } from '~/story/storage'
 import { appStore } from '~/story/store'
 import { IconButton, PaperCard, StickerButton } from './bits'
@@ -9,7 +10,9 @@ import { IconButton, PaperCard, StickerButton } from './bits'
 type ExportState =
   | { k: 'idle' }
   | { k: 'running'; fraction: number; phase: 'frames' | 'audio' | 'mux' }
-  | { k: 'done'; mb: number; how: 'shared' | 'downloaded' }
+  | { k: 'done'; mb: number; how: 'downloaded' }
+  /** Native: the camera-roll result, with Share as the second step or the fallback. */
+  | { k: 'kept'; mb: number; how: 'saved' | 'denied' | 'unsaved'; sharing: boolean }
   | { k: 'error'; message: string }
 
 const PHASE_WORDS = {
@@ -19,9 +22,10 @@ const PHASE_WORDS = {
 } as const
 
 /**
- * "Download video": renders the saved story to an .mp4 in the browser, then hands it to the native
- * share sheet on iPad or the browser's downloads on the web (`shareVideo`). `icon` sits in the replay
- * toolbar; `studio` is the closing card's button; `player` is the share page's sticker.
+ * "Download video": renders the saved story to an .mp4 in the browser, then saves it to Photos on the
+ * iPad app (with a Share button for AirDrop/Messages, also the fallback when Photos is off) or hands
+ * it to the browser's downloads on the web. `icon` sits in the replay toolbar; `studio` is the closing
+ * card's button; `player` is the share page's sticker.
  */
 export function VideoExportButton({
   getRecord,
@@ -36,6 +40,8 @@ export function VideoExportButton({
 }) {
   const [state, setState] = useState<ExportState>({ k: 'idle' })
   const abortRef = useRef<AbortController | null>(null)
+  const videoRef = useRef<{ blob: Blob; filename: string } | null>(null)
+  const actionLabel = NATIVE ? 'Save video' : 'Download video'
 
   useEffect(() => () => abortRef.current?.abort(), [])
   useEffect(() => {
@@ -60,8 +66,23 @@ export function VideoExportButton({
         moderation: appStore.get().settings.moderation,
         onProgress: (p) => setState({ k: 'running', fraction: p.fraction, phase: p.phase }),
       })
-      const how = await shareVideo(res.blob, videoFileName(record.title))
-      setState({ k: 'done', mb: res.blob.size / 1e6, how })
+      const filename = videoFileName(record.title)
+      const mb = res.blob.size / 1e6
+      if (NATIVE) {
+        videoRef.current = { blob: res.blob, filename }
+        let how: 'saved' | 'denied' | 'unsaved'
+        try {
+          const saved = await saveVideo(res.blob, filename)
+          how = saved === 'denied' ? 'denied' : 'saved'
+        } catch (e) {
+          console.error('save to Photos failed', e)
+          how = 'unsaved'
+        }
+        setState({ k: 'kept', mb, how, sharing: false })
+      } else {
+        await saveVideo(res.blob, filename)
+        setState({ k: 'done', mb, how: 'downloaded' })
+      }
       onExported?.()
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') setState({ k: 'idle' })
@@ -75,12 +96,30 @@ export function VideoExportButton({
     }
   }
 
+  const share = async (): Promise<void> => {
+    const video = videoRef.current
+    if (!video || state.k !== 'kept' || state.sharing) return
+    setState({ ...state, sharing: true })
+    try {
+      await shareVideo(video.blob, video.filename)
+    } catch (e) {
+      console.error('share video failed', e)
+    } finally {
+      setState((s) => (s.k === 'kept' ? { ...s, sharing: false } : s))
+    }
+  }
+
+  const closeCard = (): void => {
+    videoRef.current = null
+    setState({ k: 'idle' })
+  }
+
   const running = state.k === 'running'
   return (
     <>
       {variant === 'icon' ? (
         <IconButton
-          label="Download video"
+          label={actionLabel}
           onClick={() => void start()}
           disabled={running}
           data-testid="download-video">
@@ -102,12 +141,12 @@ export function VideoExportButton({
           disabled={running}
           data-testid="download-video">
           <Download size={21} />
-          Download video
+          {actionLabel}
         </button>
       )}
       {state.k !== 'idle' && (
         <div
-          className="pointer-events-auto fixed bottom-24 left-1/2 z-50 w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2"
+          className="pointer-events-auto fixed bottom-[calc(6rem+var(--sab))] left-1/2 z-50 w-[min(26rem,calc(100vw-2rem-var(--sal)-var(--sar)))] -translate-x-1/2"
           data-testid="export-card"
           role="status">
           <PaperCard className="font-hand text-ink flex flex-col gap-3 !p-5">
@@ -143,13 +182,41 @@ export function VideoExportButton({
             )}
             {state.k === 'done' && (
               <div className="flex items-center justify-between gap-3">
-                <span className="font-scrawl text-xl leading-tight">
-                  {state.how === 'shared'
-                    ? 'Your video is ready'
-                    : 'Your video is in your downloads'}
-                </span>
+                <span className="font-scrawl text-xl leading-tight">Your video is in your downloads</span>
                 <span className="text-ink-soft text-lg">{state.mb.toFixed(1)} MB</span>
               </div>
+            )}
+            {state.k === 'kept' && (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-scrawl text-xl leading-tight" data-testid="export-kept">
+                    {state.how === 'saved' ? 'Saved to your Photos' : 'Not saved to Photos yet'}
+                  </span>
+                  <span className="text-ink-soft text-lg">{state.mb.toFixed(1)} MB</span>
+                </div>
+                {state.how === 'denied' && (
+                  <p className="text-ink-soft text-lg leading-snug">
+                    Grown-up: turn on Photos for Squiggletale in Settings, or share the video instead
+                  </p>
+                )}
+                {state.how === 'unsaved' && (
+                  <p className="text-ink-soft text-lg leading-snug">Photos said no this time. You can still share it</p>
+                )}
+                <div className="flex items-center justify-end gap-3">
+                  <StickerButton
+                    tone={state.how === 'saved' ? 'paper' : 'yellow'}
+                    tilt={-2}
+                    className="!text-lg"
+                    disabled={state.sharing}
+                    onClick={() => void share()}
+                    data-testid="export-share">
+                    {state.sharing ? 'One moment…' : 'Share'}
+                  </StickerButton>
+                  <StickerButton tone="paper" tilt={2} className="!text-lg" onClick={closeCard}>
+                    ok
+                  </StickerButton>
+                </div>
+              </>
             )}
             {state.k === 'error' && (
               <div className="flex items-center justify-between gap-3">

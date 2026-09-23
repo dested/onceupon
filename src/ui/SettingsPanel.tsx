@@ -312,8 +312,8 @@ export function SettingsPanel() {
   )
 
   return (
-    <div className="bg-ink/30 absolute inset-0 z-40 grid place-items-center" onClick={close}>
-      <PaperCard className="relative max-h-[92dvh] w-[36rem] max-w-[calc(100vw-32px)] overflow-y-auto">
+    <div className="modal-overlay bg-ink/30 z-40" onClick={close}>
+      <PaperCard className="modal-card w-[36rem]">
         <div onClick={(e) => e.stopPropagation()}>
           <button onClick={close} aria-label="Close" className="text-ink absolute top-4 right-4">
             <X size={26} strokeWidth={3} />

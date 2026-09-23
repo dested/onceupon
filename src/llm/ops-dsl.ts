@@ -248,6 +248,8 @@ function parseDraw(rest: Tok[], line: string): unknown {
         const pts: number[] = []
         for (let k = i + 1; k < rest.length; k++) {
           const t = rest[k]
+          // A poly is always closed; models sometimes end one with a path-style Z. Accept it.
+          if (t && k === rest.length - 1 && /^z$/i.test(t.text)) break
           if (!t || !isNum(t)) throw new Error('poly takes only numbers')
           pts.push(toNum(t))
         }

@@ -1,6 +1,5 @@
 import * as Application from 'expo-application'
 import { Asset } from 'expo-asset'
-import * as Network from 'expo-network'
 import { BRAND, STUDIO_PATH } from '../../../packages/shared/src/brand'
 import { SHELL_QUERY } from '../../../packages/shared/src/bridge'
 import studioHtml from '../assets/studio.html'
@@ -26,15 +25,4 @@ export async function localSource(): Promise<StudioSource> {
   const readAccess = filePath.slice(0, filePath.lastIndexOf('/') + 1)
   // The shell query must be present offline too, so the studio's `hasBridge()` detects the shell.
   return { kind: 'local', uri: `${filePath}?${SHELL_QUERY}`, readAccess }
-}
-
-/** Remote when the internet is reachable, otherwise the bundled offline copy. */
-export async function pickStudioSource(): Promise<StudioSource> {
-  try {
-    const state = await Network.getNetworkStateAsync()
-    if (state.isInternetReachable !== false) return remoteSource()
-  } catch {
-    // Network probe failed; fall back to the bundled copy.
-  }
-  return localSource()
 }

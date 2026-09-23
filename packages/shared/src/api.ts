@@ -135,6 +135,14 @@ export interface AppApi {
     input: { sessionId: string; listeningMs: number }
     output: { remainingSec: number; exhausted: boolean }
   }
+  /**
+   * One typed message. The server charges it as talking time from the text itself
+   * (`typedChargeSec` in ./typed: max(3, ceil(words / 2.5)) s); the studio reports no duration.
+   */
+  'session.typed': {
+    input: { sessionId: string; text: string }
+    output: { remainingSec: number; exhausted: boolean; chargedSec: number }
+  }
   'session.stop': {
     input: { sessionId: string; listeningMs: number; ended: EndReason | null }
     output: { remainingSec: number }

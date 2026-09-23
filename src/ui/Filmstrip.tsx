@@ -6,7 +6,7 @@ export function Filmstrip({ embedded = false }: { embedded?: boolean }) {
   if (pages.length === 0) return null
   return (
     <div
-      className={embedded ? 'embedded-filmstrip' : 'absolute top-4 left-4 flex gap-3'}
+      className={embedded ? 'embedded-filmstrip' : 'absolute top-[calc(0.5rem+var(--sat))] left-[calc(0.5rem+var(--sal))] flex max-w-[calc(100%-1rem-var(--sal)-var(--sar)-16rem)] gap-3 overflow-x-auto p-2'}
       data-testid="filmstrip">
       {pages.map((p, i) => (
         <div

@@ -46,9 +46,9 @@ export function Bookshelf() {
   }
 
   return (
-    <div className="relative h-full w-full overflow-x-hidden overflow-y-auto p-6" data-testid="shelf">
+    <div className="screen-safe relative h-full w-full overflow-x-hidden overflow-y-auto" data-testid="shelf">
       <Offline />
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-6 flex flex-wrap items-center gap-4">
         <IconButton label="Back to drawing" onClick={back}>
           <ArrowLeft size={24} strokeWidth={3} />
         </IconButton>

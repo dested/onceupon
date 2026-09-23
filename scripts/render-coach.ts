@@ -1,12 +1,14 @@
 /**
- * Renders the four tutorial coach lines to mp3 with OpenAI TTS. Run once:
- *   bun scripts/render-coach.ts
- * Writes src/tutorial/coach/1.mp3 … 4.mp3. Needs VITE_OPENAI_API_KEY in .env.local.
+ * Renders the spoken lines to mp3 with OpenAI TTS. Run once:
+ *   bun scripts/render-coach.ts          the four coach lines -> src/tutorial/coach/1..4.mp3
+ *   bun scripts/render-coach.ts intro    the intro slides (src/tutorial/intro-copy.ts) -> src/tutorial/intro/1..N.mp3
+ * Needs VITE_OPENAI_API_KEY in .env.local.
  */
 import { readFileSync, mkdirSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { INTRO_COPY } from '../src/tutorial/intro-copy'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -32,10 +34,12 @@ const INSTRUCTIONS =
 async function main(): Promise<void> {
   const key = envValue('VITE_OPENAI_API_KEY')
   if (!key) throw new Error('VITE_OPENAI_API_KEY missing in .env.local')
-  const outDir = join(ROOT, 'src', 'tutorial', 'coach')
+  const intro = process.argv[2] === 'intro'
+  const lines = intro ? INTRO_COPY.map((c) => c.voice) : LINES
+  const outDir = join(ROOT, 'src', 'tutorial', intro ? 'intro' : 'coach')
   mkdirSync(outDir, { recursive: true })
-  for (let i = 0; i < LINES.length; i++) {
-    const input = LINES[i]
+  for (let i = 0; i < lines.length; i++) {
+    const input = lines[i]
     const res = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },

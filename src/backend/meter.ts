@@ -9,7 +9,8 @@ import type {
 
 /**
  * The story meter: it opens a metered session on the server, reports mic-open time in beats while the
- * child talks, and closes the session at the end. Beats never block the child on a flaky network (the
+ * child talks, charges each typed message (priced by the server from its words), and closes the
+ * session at the end. Beats never block the child on a flaky network (the
  * unsent time is kept and folded into the next beat or the stop), so the server settles on stop().
  */
 
@@ -33,6 +34,8 @@ export class StoryMeter {
   private unsentMs = 0
   private stopped = false
   private exhaustedFired = false
+  /** The ears vendor the session was opened with, reused when a stale session is reopened. */
+  private vendor: EarsVendor = 'browser'
 
   constructor(
     private storyId: string,
@@ -52,6 +55,7 @@ export class StoryMeter {
   /** Open the session (idempotent: the in-flight promise is cached). Rejects with the server's error. */
   ensureStarted(ears: EarsVendor): Promise<SessionStart> {
     if (this.startPromise) return this.startPromise
+    this.vendor = ears
     const promise = (async (): Promise<SessionStart> => {
       const start = await api('session.start', { storyId: this.storyId, ears })
       this._sessionId = start.sessionId
@@ -100,17 +104,65 @@ export class StoryMeter {
     this.unsentMs = 0
     if (!sessionId || ms <= 0) return
     try {
-      const res = await api('session.beat', { sessionId, listeningMs: ms })
-      this._remainingSec = res.remainingSec
-      this.handlers.onRemaining(res.remainingSec)
-      if (res.exhausted && !this.exhaustedFired) {
-        this.exhaustedFired = true
-        this.handlers.onExhausted()
-      }
+      await this.withSession(async (id) => {
+        const res = await api('session.beat', { sessionId: id, listeningMs: ms })
+        this.report(res.remainingSec, res.exhausted)
+      })
     } catch (e) {
       // Keep counting locally so the time is not lost; the server settles on stop.
       this.unsentMs += ms
-      if (e instanceof ApiError) this.handlers.onError(e.code, e.message)
+      if (e instanceof ApiError && e.code === 'exhausted') this.report(0, true)
+      else if (e instanceof ApiError) this.handlers.onError(e.code, e.message)
+    }
+  }
+
+  /**
+   * Charge one typed message. The server prices it from the text (talking time, see
+   * packages/shared/src/typed.ts); we never report a duration. Exhausted -> the same sleepy end as a beat.
+   */
+  async typed(text: string): Promise<void> {
+    if (this.stopped) return
+    try {
+      await this.withSession(async (sessionId) => {
+        const res = await api('session.typed', { sessionId, text })
+        this.report(res.remainingSec, res.exhausted)
+      })
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'exhausted') this.report(0, true)
+      else if (e instanceof ApiError) this.handlers.onError(e.code, e.message)
+    }
+  }
+
+  private report(remainingSec: number, exhausted: boolean): void {
+    this._remainingSec = remainingSec
+    this.handlers.onRemaining(remainingSec)
+    if (exhausted && !this.exhaustedFired) {
+      this.exhaustedFired = true
+      this.handlers.onExhausted()
+    }
+  }
+
+  /**
+   * Run a metered call against the open session. The server closes a session whose heartbeat stopped
+   * for ~2 minutes (mic closed, or a slow typist); a `not_found` then opens a fresh one for the same
+   * story and retries once, so a long pause never makes the rest of the story free or broken.
+   */
+  private async withSession(call: (sessionId: string) => Promise<void>): Promise<void> {
+    const vendor = this.vendor
+    await this.ensureStarted(vendor)
+    const sessionId = this._sessionId
+    if (!sessionId) return
+    try {
+      await call(sessionId)
+    } catch (e) {
+      if (!(e instanceof ApiError) || e.code !== 'not_found' || this.stopped) throw e
+      if (this._sessionId === sessionId) {
+        this._sessionId = null
+        this.startPromise = null
+      }
+      await this.ensureStarted(vendor)
+      const fresh = this._sessionId
+      if (fresh) await call(fresh)
     }
   }
 

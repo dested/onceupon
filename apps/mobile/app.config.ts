@@ -15,6 +15,11 @@ const BRAND = {
 const EAS_PROJECT_ID = process.env.EAS_PROJECT_ID ?? '2606405b-8283-4717-a35b-25a41ca45a69'
 
 const PAPER = '#fbf6ea'
+
+// Info.plist usage strings (parents read these in the iOS permission prompts).
+const MIC_USAGE = `${BRAND.name} listens while your child tells a story so the crayon can draw it. Audio is transcribed live and never stored.`
+const PHOTOS_ADD_USAGE = `${BRAND.name} saves your story videos to your Photos.`
+const SPEECH_USAGE = `${BRAND.name} turns your child's spoken story into words so the crayon can draw it.`
 // The splash image's paper tone (sampled from the generated icon) so the letterbox matches the art.
 const SPLASH_PAPER = '#f9f0d0'
 
@@ -26,6 +31,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   version: '1.0.0',
   orientation: 'default',
   userInterfaceStyle: 'light',
+  // Root view color (expo-system-ui) so rotation and the keyboard never flash white.
+  backgroundColor: PAPER,
   icon: './assets/icon.png',
   // The splash is configured through the expo-splash-screen plugin below (SDK 54+ removed the
   // top-level `splash` key from the config type).
@@ -36,8 +43,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     requireFullScreen: true,
     buildNumber: '1',
     infoPlist: {
-      NSMicrophoneUsageDescription: `${BRAND.name} listens while your child tells a story so the crayon can draw it. Audio is transcribed live and never stored.`,
-      WKAppBoundDomains: [BRAND.domain],
+      NSMicrophoneUsageDescription: MIC_USAGE,
+      // No WKAppBoundDomains: with that key present WebKit disables user scripts, script message
+      // handlers and evaluateJavaScript on any navigation it does not treat as app-bound (file:// never
+      // is), which silently removed window.ReactNativeWebView and broke the whole bridge.
       ITSAppUsesNonExemptEncryption: false,
       UISupportedInterfaceOrientations: [
         'UIInterfaceOrientationLandscapeLeft',
@@ -70,6 +79,26 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-secure-store',
     ['expo-splash-screen', { image: './assets/splash.png', backgroundColor: SPLASH_PAPER, resizeMode: 'contain' }],
     'expo-dev-client',
+    // Add-only Photos access for saving exported videos; never the full-library read permission.
+    [
+      'expo-media-library',
+      { photosPermission: false, savePhotosPermission: PHOTOS_ADD_USAGE, granularPermissions: ['video'] },
+    ],
+    // Audio session control only; the WebView records, so no background audio modes.
+    [
+      'expo-audio',
+      { microphonePermission: MIC_USAGE, enableBackgroundPlayback: false, enableBackgroundRecording: false },
+    ],
+    'expo-web-browser',
+    'expo-localization',
+    'expo-screen-orientation',
+    'expo-system-ui',
+    // Installed for later; the app never prompts on its own (kids app, grown-up action only).
+    'expo-notifications',
+    [
+      'expo-speech-recognition',
+      { speechRecognitionPermission: SPEECH_USAGE, microphonePermission: MIC_USAGE },
+    ],
   ],
   extra: { eas: { projectId: EAS_PROJECT_ID } },
 })

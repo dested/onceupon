@@ -1,5 +1,5 @@
 import { bridgeCall, BridgeError } from './bridge'
-import { NATIVE } from './config'
+import { APP_SHELL, NATIVE } from './config'
 import { api, ApiError } from './api'
 import { refreshDevice } from './device'
 import { appStore } from '~/story/store'
@@ -10,7 +10,7 @@ import type { AppApi } from '../../packages/shared/src/api'
 /**
  * Minute packs. Native devices buy through StoreKit and the server verifies the signed transaction;
  * the web app sends the parent to the website shop with the device code so the balance lands here on
- * the next refresh. Prices come from the store when native, else the built-in USD list.
+ * the next refresh. The app never links to the web shop (App Store rules). Prices come from the store when native, else the built-in USD list.
  */
 
 export interface PriceInfo {
@@ -42,6 +42,9 @@ export type BuyResult =
 
 export async function buyPack(id: PackId): Promise<BuyResult> {
   if (!NATIVE) {
+    // Inside the app (even with a broken bridge) purchases are StoreKit only: never navigate the
+    // WebView to the web shop.
+    if (APP_SHELL) return { ok: false, reason: 'failed' }
     window.location.assign(webShopUrl(id))
     return { ok: false, reason: 'web' }
   }

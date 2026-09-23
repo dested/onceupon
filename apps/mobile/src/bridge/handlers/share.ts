@@ -2,6 +2,7 @@ import { Directory, File, Paths } from 'expo-file-system'
 import * as Haptics from 'expo-haptics'
 import * as Linking from 'expo-linking'
 import * as Sharing from 'expo-sharing'
+import * as WebBrowser from 'expo-web-browser'
 import { Share } from 'react-native'
 import { z } from 'zod'
 import { BridgeHostError, parseInput, type Handler } from '../host'
@@ -39,10 +40,25 @@ export const shareFile: Handler<'share.file'> = async (input) => {
   return { completed: true }
 }
 
+/**
+ * http(s) pages (privacy, terms, support) open in an in-app Safari sheet so the child never leaves
+ * the app; mailto:, itms-apps:, tel: and App Store links go to the system.
+ */
+export async function openExternal(url: string): Promise<void> {
+  if (/^https?:\/\//i.test(url) && !/^https?:\/\/(apps|itunes)\.apple\.com\//i.test(url)) {
+    await WebBrowser.openBrowserAsync(url, {
+      presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+      dismissButtonStyle: 'done',
+    })
+    return
+  }
+  await Linking.openURL(url)
+}
+
 const openUrlSchema = z.object({ url: z.string() })
 export const openUrl: Handler<'open.url'> = async (input) => {
   const { url } = parseInput(openUrlSchema, input)
-  await Linking.openURL(url)
+  await openExternal(url)
   return {}
 }
 

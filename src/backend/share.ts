@@ -51,6 +51,20 @@ export async function shareLink(url: string, title: string): Promise<'shared' | 
   return 'copied'
 }
 
+/**
+ * Keep the exported video: the camera roll on the native shell (add-only Photos access; 'denied'
+ * when the grown-up has said no to Photos), the browser's downloads on the web.
+ */
+export async function saveVideo(blob: Blob, filename: string): Promise<'saved' | 'denied' | 'downloaded'> {
+  if (NATIVE) {
+    const base64 = await blobToBase64(blob)
+    const { saved } = await bridgeCall('media.saveVideo', { base64, filename })
+    return saved ? 'saved' : 'denied'
+  }
+  downloadBlob(blob, filename)
+  return 'downloaded'
+}
+
 /** Share the exported video natively, or hand it to the browser's downloads on the web. */
 export async function shareVideo(blob: Blob, filename: string): Promise<'shared' | 'downloaded'> {
   if (NATIVE) {
@@ -58,6 +72,11 @@ export async function shareVideo(blob: Blob, filename: string): Promise<'shared'
     await bridgeCall('share.file', { base64, mime: blob.type || 'video/mp4', filename })
     return 'shared'
   }
+  downloadBlob(blob, filename)
+  return 'downloaded'
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -66,5 +85,4 @@ export async function shareVideo(blob: Blob, filename: string): Promise<'shared'
   a.click()
   a.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
-  return 'downloaded'
 }

@@ -5,6 +5,7 @@ import * as ledger from './ledger'
 import { getFlags } from './flags'
 import { mintEarsWithFallback } from './ears'
 import type { AppApi, EarsToken, EndReason, SessionStart } from '../../../packages/shared/src/api'
+import { typedChargeSec } from '../../../packages/shared/src/typed'
 
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n))
 
@@ -94,6 +95,37 @@ export async function beat(
     },
   })
   return { remainingSec: balanceSec, exhausted }
+}
+
+/**
+ * Meter one typed message as talking time, computed here from the text (never from a client-reported
+ * duration): `typedChargeSec` = max(3, ceil(words / 2.5)). A session that never opens the mic and types
+ * forever pays for every message and ends sleepy like a spoken one. listenedMs stays mic time only.
+ */
+export async function typed(
+  device: Device,
+  sessionId: string,
+  text: string
+): Promise<{ remainingSec: number; exhausted: boolean; chargedSec: number }> {
+  await ownedOpenSession(device, sessionId)
+  const { charged, balanceSec } = await ledger.debit(
+    device.id,
+    'debit',
+    typedChargeSec(text),
+    sessionId,
+    'typed'
+  )
+  const exhausted = balanceSec <= 0
+  await prisma.storySession.update({
+    where: { id: sessionId },
+    data: {
+      chargedSec: { increment: charged },
+      typedSec: { increment: charged },
+      lastBeatAt: new Date(),
+      ...(exhausted ? { status: 'exhausted' } : {}),
+    },
+  })
+  return { remainingSec: balanceSec, exhausted, chargedSec: charged }
 }
 
 /** Close a session (idempotent). Charges the final span, marks the end, reports the balance. */

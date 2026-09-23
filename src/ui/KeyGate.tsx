@@ -43,8 +43,8 @@ export function KeyGate() {
   const canStart = anthropic.trim().length > 0
 
   return (
-    <div className="absolute inset-0 z-20 grid place-items-center bg-ink/40">
-      <PaperCard className="relative w-[34rem] max-w-[92vw]">
+    <div className="modal-overlay z-20 bg-ink/40">
+      <PaperCard className="modal-card w-[34rem]">
         <h2 className="mb-2 font-scrawl text-3xl">Bring your own crayons</h2>
         <p className="mb-5 font-hand text-lg text-ink-soft">
           Squiggletale draws with your own AI keys, straight from this browser. They stay on this device, nobody else
