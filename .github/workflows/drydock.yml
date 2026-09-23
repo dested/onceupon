@@ -49,6 +49,17 @@ jobs:
             taskdef.json > taskdef-new.json
           aws ecs register-task-definition --cli-input-json file://taskdef-new.json
 
+      - name: Run pre-deploy command (migrations)
+        run: |
+          TASKDEF=$(aws ecs describe-task-definition --task-definition drydock-onceupon --query taskDefinition.taskDefinitionArn --output text)
+          TASK=$(aws ecs run-task --cluster drydock --task-definition "$TASKDEF" \
+            --overrides '{"containerOverrides":[{"name":"app","command":["sh","-c","bunx prisma db push --accept-data-loss"]}]}' \
+            --query 'tasks[0].taskArn' --output text)
+          echo "migration task: $TASK"
+          aws ecs wait tasks-stopped --cluster drydock --tasks "$TASK"
+          EXIT=$(aws ecs describe-tasks --cluster drydock --tasks "$TASK" --query 'tasks[0].containers[0].exitCode' --output text)
+          if [ "$EXIT" != "0" ]; then echo "pre-deploy failed (exit $EXIT)"; exit 1; fi
+
       - name: Deploy
         run: |
           aws ecs update-service --cluster drydock --service drydock-onceupon --task-definition drydock-onceupon --desired-count 1 >/dev/null
