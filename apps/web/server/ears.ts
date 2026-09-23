@@ -18,6 +18,22 @@ export function pickEarsVendor(flags: Flags): 'deepgram' | 'openai' | null {
   return null
 }
 
+/**
+ * The flagged vendor first, then the other one: a key without the grant scope (Deepgram 403) must
+ * not leave a session with no ears when the other vendor can carry it.
+ */
+export async function mintEarsWithFallback(flags: Flags, ttlSec: number): Promise<EarsToken | null> {
+  const first = pickEarsVendor(flags)
+  if (!first) return null
+  const token = await mintEarsToken(first, ttlSec)
+  if (token) return token
+  const other = first === 'deepgram' ? 'openai' : 'deepgram'
+  const has = other === 'deepgram' ? Boolean(env.DEEPGRAM_API_KEY) : Boolean(env.OPENAI_API_KEY)
+  if (!has) return null
+  log.warn(`ears: ${first} minting failed, falling back to ${other}`)
+  return mintEarsToken(other, ttlSec)
+}
+
 /** Mint a short-lived streaming-STT credential; null on any upstream failure (log, don't throw). */
 export async function mintEarsToken(
   vendor: 'deepgram' | 'openai',

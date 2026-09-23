@@ -3,7 +3,7 @@ import { prisma } from './prisma'
 import { ApiError } from './app-api-types'
 import * as ledger from './ledger'
 import { getFlags } from './flags'
-import { mintEarsToken, pickEarsVendor } from './ears'
+import { mintEarsWithFallback } from './ears'
 import type { AppApi, EarsToken, EndReason, SessionStart } from '../../../packages/shared/src/api'
 
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n))
@@ -46,8 +46,7 @@ export async function startSession(
 
   let ears: EarsToken | null = null
   if (fresh.balanceSec > 0 && input.ears !== 'browser') {
-    const vendor = pickEarsVendor(flags)
-    if (vendor) ears = await mintEarsToken(vendor, earsTtl(fresh.balanceSec))
+    ears = await mintEarsWithFallback(flags, earsTtl(fresh.balanceSec))
   }
 
   if (!fresh.freeStoryUsed) {
@@ -137,8 +136,7 @@ export async function earsTokenFor(device: Device, sessionId: string): Promise<E
   await ownedOpenSession(device, sessionId)
   const d = await prisma.device.findUniqueOrThrow({ where: { id: device.id } })
   if (d.balanceSec <= 0) throw new ApiError(402, 'exhausted', 'out of minutes')
-  const vendor = pickEarsVendor(flags)
-  const token = vendor ? await mintEarsToken(vendor, earsTtl(d.balanceSec)) : null
+  const token = await mintEarsWithFallback(flags, earsTtl(d.balanceSec))
   if (!token) throw new ApiError(503, 'upstream', 'could not get an ears token')
   return token
 }
