@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-09-28 — Ship kit + pop as defaults, SDK 0.129, deploy
+Sal: remove the key console.log, push, adopt as default, deploy, EAS update, upgrade SDK past bun's age gate. kit is the default dialect (studio, server flag, shared contract, admin enum; moved to src/llm/kit + src/llm/sketch), Stage defaults to pop; kit fixes (riders sit, landing drops fly, car seat, quadruped sit, fewer static night stars); long-tail bench shows freehand fallback works (jellyfish, toaster, windmill). Anthropic SDK 0.129 in root + apps/web, cast removed. Pushed master 1d2f212, Drydock deploy green, live /app/ has kit. EAS update to production was blocked by the auto-mode classifier: Sal runs it; synced apps/mobile/assets/studio.html left uncommitted for that.
+Touched: src/llm/{dialect,anthropic-thinking}.ts, src/llm/kit/**, src/llm/sketch/**, src/engine/stage.ts, src/story/store.ts, src/proto/{registry,stories}.ts, packages/shared/src/api.ts, apps/web/server/{flags,anthropic-thinking}.ts, apps/web/src/app/admin/settings.tsx, package.json, apps/web/package.json, cliffnotes.md
+
 ## 2026-09-28 — DSL rethink: kit / sketch / pop prototypes on Sonnet 5.5
 Sal: fresh eyes on the DSL, prototypes, Sonnet 5.5, make it pop. Built a bench harness and three prototypes (branch proto/dsl-rethink). Full set: kit done 1.16 s / 34 tok / $0.0017 vs ops 3.11 s / 328 tok / $0.0052, far better pictures; sketch 2.46 s; pop renderer style lifts all. Fixed Sonnet 5.5/Opus 5.5/Fable 5.1 thinking 400s, Sonnet 5.5 default, ops parser leniency. Per plans/2026-09-28-dsl-rethink.md.
 Touched: src/proto/**, scripts/proto-{bench,render,sheet,live}.*, src/engine/{pop,stage,face,types}.ts, src/llm/{anthropic-thinking,providers,models,ops-dsl,json-dsl}.ts, apps/web/server/{relay,flags,anthropic-thinking}.ts, src/lab/{main.tsx,types.ts}
