@@ -15,6 +15,10 @@ import { BG_ID, type SceneEvent } from './scene'
 import { darken } from './colors'
 import type { StageAudio } from './audio'
 import { realClock, type Clock } from './clock'
+import { faceExtras, faceInfo, isOutlineOf, luminance, popShapeToStrokes, type FaceInfo } from './pop'
+
+/** How the page looks: classic crayon, or pop (engine/pop.ts: opaque waxy fills, light, faces, grounding). */
+export type StageStyle = 'classic' | 'pop'
 
 interface Tween {
   from: number
@@ -56,6 +60,10 @@ interface ObjView {
   z: number
   /** The finale title breathes with nothing (a fixed closing card), unlike living characters. */
   noLife: boolean
+  /** Pop style: every shape drawn so far (face extras and blinks read it). */
+  popShapes: Shape[]
+  /** Pop style: cached eyes for blinking (undefined = recompute). */
+  face: FaceInfo | null | undefined
 }
 
 interface Bubble {
@@ -152,6 +160,9 @@ export class Stage {
   /** Draw the crayon cursor (the drawing lab turns it off for judged snapshots). */
   showCursor = true
   private wasBusy = false
+  readonly style: StageStyle
+  /** Pop: the sky is dark, so the bg gets twinkling stars. */
+  private night = false
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -167,8 +178,11 @@ export class Stage {
       software?: boolean
       /** Where the idle crayon rests (world units); video export moves it off the corner logo. */
       cursorRest?: Vec
+      /** Default classic. */
+      style?: StageStyle
     }
   ) {
+    this.style = opts.style ?? 'classic'
     this.rest = opts.cursorRest ?? REST
     this.cursor = { ...this.rest }
     this.canvas = canvas
@@ -201,7 +215,7 @@ export class Stage {
     if (this.canvas.width === w && this.canvas.height === h && this.paper) return
     this.canvas.width = w
     this.canvas.height = h
-    this.paper = makePaper(w, h, this.ctxOpts)
+    this.paper = makePaper(w, h, this.ctxOpts, this.style === 'pop')
     this.S = Math.min(w / WORLD_W, h / WORLD_H)
     this.offX = (w - WORLD_W * this.S) / 2
     this.offY = (h - WORLD_H * this.S) / 2
@@ -260,6 +274,8 @@ export class Stage {
       alpha: 1,
       z: this.zCounter++,
       noLife: false,
+      popShapes: [],
+      face: undefined,
     }
     this.views.set(id, v)
     return v
@@ -297,6 +313,8 @@ export class Stage {
         v.lctx = null
         v.layerBounds = null
         v.contentBounds = null
+        v.popShapes = ev.shapes.slice(0, keep)
+        v.face = undefined
         for (const s of ev.shapes.slice(0, keep))
           v.contentBounds = unionBounds(v.contentBounds, shapeBounds(s))
         this.rebuildLayer(v)
@@ -374,6 +392,7 @@ export class Stage {
         }
         const v = this.newView(BG_ID, 0, 0)
         v.z = -1e9
+        this.night = luminance(ev.sky) < 0.3
         const shapes: Shape[] = [
           { k: 'rect', x: -2, y: -2, w: WORLD_W + 4, h: GROUND_Y + 2, color: ev.sky, fill: true },
         ]
@@ -416,6 +435,10 @@ export class Stage {
   ): void {
     for (const s of shapes) v.contentBounds = unionBounds(v.contentBounds, shapeBounds(s))
     if (v.contentBounds) this.ensureLayer(v, v.contentBounds)
+    if (this.style === 'pop') {
+      this.addPopShapes(v, shapes, opts)
+      return
+    }
     for (const s of shapes) {
       const seed = hashString(`${this.seed}:${v.id}:${v.strokes.length}`)
       const rng = mulberry32(seed)
@@ -432,6 +455,39 @@ export class Stage {
       }
       v.shapeStrokes.push(strokes.length)
     }
+  }
+
+  /** Pop strokes for a batch of shapes: looks one ahead (a fill's ink outline) and back (face extras). */
+  private addPopShapes(
+    v: ObjView,
+    shapes: Shape[],
+    opts: { speedMul?: number; wobbleAmp?: number; background?: boolean }
+  ): void {
+    shapes.forEach((s, i) => {
+      const seed = hashString(`${this.seed}:${v.id}:${v.strokes.length}`)
+      const rng = mulberry32(seed)
+      const prev = v.popShapes[v.popShapes.length - 1]
+      const speedMul = opts.speedMul ?? 1
+      const strokes = popShapeToStrokes(s, rng, {
+        ax: v.x,
+        ay: v.y,
+        background: opts.background ?? false,
+        next: shapes[i + 1],
+        pairedFill: prev && isOutlineOf(s, prev) ? prev.color : null,
+        speedMul,
+        wobbleAmp: opts.wobbleAmp ?? 0.35,
+      })
+      if (s.role) strokes.push(...faceExtras(s, v.popShapes, rng, speedMul))
+      v.popShapes.push(s)
+      v.face = undefined
+      for (const st of strokes) {
+        const idx = v.strokes.length
+        v.strokes.push(st)
+        v.seeds.push(seed + idx)
+        this.queue.push({ id: v.id, stroke: idx })
+      }
+      v.shapeStrokes.push(strokes.length)
+    })
   }
 
   private ensureLayer(v: ObjView, bounds: Bounds): void {
@@ -654,8 +710,14 @@ export class Stage {
     }
     const x = tweenValue(v.tx, v.x, now) + dx
     const y = tweenValue(v.ty, v.y, now) + dy
-    const sc = tweenValue(v.ts, v.scale, now) * breath
     if (v.tx && now - v.tx.t0 > v.tx.dur * 1000) v.moving = false
+    if (this.style === 'pop') {
+      // Squash and stretch from the feet: taller on the in-breath, a touch wider on the out-breath.
+      const base = tweenValue(v.ts, v.scale, now)
+      const st = Math.sin(bt * 1.3) * 0.011 * (v.z >= 0 ? life : 0)
+      return { x, y, sx: base * (1 - st * 0.6) * (v.flipped ? -1 : 1), sy: base * (1 + st), rot }
+    }
+    const sc = tweenValue(v.ts, v.scale, now) * breath
     return { x, y, sx: sc * (v.flipped ? -1 : 1), sy: sc, rot }
   }
 
@@ -776,13 +838,16 @@ export class Stage {
         v.alpha = 1 - Math.max(0, (t - 0.4) / 0.6)
       }
       const t = this.objectTransform(v, now)
+      if (this.style === 'pop') this.drawContactShadow(v, t)
       ctx.save()
       ctx.globalAlpha = v.alpha
       ctx.translate(this.offX + t.x * this.S, this.offY + t.y * this.S)
       ctx.rotate(t.rot)
       ctx.scale(t.sx, t.sy)
       ctx.drawImage(v.layer, v.xform.ox * this.S, v.xform.oy * this.S)
+      if (this.style === 'pop') this.drawBlink(v, now)
       ctx.restore()
+      if (this.style === 'pop' && v.id === BG_ID && this.night) this.drawStars(v, now)
     }
 
     const wx = this.worldXform()
@@ -804,6 +869,93 @@ export class Stage {
     }
 
     this.drawCursor(head, dt, now)
+  }
+
+  /** Pop: a soft shadow under anything standing on the ground, fading in as it is drawn. */
+  private drawContactShadow(v: ObjView, t: { x: number; y: number; sx: number; sy: number }): void {
+    const b = v.contentBounds
+    if (!b || v.id === BG_ID || v.noLife || v.strokes.length === 0) return
+    const x1 = t.x + b.minX * t.sx
+    const x2 = t.x + b.maxX * t.sx
+    const bottom = t.y + b.maxY * Math.abs(t.sy)
+    const width = Math.abs(x2 - x1)
+    // Standing on the ground line, or on a ground band drawn a little lower.
+    if (width > WORLD_W * 0.6 || width < 2 || bottom < GROUND_Y - 2.5 || bottom > GROUND_Y + 7) return
+    const shown = Math.min(1, v.head / v.strokes.length) * v.alpha
+    if (shown <= 0) return
+    const ctx = this.ctx
+    const cx = this.offX + ((x1 + x2) / 2) * this.S
+    const cy = this.offY + (bottom - 0.3) * this.S
+    const rx = width * 0.46 * this.S
+    const ry = Math.max(0.9, Math.min(2.6, width * 0.06)) * this.S
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.scale(1, ry / rx)
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx)
+    g.addColorStop(0, `rgba(70,45,25,${(0.24 * shown).toFixed(3)})`)
+    g.addColorStop(0.65, `rgba(70,45,25,${(0.12 * shown).toFixed(3)})`)
+    g.addColorStop(1, 'rgba(70,45,25,0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(0, 0, rx, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+
+  /** Pop: eyes blink on a seeded schedule (live only; snapshots and scrubbing keep them open). */
+  private drawBlink(v: ObjView, now: number): void {
+    if (this.instant || v.dying || v.head < v.strokes.length) return
+    if (v.face === undefined) v.face = faceInfo(v.popShapes)
+    const face = v.face
+    if (!face) return
+    const h = hashString(v.id)
+    const period = 3200 + (h % 2600)
+    const phase = (h >>> 8) % period
+    const t = (now + phase) % period
+    if (t > 150) return
+    const ctx = this.ctx
+    const S = this.S
+    ctx.lineCap = 'round'
+    for (const e of face.eyes) {
+      ctx.fillStyle = e.lid
+      ctx.beginPath()
+      ctx.arc(e.cx * S, e.cy * S, e.r * 1.12 * S, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = e.ink
+      ctx.lineWidth = Math.max(1, 0.55 * S)
+      ctx.beginPath()
+      ctx.moveTo((e.cx - e.r * 0.95) * S, e.cy * S)
+      ctx.quadraticCurveTo(e.cx * S, (e.cy + e.r * 0.55) * S, (e.cx + e.r * 0.95) * S, e.cy * S)
+      ctx.stroke()
+    }
+  }
+
+  /** Pop: seeded twinkling stars over a night sky, once the sky is drawn. */
+  private drawStars(bg: ObjView, now: number): void {
+    if (bg.head < bg.strokes.length) return
+    const ctx = this.ctx
+    const rng = mulberry32(hashString(`${this.seed}:stars`))
+    const S = this.S
+    ctx.save()
+    ctx.fillStyle = '#fff6c9'
+    for (let i = 0; i < 28; i++) {
+      const x = 4 + rng() * (WORLD_W - 8)
+      const y = 3 + rng() * (GROUND_Y - 22)
+      const r = 0.25 + rng() * 0.45
+      const ph = rng() * Math.PI * 2
+      const sp = 0.6 + rng() * 1.2
+      ctx.globalAlpha = this.instant ? 0.85 : 0.55 + 0.45 * Math.sin((now / 1000) * sp + ph)
+      const px = this.offX + x * S
+      const py = this.offY + y * S
+      ctx.beginPath()
+      ctx.arc(px, py, r * S, 0, Math.PI * 2)
+      ctx.fill()
+      if (r > 0.5) {
+        ctx.fillRect(px - r * 2.4 * S, py - 0.08 * S, r * 4.8 * S, 0.16 * S)
+        ctx.fillRect(px - 0.08 * S, py - r * 2.4 * S, 0.16 * S, r * 4.8 * S)
+      }
+    }
+    ctx.restore()
   }
 
   private drawBubbles(now: number, wx: LayerXform): void {

@@ -5,7 +5,7 @@ import { renderOps } from './render'
 import { readText, writeBlob } from './api'
 import { hashString } from '~/engine/rng'
 import type { DrawLine } from './types'
-import { renderBench } from '~/proto/render'
+import { playLive, renderBench } from '~/proto/render'
 import { benchFileSchema } from '~/proto/bench-types'
 
 document.title = 'Once Upon lab'
@@ -27,6 +27,13 @@ interface LabHook {
 /** Prototype bench: render lab/proto/<run>/<dialect>/<story>.json, one jpg per beat beside it. */
 interface ProtoHook {
   render: (run: string, dialect: string, storyId: string, style?: string) => Promise<{ images: string[]; parseErrors: string[]; warnings: string[] }>
+  /** Real-time playback: per-frame render timings, reveal snapshots written to <dir>/live-<story>.<style>-NN.jpg. */
+  live: (
+    run: string,
+    dialect: string,
+    storyId: string,
+    style?: string
+  ) => Promise<{ frames: number; renderP50: number; renderP95: number; renderMax: number; snaps: number }>
 }
 
 declare global {
@@ -80,6 +87,16 @@ window.__proto = {
       parseErrors: beats.flatMap((b) => b.parseErrors),
       warnings: beats.flatMap((b) => b.warnings),
     }
+  },
+  live: async (run, dialect, storyId, style) => {
+    const dir = `lab/proto/${run}/${dialect}`
+    const text = await readText(`${dir}/${storyId}.json`)
+    if (text === null) throw new Error(`missing ${dir}/${storyId}.json`)
+    const file = benchFileSchema.parse(JSON.parse(text))
+    const r = await playLive(file, style ? { style } : {})
+    for (const [i, b] of r.snaps.entries())
+      await writeBlob(`${dir}/live-${storyId}.${style ?? 'classic'}-${String(i).padStart(2, '0')}.jpg`, b)
+    return { frames: r.frames, renderP50: r.renderP50, renderP95: r.renderP95, renderMax: r.renderMax, snaps: r.snaps.length }
   },
 }
 

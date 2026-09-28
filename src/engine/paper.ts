@@ -2,7 +2,9 @@
 export function makePaper(
   width: number,
   height: number,
-  ctxOpts: CanvasRenderingContext2DSettings = {}
+  ctxOpts: CanvasRenderingContext2DSettings = {},
+  /** Pop style: warmer fibers and a deeper vignette (the base color stays: knockouts paint it). */
+  pop = false
 ): HTMLCanvasElement {
   const c = document.createElement('canvas')
   c.width = Math.max(1, width)
@@ -48,8 +50,31 @@ export function makePaper(
     Math.max(c.width, c.height) * 0.75
   )
   grad.addColorStop(0, 'rgba(120,90,40,0)')
-  grad.addColorStop(1, 'rgba(120,90,40,0.10)')
+  grad.addColorStop(1, pop ? 'rgba(130,85,35,0.16)' : 'rgba(120,90,40,0.10)')
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, c.width, c.height)
+  if (pop) {
+    // Paper fibers: short faint seeded hairlines.
+    let h = 362436069
+    const rand = (): number => {
+      h ^= h << 13
+      h ^= h >>> 17
+      h ^= h << 5
+      return ((h >>> 0) % 100000) / 100000
+    }
+    const n = Math.round((c.width * c.height) / 9000)
+    ctx.lineWidth = Math.max(1, c.width / 1400)
+    for (let i = 0; i < n; i++) {
+      const x = rand() * c.width
+      const y = rand() * c.height
+      const a = rand() * Math.PI
+      const len = (4 + rand() * 10) * (c.width / 1280)
+      ctx.strokeStyle = rand() < 0.5 ? 'rgba(150,110,60,0.07)' : 'rgba(255,255,255,0.18)'
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len)
+      ctx.stroke()
+    }
+  }
   return c
 }
