@@ -1,6 +1,6 @@
 # Squiggletale — cliffnotes
 
-> Living map of the project. Read first, every task. Last updated: 2026-09-22 (launch platform: monorepo, hosted mode, web, mobile)
+> Living map of the project. Read first, every task. Last updated: 2026-09-28 (DSL prototypes: kit, sketch, pop; Sonnet 5.5)
 
 ## What it is
 
@@ -74,6 +74,7 @@ src/
     rng.ts                 mulberry32, hashString, noise1 (determinism for replay)
     scene.ts               Scene model: objects, pages, apply(Command) -> SceneEvent[], summary() for the prompt
     stage.ts               Stage renderer: per-object layers, reveal queue, tweens, idle motion, bubbles, page turn, crayon cursor
+    pop.ts                 the `pop` Stage style (opaque waxy fills, tinted outlines, light, face cheeks/catchlights/blink via Shape.role, contact shadows, washed sky/ground, stars); Stage `style: 'classic' | 'pop'`, classic byte-identical
     fx.ts                  particle effects (explode, sparkle, hearts, rain, fire, smoke, stars, poof, scribble-out)
     face.ts                faceShapes(): eyes + mouth anchored to a head contour (json dialect's face op)
     audio.ts               synthesized crayon scratch + page flip (Web Audio, seeded noise); StageAudio, AudioCues + renderAudioCues() for offline export
@@ -128,6 +129,7 @@ src/
     ShareCard.tsx          after The End: name, include voice, make link, share sheet, download video
     MinutesChip.tsx        remaining minutes tag in the header (coral when sleepy)
     Offline.tsx            offline note/banner
+  proto/                   prototype dialects benched head to head (plans/2026-09-28-dsl-rethink.md): registry.ts (id -> factory), stories.ts (bench set), bench-types.ts, render.ts (window.__proto.render/live); kit/ (model names subjects, library/ draws them; place presets), sketch/ (100-box SVG-icon freehand, derived outlines, blobs)
   lab/                     drawing lab (lab.html): word -> picture -> critique -> prompt hill-climb; spec plans/2026-09-22-drawing-lab.md
     types.ts               zod contracts for everything under lab/ (cases, prompt versions, draw results, critiques, rounds, campaign, patches)
     cases.ts               DEFAULT_CASES: ~45 subjects + 15 action phrases with judge expectations; seeds lab/cases.json
@@ -238,7 +240,8 @@ scripts/                   one-off dev scripts (author-intro.ts: intro page draw
 - **Automated Chrome here exits on any download** (even a 5-byte blob), in bx and plain Playwright. To verify exports, capture the Blob instead (see verify.md).
 - **Resize** re-rasterizes all layers (`Stage.rebuildLayer`). Layers are capped at 4096px.
 - **Prompt caching needs a 4096-token prefix on Haiku 4.5** (1024 on Sonnet 5, 512 on Opus 5). Both system prompts carry a cookbook + story-beat section partly to be useful and partly to clear that bar; below it Anthropic silently caches nothing. The user message is blocks: header, one block per story chunk with the breakpoint on the last (`storyBlocks`), then the per-call tail, so each call reads the earlier story from cache and writes only the new chunk (hits are at block boundaries only). Debug panel shows `in/cacheWrite/cacheRead` per call; verify with the recipe in verify.md if it ever reads 0 again.
-- **Thinking is switched off** for Sonnet 5 / Opus 5 in `providers.ts` for first-token speed.
+- **Thinking: fastest setting per model** in `src/llm/anthropic-thinking.ts` (mirrored in `apps/web/server/anthropic-thinking.ts`). Sonnet 5.5 400s on `disabled` and needs `between_tools`; Opus 5.5 / Fable 5.1 reject both and get adaptive + effort low. SDK 0.126 lacks the `between_tools` type (one documented cast; drop it on SDK 0.129). Cold vs warm prompt cache makes no first-token difference on 5.5 (~1.0-1.4 s floor): output tokens are the latency lever.
+- **Prototype bench:** `bun scripts/proto-bench.ts <dialect> set=quick|full run=<r>` → `node scripts/proto-render.mjs <r> <dialect> [style=pop] [port=]` (dev server up) → `bun scripts/proto-sheet.ts <r>` → `lab/proto/<r>/sheet.html` (gitignored).
 - The Anthropic call uses `dangerouslyAllowBrowser`. That is the design for now (localhost). See decisions.md.
 - The only `as` cast in the app is the constructor boundary in `speech/recognition.ts`.
 - Web Speech only exists in Chrome/Edge. The typed-sentence input at bottom-right is the mic-free path (also what `bx` tests use).

@@ -31,6 +31,24 @@
 | sketch | Model still illustrates, in an SVG-icon language: per-entity 0..100 box, blobs, arcs, fill-derived outlines, pattern tokens | agent, worktree, port 7742 |
 | pop | Renderer style for every dialect: opaque waxy fills, tinted outlines, light, face appeal + blink, contact shadows, washed skies | agent, worktree, port 7743 |
 
-## Results
+## Results (run `final`, full set, 31 calls each, Sonnet 5.5, same hour)
 
-(filled in when the agents report)
+| dialect | system tok | med first token | med first ink | med done | mean out tok | mean $/call | parse errs |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| ops (today) | 8455 | 1.16 s | 1.35 s | 3.11 s | 328 | $0.0052 | 5 |
+| sketch | 8856 | 1.06 s | 1.15 s | 2.46 s | 285 | $0.0055 | 0 |
+| kit | 5757 | 1.11 s | 1.13 s | 1.16 s | 34 | $0.0017 | 0 |
+
+Sheet: `lab/proto/final/sheet.html` (ops / sketch / kit x classic / pop).
+
+- **kit** wins on every axis: the whole beat lands ~50 ms after the first token, a third of the cost, and the pictures are designed pages (full backdrops, props, poses) instead of assembled primitives. ~140 kinds, 21 places, 20 accessories. Unknown words fall back to freehand ops lines.
+- **sketch** is the better freehand: derived outlines, blobs, 100-box coordinates; 20% faster to done than ops, same cost. It is the right fallback language inside kit (replacing the ops freehand) for the long tail.
+- **pop** lifts every dialect for free: opaque fills fix see-through characters (sketch's hide-behind-tree case), cheeks, catchlights, light, grounding, washed skies. Classic is byte-identical.
+
+Known issues to fix before shipping kit + pop:
+- kit riders: pig stands on the car roof; accessories accepted on vehicles; landing keeps the fly pose; no overlap avoidance.
+- pop draws its own twinkle stars on dark skies, doubling kit's night stars; pop cheeks/blink key off face.ts roles, kit draws its own faces (ids match the contract, roles not set).
+- Stage: objectCreated ignores flipped/scale/anim for characters carried to a new page (kit works around it).
+- ops parse errors still seen: two fill colors, w= above 24.
+
+Recommendation: ship kit as the default dialect with sketch as its freehand fallback, and pop as the default style.
