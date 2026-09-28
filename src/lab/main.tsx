@@ -5,6 +5,8 @@ import { renderOps } from './render'
 import { readText, writeBlob } from './api'
 import { hashString } from '~/engine/rng'
 import type { DrawLine } from './types'
+import { renderBench } from '~/proto/render'
+import { benchFileSchema } from '~/proto/bench-types'
 
 document.title = 'Once Upon lab'
 
@@ -22,9 +24,15 @@ interface LabHook {
   ) => Promise<{ lines: DrawLine[]; imagePath: string }>
 }
 
+/** Prototype bench: render lab/proto/<run>/<dialect>/<story>.json, one jpg per beat beside it. */
+interface ProtoHook {
+  render: (run: string, dialect: string, storyId: string, style?: string) => Promise<{ images: string[]; parseErrors: string[]; warnings: string[] }>
+}
+
 declare global {
   interface Window {
     __lab?: LabHook
+    __proto?: ProtoHook
   }
 }
 
@@ -52,6 +60,28 @@ const labHook: LabHook = {
 }
 
 window.__lab = labHook
+
+window.__proto = {
+  render: async (run, dialect, storyId, style) => {
+    const dir = `lab/proto/${run}/${dialect}`
+    const text = await readText(`${dir}/${storyId}.json`)
+    if (text === null) throw new Error(`missing ${dir}/${storyId}.json`)
+    const file = benchFileSchema.parse(JSON.parse(text))
+    const beats = await renderBench(file, style ? { style } : {})
+    const suffix = style && style !== 'classic' ? `.${style}` : ''
+    const images: string[] = []
+    for (const [i, b] of beats.entries()) {
+      const p = `${dir}/${storyId}-b${i + 1}${suffix}.jpg`
+      await writeBlob(p, b.image)
+      images.push(p)
+    }
+    return {
+      images,
+      parseErrors: beats.flatMap((b) => b.parseErrors),
+      warnings: beats.flatMap((b) => b.warnings),
+    }
+  },
+}
 
 const root = document.getElementById('lab')
 if (!root) throw new Error('#lab missing')

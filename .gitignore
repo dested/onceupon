@@ -24,3 +24,4 @@ apps/mobile/*.p8
 apps/mobile/*.p12
 apps/mobile/*.mobileprovision
 lab/agent/r*/
+lab/proto/
