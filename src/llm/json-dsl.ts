@@ -282,6 +282,11 @@ export class JsonDialect implements Dialect {
   readonly maxTokens = 2600
   later: ((cmds: Command[]) => void) | null = null
   private ents = new Map<string, EntityMeta>()
+  /**
+   * Where each entity was created (world units). A composing dialect may create an entity and draw
+   * into it within one parsed line, before the caller has applied the creation to the scene.
+   */
+  private born = new Map<string, { x: number; y: number }>()
   private timers: number[] = []
   private clock: Clock
 
@@ -303,6 +308,7 @@ export class JsonDialect implements Dialect {
 
   reset(): void {
     this.ents.clear()
+    this.born.clear()
     for (const t of this.timers) this.clock.cancel(t)
     this.timers = []
   }
@@ -327,6 +333,26 @@ export class JsonDialect implements Dialect {
       return { ok: false, error: `${issue ? `${issue.path.join('.')}: ${issue.message}` : 'invalid operation'} in ${source.slice(0, 80)}` }
     }
     return this.apply(res.data)
+  }
+
+  /**
+   * Replace every shape of an entity in one reset (a composing dialect redrawing a whole subject).
+   * The stage keeps the strokes of the leading unchanged shapes, so only what changed is redrawn.
+   */
+  redrawRaw(id: string, shapes: unknown[], source: string): DialectParse {
+    const meta = this.ents.get(id)
+    if (!meta) return { ok: false, error: `redraw: no entity "${id}" in ${source.slice(0, 80)}` }
+    const fresh = new Map<string, ShapeMeta>()
+    for (const raw of shapes) {
+      const res = shapeSchema.safeParse(raw)
+      if (!res.success) {
+        const issue = res.error.issues[0]
+        return { ok: false, error: `${issue ? `${issue.path.join('.')}: ${issue.message}` : 'invalid shape'} in ${source.slice(0, 80)}` }
+      }
+      fresh.set(res.data.id, { id: res.data.id, color: res.data.color, fill: res.data.fill, shapes: shapeToEngine(res.data) })
+    }
+    meta.shapes = fresh
+    return { ok: true, cmds: [{ k: 'reset', id, shapes: this.allShapes(meta) }] }
   }
 
   /** The scene as JSON for the model: paper coordinates, entity names, shape ids and colors. */
@@ -369,7 +395,7 @@ export class JsonDialect implements Dialect {
 
   /** Commands that append shapes to an existing entity without moving it. */
   private appendCmds(id: string, shapes: Shape[]): Command[] {
-    const obj = this.scene.objects.get(id)
+    const obj = this.scene.objects.get(id) ?? this.born.get(id)
     if (!obj) return []
     const cmds: Command[] = [{ k: 'obj', id, x: obj.x, y: obj.y }]
     for (const shape of shapes) cmds.push({ k: 'shape', shape })
@@ -391,6 +417,7 @@ export class JsonDialect implements Dialect {
       case 'entity': {
         if (this.scene.objects.has(op.id)) return { ok: true, cmds: [] }
         this.ents.set(op.id, { name: op.name, idle: op.idle, layer: op.layer, shapes: new Map() })
+        this.born.set(op.id, { x: px(op.x), y: py(op.y) })
         const cmds: Command[] = [{ k: 'obj', id: op.id, x: px(op.x), y: py(op.y) }, { k: 'end' }]
         if (op.layer !== 0) cmds.push({ k: 'layer', id: op.id, z: op.layer })
         if (op.scale !== 1) cmds.push({ k: 'sc', id: op.id, factor: op.scale, secs: 0 })
@@ -401,7 +428,7 @@ export class JsonDialect implements Dialect {
       case 'draw': {
         const s = op.shape
         const meta = this.ents.get(s.entity)
-        if (!meta || !this.scene.objects.has(s.entity)) return { ok: false, error: `draw: no entity "${s.entity}" on this page` }
+        if (!meta || !(this.scene.objects.has(s.entity) || this.born.has(s.entity))) return { ok: false, error: `draw: no entity "${s.entity}" on this page` }
         const shapes = shapeToEngine(s)
         const replacing = meta.shapes.has(s.id)
         meta.shapes.set(s.id, { id: s.id, color: s.color, fill: s.fill, shapes })
