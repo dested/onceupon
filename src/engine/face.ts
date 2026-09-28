@@ -34,9 +34,9 @@ export function faceShapes(headId: string, head: Shape, facing: Facing, expressi
   const out: FacePart[] = []
   eyeXs.forEach((ex, i) => {
     const eye = `${headId}_eye${i}`
-    out.push({ id: `${eye}w`, shape: { k: 'circle', cx: ex, cy: eyeY, r, color: '#ffffff', fill: true } })
-    out.push({ id: eye, shape: { k: 'circle', cx: ex, cy: eyeY, r, color: ink, fill: false } })
-    out.push({ id: `${eye}_pupil`, shape: { k: 'circle', cx: ex + look, cy: eyeY + r * 0.1, r: r * 0.45, color: '#1f1a1a', fill: true } })
+    out.push({ id: `${eye}w`, shape: { k: 'circle', cx: ex, cy: eyeY, r, color: '#ffffff', fill: true, role: 'eyeWhite' } })
+    out.push({ id: eye, shape: { k: 'circle', cx: ex, cy: eyeY, r, color: ink, fill: false, role: 'eye' } })
+    out.push({ id: `${eye}_pupil`, shape: { k: 'circle', cx: ex + look, cy: eyeY + r * 0.1, r: r * 0.45, color: '#1f1a1a', fill: true, role: 'pupil' } })
   })
   const my = b.minY + h * 0.7
   const mx = b.minX + w * (facing === 'right' ? 0.62 : facing === 'left' ? 0.38 : 0.5)
@@ -51,6 +51,6 @@ export function faceShapes(headId: string, head: Shape, facing: Facing, expressi
     const d = `M ${f2(mx - mw)} ${f2(my)} Q ${f2(mx)} ${f2(my + mw * 0.9)} ${f2(mx + mw)} ${f2(my)}`
     mouth = { k: 'path', d, color: ink, fill: false }
   }
-  out.push({ id: `${headId}_mouth`, shape: mouth })
+  out.push({ id: `${headId}_mouth`, shape: { ...mouth, role: 'mouth' } })
   return out
 }

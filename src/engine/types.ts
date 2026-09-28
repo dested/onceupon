@@ -8,7 +8,10 @@ export interface Vec {
   y: number
 }
 
-export type Shape =
+/** What a shape is for, when the engine made it (face parts); renderers may style by it. No effect in the classic style. */
+export type ShapeRole = 'eyeWhite' | 'eye' | 'pupil' | 'mouth'
+
+export type Shape = (
   | { k: 'circle'; cx: number; cy: number; r: number; color: string; fill: boolean }
   | { k: 'ellipse'; cx: number; cy: number; rx: number; ry: number; color: string; fill: boolean }
   | { k: 'rect'; x: number; y: number; w: number; h: number; color: string; fill: boolean }
@@ -16,6 +19,7 @@ export type Shape =
   | { k: 'poly'; pts: Vec[]; color: string; fill: boolean; closed: boolean }
   | { k: 'path'; d: string; color: string; fill: boolean }
   | { k: 'text'; x: number; y: number; size: number; color: string; text: string }
+) & { role?: ShapeRole }
 
 export const ANIM_KINDS = ['none', 'bob', 'bounce', 'shake', 'spin', 'wobble', 'fly', 'walk'] as const
 export type AnimKind = (typeof ANIM_KINDS)[number]

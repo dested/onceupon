@@ -16,6 +16,25 @@ export interface Stroke {
   text: { x: number; y: number; size: number; text: string } | null
   /** Reveal-speed multiplier; backgrounds use a high value. */
   speedMul: number
+  /** Extra paint for the pop style (engine/pop.ts); absent in classic. */
+  pop?: PopPaint
+}
+
+/**
+ * How a pop-style stroke paints beyond its wax dabs. Region paints (knockout, wash) follow the
+ * hachure sweep: the band of scan lines revealed so far, so nothing appears ahead of the crayon.
+ */
+export interface PopPaint {
+  /** Scan-line axis of a fill: lines run perpendicular to (nx,ny), offsets grow with arc length. */
+  sweep: { cx: number; cy: number; nx: number; ny: number; spacing: number } | null
+  /** Paper-colored underlay: `full` goes behind what the layer already has, `inset` over it (occludes earlier parts). */
+  knock: { full: Vec[][]; inset: Vec[][] } | null
+  /** Solid vertical gradient wash in the revealed band (sky, ground), world-local y range. */
+  wash: { top: string; bottom: string; y0: number; y1: number; tooth: number } | null
+  /** Clip these regions away (shading crescent = shape minus the shape nudged toward the light). */
+  exclude: Vec[][] | null
+  /** Outline line quality: taper at the ends, heavier below this local y. */
+  taper: { cy: number } | null
 }
 
 export interface Bounds {
@@ -29,7 +48,7 @@ export const OUTLINE_WIDTH = 1.5
 export const FILL_WIDTH = 2.1
 export const FILL_SPACING = 1.5
 
-function cumLengths(pts: Vec[]): { cum: number[]; length: number } {
+export function cumLengths(pts: Vec[]): { cum: number[]; length: number } {
   const cum: number[] = [0]
   let total = 0
   for (let i = 1; i < pts.length; i++) {
@@ -42,7 +61,7 @@ function cumLengths(pts: Vec[]): { cum: number[]; length: number } {
   return { cum, length: total }
 }
 
-function makeStroke(
+export function makeStroke(
   kind: Stroke['kind'],
   pts: Vec[],
   color: string,
@@ -56,7 +75,7 @@ function makeStroke(
 }
 
 /** Resample a polyline so no segment is longer than `step`, then add hand wobble. */
-function wobble(pts: Vec[], rng: Rng, amp: number, step = 1.2): Vec[] {
+export function wobble(pts: Vec[], rng: Rng, amp: number, step = 1.2): Vec[] {
   if (pts.length < 2) return pts
   const seed = Math.floor(rng() * 10000)
   const phase = rng() * 100
@@ -90,7 +109,7 @@ function wobble(pts: Vec[], rng: Rng, amp: number, step = 1.2): Vec[] {
   return out
 }
 
-function ellipsePts(cx: number, cy: number, rx: number, ry: number, rng: Rng): Vec[] {
+export function ellipsePts(cx: number, cy: number, rx: number, ry: number, rng: Rng): Vec[] {
   const per = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)))
   const n = Math.max(16, Math.min(96, Math.ceil(per / 1.0)))
   const start = rng() * Math.PI * 2
@@ -105,7 +124,7 @@ function ellipsePts(cx: number, cy: number, rx: number, ry: number, rng: Rng): V
   return pts
 }
 
-function closeWithOvershoot(pts: Vec[]): Vec[] {
+export function closeWithOvershoot(pts: Vec[]): Vec[] {
   if (pts.length < 2) return pts
   const first = pts[0]
   const second = pts[1]
@@ -115,7 +134,7 @@ function closeWithOvershoot(pts: Vec[]): Vec[] {
 
 // ---- SVG path (subset: M L H V C S Q T A Z, absolute and relative) ----
 
-function parsePathData(d: string): Vec[][] {
+export function parsePathData(d: string): Vec[][] {
   const tokens = d.match(/[a-zA-Z]|-?\d*\.?\d+(?:e-?\d+)?/g) ?? []
   const polys: Vec[][] = []
   let cur: Vec[] = []
@@ -305,7 +324,7 @@ function parsePathData(d: string): Vec[][] {
 
 // ---- Fill: zig-zag hachure clipped to the shape ----
 
-function polyBounds(polys: Vec[][]): Bounds {
+export function polyBounds(polys: Vec[][]): Bounds {
   let minX = Infinity
   let minY = Infinity
   let maxX = -Infinity
@@ -322,7 +341,7 @@ function polyBounds(polys: Vec[][]): Bounds {
 }
 
 /** Intersections of the line through (px,py) with direction (dx,dy) against polygon edges, as params along the line. */
-function lineHits(polys: Vec[][], px: number, py: number, dx: number, dy: number): number[] {
+export function lineHits(polys: Vec[][], px: number, py: number, dx: number, dy: number): number[] {
   const hits: number[] = []
   for (const poly of polys) {
     for (let i = 0; i < poly.length; i++) {
@@ -382,7 +401,7 @@ function hachure(polys: Vec[][], rng: Rng, spacing: number): Vec[] {
 }
 
 /** Outline polygons of a shape in local coords (used for fill clipping and bounds). */
-function outlinePolys(shape: Shape): Vec[][] {
+export function outlinePolys(shape: Shape): Vec[][] {
   switch (shape.k) {
     case 'circle': {
       const pts: Vec[] = []
