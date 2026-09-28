@@ -170,7 +170,8 @@ const GEOMETRY_WORDS = ['circle', 'oval', 'rect', 'poly', 'stamp'] as const
 const isPathStart = (t: Tok | undefined): boolean =>
   t !== undefined && !t.quoted && /^[Mm]([-+.\d,]|$)/.test(t.text)
 
-function parseDraw(rest: Tok[], line: string): unknown {
+function parseDraw(tokens: Tok[], line: string): unknown {
+  let rest = tokens
   const target = rest[0]
   if (!target) throw new Error('draw needs entity.shape')
   let entity: string
@@ -198,14 +199,13 @@ function parseDraw(rest: Tok[], line: string): unknown {
     shape.fill = resolveColor(fillTok.text)
     i++
   }
-  // flags and k=v until the geometry
-  while (i < rest.length) {
-    const t = rest[i]
-    if (!t) break
+  // Flags and k=v anywhere after the colors: before the geometry as documented, or trailing after it
+  // (Sonnet 5.5 often writes `... Q -110 -120 -95 -128 w=6`). Geometry tokens are never k=v or `mirror`.
+  const tail = rest.slice(0, i)
+  for (const t of rest.slice(i)) {
     const word = t.text.toLowerCase()
     if (!t.quoted && word === 'mirror') {
       shape.mirror = true
-      i++
       continue
     }
     if (isKv(t)) {
@@ -216,11 +216,11 @@ function parseDraw(rest: Tok[], line: string): unknown {
       else if (k === 'fill') shape.fill = resolveColor(v)
       else if (k === 'mirror') shape.mirror = v !== 'false' && v !== '0'
       else throw new Error(`draw: unknown option ${k}`)
-      i++
       continue
     }
-    break
+    tail.push(t)
   }
+  rest = tail
   const g = rest[i]
   if (!g) throw new Error('draw needs a geometry: M.. path, circle, oval, rect, poly or stamp')
   const gw = g.text.toLowerCase()
@@ -294,7 +294,7 @@ export function parseOpsLine(raw: string): OpsLineParse {
   const verbTok = toks[0]
   if (!verbTok) return { ok: true, op: null }
   const verb = verbTok.text.toLowerCase()
-  const rest = toks.slice(1)
+  let rest = toks.slice(1)
   const id = (i: number, what: string): string => {
     const t = rest[i]
     if (!t || t.quoted || isNum(t)) throw new Error(`${what} needs an entity id`)
@@ -331,9 +331,19 @@ export function parseOpsLine(raw: string): OpsLineParse {
         return { ok: true, op: parseDraw(rest, line) }
 
       case 'face': {
+        // `face dragon.head right` and `face dog dog.head` both mean entity + head shape.
+        const first = rest[0]
+        const dot = first && !first.quoted ? first.text.indexOf('.') : -1
+        if (first && dot > 0) {
+          rest = [{ ...first, text: first.text.slice(0, dot) }, { ...first, text: first.text.slice(dot + 1) }, ...rest.slice(1)]
+        }
         const eid = id(0, 'face')
         const op: Record<string, unknown> = { op: 'face', id: eid, head: 'head' }
         for (const t of rest.slice(1)) {
+          if (!t.quoted && t.text.startsWith(`${eid}.`)) {
+            op.head = t.text.slice(eid.length + 1)
+            continue
+          }
           const w = t.text.toLowerCase()
           if (has(OPS_VOCAB.facing, w)) op.facing = w
           else if (has(OPS_VOCAB.expression, w)) op.expression = w
