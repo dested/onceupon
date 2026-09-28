@@ -6,8 +6,8 @@
 import type { Scene } from '~/engine/scene'
 import type { Dialect, DialectOptions } from '~/llm/dialect'
 import { OpsDialect } from '~/llm/ops-dsl'
-import { SketchDialect } from './sketch/dialect'
-import { KitDialect } from './kit/dialect'
+import { SketchDialect } from '~/llm/sketch/dialect'
+import { KitDialect } from '~/llm/kit/dialect'
 
 export interface ProtoDialect extends Omit<Dialect, 'id'> {
   readonly id: string

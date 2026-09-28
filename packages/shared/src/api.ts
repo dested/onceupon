@@ -50,7 +50,7 @@ export interface DeviceState {
 export interface ClientConfig {
   earsVendor: Exclude<EarsVendor, 'browser'>
   model: string
-  dialect: 'ops' | 'json' | 'lines'
+  dialect: 'kit' | 'sketch' | 'ops' | 'json' | 'lines'
   freeFirstStorySec: number
   weeklyFreeSec: number
   purchasesPaused: boolean

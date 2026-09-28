@@ -21,7 +21,7 @@ import type { DialectInput, DialectOptions, DialectParse } from '~/llm/dialect'
 import { JsonDialect, OPS_VOCAB, type PathCmd } from '~/llm/json-dsl'
 import { parseOpsLine } from '~/llm/ops-dsl'
 import type { PromptBlock } from '~/llm/providers'
-import type { ProtoDialect } from '../registry'
+import type { Dialect } from '~/llm/dialect'
 import {
   blobPath,
   bounds,
@@ -307,7 +307,7 @@ function geoFields(g: Geo): Record<string, unknown> {
 
 /* ---------- the dialect ---------- */
 
-export class SketchDialect implements ProtoDialect {
+export class SketchDialect implements Dialect {
   readonly id = 'sketch'
   readonly system: string
   readonly maxTokens = 1600

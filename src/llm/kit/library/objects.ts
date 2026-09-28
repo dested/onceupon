@@ -29,7 +29,7 @@ function car(p: KitParams): KitDrawing {
     ...wheel('wheel', -85, -18, 30),
     ...wheel('wheel2', 95, -18, 30),
   ]
-  return { shapes: back, front, seat: P(-10, -70) }
+  return { shapes: back, front, seat: P(-10, -45) }
 }
 
 function truck(p: KitParams): KitDrawing {

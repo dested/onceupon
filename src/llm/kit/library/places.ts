@@ -97,7 +97,7 @@ function skyThings(o: PlaceOpts, sunX = 430, clouds = 2): KitShape[] {
     return out
   }
   if (o.time === 'night') {
-    out.push(...stars(22, o.rng, { x0: -580, x1: 580, y0: -500, y1: -200 }))
+    out.push(...stars(7, o.rng, { x0: -580, x1: 580, y0: -500, y1: -200 }))
     out.push(...moon(sunX, -420, 46))
   } else if (o.time === 'sunset') {
     out.push(...sun(sunX, -90, 70))
@@ -361,7 +361,7 @@ export const PLACES: PlaceDef[] = [
     doc: 'dark sky, stars, a ringed planet, the moon surface',
     build: (o) => {
       const back: KitShape[] = [
-        ...stars(30, o.rng, { x0: -590, x1: 590, y0: -510, y1: -60 }),
+        ...stars(9, o.rng, { x0: -590, x1: 590, y0: -510, y1: -60 }),
         circle('planet', C('coral'), -420, -380, 55),
         { id: 'ring', color: C('yellow'), path: [['M', -500, -370], ['Q', -420, -330, -340, -390]] },
         circle('earth', '#4aa6e0', 420, -400, 40),
@@ -377,7 +377,7 @@ export const PLACES: PlaceDef[] = [
     title: 'the moon',
     doc: 'on the moon: gray craters, black sky, Earth',
     build: (o) => {
-      const back: KitShape[] = [...stars(26, o.rng, { x0: -590, x1: 590, y0: -510, y1: -80 }), circle('earth', '#4aa6e0', 400, -400, 55), patch(blob('eland', C('green'), [P(380, -430), P(420, -420), P(410, -385), P(375, -392)]))]
+      const back: KitShape[] = [...stars(8, o.rng, { x0: -590, x1: 590, y0: -510, y1: -80 }), circle('earth', '#4aa6e0', 400, -400, 55), patch(blob('eland', C('green'), [P(380, -430), P(420, -420), P(410, -385), P(375, -392)]))]
       const land: KitShape[] = [groundBand('moonground', '#c9c9d2', -10, o.rng, 18), patch(oval('crater1', '#a4a4b2', -320, 35, 70, 18)), patch(oval('crater2', '#a4a4b2', 220, 60, 48, 12)), patch(oval('crater3', '#a4a4b2', -40, 75, 30, 8))]
       return { sky: '#1e2246', back, land }
     },
@@ -427,7 +427,7 @@ export const PLACES: PlaceDef[] = [
     title: 'up in the sky',
     doc: 'only sky and big clouds (for flying)',
     build: (o) => {
-      const back = o.time === 'night' ? [...stars(24, o.rng, { x0: -590, x1: 590, y0: -510, y1: 60 }), ...moon(430, -420, 46)] : [...sun(430, -420, 46)]
+      const back = o.time === 'night' ? [...stars(7, o.rng, { x0: -590, x1: 590, y0: -510, y1: 60 }), ...moon(430, -420, 46)] : [...sun(430, -420, 46)]
       const land: KitShape[] = [cloud('c1', -420, -120, 150), cloud('c2', 380, -40, 170), cloud('c3', -80, 60, 200), cloud('c4', -250, -380, 110)]
       return { sky: skyFor(o), back, land, note: 'no ground' }
     },

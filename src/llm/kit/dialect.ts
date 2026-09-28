@@ -14,7 +14,7 @@ import { describeScene, parseOpsLine } from '~/llm/ops-dsl'
 import { JsonDialect } from '~/llm/json-dsl'
 import { storyBlocks } from '~/llm/prompt'
 import type { PromptBlock } from '~/llm/providers'
-import type { ProtoDialect } from '../registry'
+import type { Dialect } from '~/llm/dialect'
 import { colorName } from '~/engine/colors'
 import { extent, rngFor, xform, type KitShape, type PathCmd } from './geom'
 import { kitColor } from './palette'
@@ -76,7 +76,7 @@ const isPose = (s: string): s is Pose => (POSES as readonly string[]).includes(s
 const POSE_ALIAS: Record<string, Pose> = { sitting: 'sit', sits: 'sit', sleeping: 'sleep', asleep: 'sleep', lying: 'sleep', flying: 'fly', swimming: 'swim' }
 const MOOD_ALIAS: Record<string, Mood> = { scared: 'surprised', shocked: 'surprised', crying: 'sad', mad: 'angry', tired: 'sleepy', smiling: 'happy', excited: 'happy' }
 
-export class KitDialect implements ProtoDialect {
+export class KitDialect implements Dialect {
   readonly id = 'kit'
   readonly system: string
   readonly maxTokens = 1200
@@ -333,6 +333,8 @@ export class KitDialect implements ProtoDialect {
     if (existing && this.scene.objects.has(id)) return this.updateExisting(existing, given, nums, source)
 
     const spec: Spec = { ...DEFAULT_SPEC, ...given }
+    // A rider in a car, boat or bed sits unless the line says otherwise.
+    if (spec.inside && given.pose === undefined) spec.pose = 'sit'
     let x = nums[0] ?? 600
     let y = nums[1] ?? (def.air || spec.pose === 'fly' ? 330 : this.standY)
     const seat = spec.inside ? this.seatOf(spec.inside) : null
@@ -426,6 +428,9 @@ export class KitDialect implements ProtoDialect {
     const cmds: Command[] = []
     const prev = k.spec
     const spec: Spec = { ...prev, ...given }
+    // Landing: a flier sent back to the ground stands up again.
+    if (given.pose === undefined && prev.pose === 'fly' && nums[1] !== undefined && nums[1] >= this.standY - 5) spec.pose = 'stand'
+    if (given.inside && given.pose === undefined) spec.pose = 'sit'
     k.spec = spec
     const snap = this.inner.snapshotData().entities.find((e) => e.id === k.id)
     let to: { x: number; y: number } | null = null

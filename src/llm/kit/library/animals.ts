@@ -130,7 +130,9 @@ function buildQuad(sp: Species, p: KitParams): KitDrawing {
   const third = slot(p, 2, sp.third ?? 'pink')
   const extra = new Set(sp.extra ?? [])
   const sleep = p.pose === 'sleep'
-  const drop = sleep ? sp.by - sp.ry * 0.95 : 0
+  // Sitting (a rider in a car or boat) drops the body like sleep and hides the legs, head up.
+  const low = sleep || p.pose === 'sit'
+  const drop = low ? sp.by - sp.ry * 0.95 : 0
   const by = sp.by - drop
   const { rx, ry } = sp
   let hx = sp.hx
@@ -154,7 +156,7 @@ function buildQuad(sp: Species, p: KitParams): KitDrawing {
   }
   // tail behind, far legs behind
   back.push(...tailShapes(sp.tail, body, second, -rx * 0.92, -by - ry * 0.25, Math.max(0.7, rx / 95)))
-  if (!sleep) {
+  if (!low) {
     back.push(...legs('leg3', -rx * 0.5 + 16, farCol), ...legs('leg4', rx * 0.55 + 16, farCol))
   }
   // neck
@@ -192,7 +194,7 @@ function buildQuad(sp: Species, p: KitParams): KitDrawing {
   if (extra.has('patch')) shapes.push(patch(blob('patch', second, [P(-rx * 0.5, -by - ry * 0.8), P(-rx * 0.05, -by - ry * 0.85), P(-rx * 0.1, -by - ry * 0.2), P(-rx * 0.55, -by - ry * 0.1)])))
   if (extra.has('udder')) shapes.push(oval('udder', third, -rx * 0.1, -by + ry * 0.95, 22, 13))
   // near legs over the body bottom
-  if (!sleep) shapes.push(...legs('leg1', -rx * 0.5, body), ...legs('leg2', rx * 0.55, body))
+  if (!low) shapes.push(...legs('leg1', -rx * 0.5, body), ...legs('leg2', rx * 0.55, body))
   // mane along the neck / on top of the head
   const ears = earShapes(sp.ear, extra.has('wool') ? second : body, light(third, 0.3), hx, hy, r)
   if (extra.has('lionmane')) shapes.push({ id: 'mane', color: ink(second), fill: second, path: scallop(hx - r * 0.1, hy, r * 1.55, r * 1.5, 12, 0.09, 0.1) })

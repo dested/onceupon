@@ -6,8 +6,10 @@ import { buildUserBlocks, SYSTEM_PROMPT, SYSTEM_PROMPT_UNMODERATED } from './pro
 import type { PromptBlock } from './providers'
 import { JsonDialect } from './json-dsl'
 import { OpsDialect } from './ops-dsl'
+import { KitDialect } from './kit/dialect'
+import { SketchDialect } from './sketch/dialect'
 
-export const DIALECT_IDS = ['lines', 'json', 'ops'] as const
+export const DIALECT_IDS = ['kit', 'sketch', 'ops', 'json', 'lines'] as const
 export type DialectId = (typeof DIALECT_IDS)[number]
 export const isDialectId = (s: string): s is DialectId => (DIALECT_IDS as readonly string[]).includes(s)
 
@@ -15,6 +17,8 @@ export const DIALECT_LABELS: Record<DialectId, string> = {
   lines: 'crayon lines (terse, v1)',
   json: 'json ops (paths + face helper, v2)',
   ops: 'ops (json ops, terse lines, v3)',
+  kit: 'kit (names subjects, the library draws them, v4, default)',
+  sketch: 'sketch (freehand SVG-icon parts, derived outlines)',
 }
 
 export type DialectParse = { ok: true; cmds: Command[] } | { ok: false; error: string }
@@ -52,6 +56,8 @@ export interface DialectOptions {
 export function makeDialect(id: DialectId, scene: Scene, opts: DialectOptions): Dialect {
   if (id === 'json') return new JsonDialect(scene, opts)
   if (id === 'ops') return new OpsDialect(scene, opts)
+  if (id === 'kit') return new KitDialect(scene, opts)
+  if (id === 'sketch') return new SketchDialect(scene, opts)
   return new LinesDialect(scene, opts)
 }
 

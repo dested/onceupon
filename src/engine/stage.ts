@@ -178,11 +178,11 @@ export class Stage {
       software?: boolean
       /** Where the idle crayon rests (world units); video export moves it off the corner logo. */
       cursorRest?: Vec
-      /** Default classic. */
+      /** Default pop (the picture-book look); classic is the original flat crayon. */
       style?: StageStyle
     }
   ) {
-    this.style = opts.style ?? 'classic'
+    this.style = opts.style ?? 'pop'
     this.rest = opts.cursorRest ?? REST
     this.cursor = { ...this.rest }
     this.canvas = canvas

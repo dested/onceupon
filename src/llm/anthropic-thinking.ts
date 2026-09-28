@@ -13,7 +13,7 @@ interface Params {
  * Mirrored in apps/web/server/anthropic-thinking.ts (the relay); change both together.
  */
 export function fastThinking(model: string): Params {
-  if (/sonnet-5-5/.test(model)) return { thinking: BETWEEN_TOOLS }
+  if (/sonnet-5-5/.test(model)) return { thinking: { type: 'between_tools' } }
   if (/opus-5-5|fable-5-1|mythos-5-1/.test(model)) {
     return { thinking: { type: 'adaptive', display: 'omitted' }, output_config: { effort: 'low' } }
   }
@@ -22,9 +22,3 @@ export function fastThinking(model: string): Params {
   }
   return {}
 }
-
-/**
- * Typed boundary: SDK 0.126 predates `between_tools` (0.129 types it, published 2026-09-28; bun's
- * 3-day minimum release age holds the upgrade until 2026-10-01). Drop this cast after upgrading.
- */
-const BETWEEN_TOOLS = { type: 'between_tools' } as unknown as Anthropic.Messages.ThinkingConfigParam

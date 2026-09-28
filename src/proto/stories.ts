@@ -9,6 +9,8 @@ export interface BenchStory {
   beats: string[]
   /** In the quick set (fast iteration). Everything is in the full set. */
   quick?: boolean
+  /** Long-tail subjects no library covers (set=tail). */
+  tail?: boolean
 }
 
 export const BENCH_STORIES: BenchStory[] = [
@@ -35,6 +37,14 @@ export const BENCH_STORIES: BenchStory[] = [
   { id: 'cat-sleeps-bed', beats: ['the cat is sleeping in a bed'] },
   // the long tail: nothing in any cookbook
   { id: 'pig-rocket-car', beats: ['a pig wearing sunglasses drove a rocket car to the candy store'] },
+  // not in any catalog: kit must break out and draw freehand
+  { id: 'tail-cheese-ship', beats: ['a spaceship made of cheese'], tail: true },
+  { id: 'tail-jellyfish', beats: ['a giant jellyfish wearing a crown'], tail: true },
+  { id: 'tail-toaster', beats: ['a toaster with legs that can talk'], tail: true },
+  { id: 'tail-volcano', beats: ['a volcano erupting with lava'], tail: true },
+  { id: 'tail-windmill', beats: ['a windmill on a hill'], tail: true },
+  { id: 'tail-snail', beats: ['a snail with a rainbow shell'], tail: true },
+  { id: 'tail-hat-horse', beats: ['a horse wearing a birthday party hat and a long striped scarf'], tail: true },
   // multi-beat stories
   {
     id: 'story-bunny',
@@ -68,6 +78,7 @@ export const BENCH_STORIES: BenchStory[] = [
 export function benchSet(which: 'quick' | 'full' | string): BenchStory[] {
   if (which === 'full') return BENCH_STORIES
   if (which === 'quick') return BENCH_STORIES.filter((s) => s.quick)
+  if (which === 'tail') return BENCH_STORIES.filter((s) => s.tail)
   const ids = which.split(',')
   return BENCH_STORIES.filter((s) => ids.includes(s.id))
 }

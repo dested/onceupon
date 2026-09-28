@@ -226,7 +226,7 @@ function loadSettings(): Settings {
   const base: Settings = {
     provider: DEFAULT_MODEL.provider,
     model: DEFAULT_MODEL.id,
-    dialect: 'ops',
+    dialect: 'kit',
     keys: envKeys,
     sound: true,
     moderation: true,
@@ -255,7 +255,7 @@ function loadSettings(): Settings {
     return {
       provider: isProvider(d.provider) ? d.provider : base.provider,
       model: d.model || base.model,
-      dialect: d.dialect && isDialectId(d.dialect) ? d.dialect : 'ops',
+      dialect: d.dialect && isDialectId(d.dialect) ? d.dialect : 'kit',
       keys: {
         anthropic: d.keys.anthropic || envKeys.anthropic,
         openrouter: d.keys.openrouter || envKeys.openrouter,

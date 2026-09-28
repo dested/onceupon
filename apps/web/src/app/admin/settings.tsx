@@ -11,7 +11,7 @@ import { FIELD, StickerButton } from '~/components/paper'
 const KILL_SWITCHES = new Set(['purchasesPaused', 'relayPaused', 'readOnly'])
 const ENUMS: Record<string, string[]> = {
   earsVendor: ['deepgram', 'openai'],
-  dialect: ['ops', 'json', 'lines'],
+  dialect: ['kit', 'sketch', 'ops', 'json', 'lines'],
 }
 
 function humanize(key: string): string {

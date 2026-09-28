@@ -8,9 +8,9 @@
 import { promises as fs } from 'node:fs'
 import { Scene } from '~/engine/scene'
 import { VirtualClock } from '~/engine/clock'
-import { SketchDialect } from '~/proto/sketch/dialect'
-import { SKETCH_SYSTEM_PROMPT } from '~/proto/sketch/prompt'
-import { isSketchColor } from '~/proto/sketch/palette'
+import { SketchDialect } from '~/llm/sketch/dialect'
+import { SKETCH_SYSTEM_PROMPT } from '~/llm/sketch/prompt'
+import { isSketchColor } from '~/llm/sketch/palette'
 import type { BenchFile } from '~/proto/bench-types'
 
 /** A dialect whose commands are applied to its own Scene, as the Director does. */
