@@ -8,7 +8,7 @@ export const FLAG_DEFAULTS = {
   weeklyFreeSec: 60,
   weeklyRefillDay: 6,
   earsVendor: 'deepgram' as 'deepgram' | 'openai',
-  model: 'claude-sonnet-5',
+  model: 'claude-sonnet-5-5',
   dialect: 'ops' as 'ops' | 'json' | 'lines',
   purchasesPaused: false,
   relayPaused: false,

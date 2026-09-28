@@ -11,6 +11,7 @@ export interface ModelOption {
 /** Presets for the picker. Any other model id can be typed in; the provider decides the wire format. */
 export const MODEL_OPTIONS: ModelOption[] = [
   { provider: 'anthropic', id: 'claude-haiku-4-5', label: 'Haiku 4.5', hint: 'fastest Anthropic model' },
+  { provider: 'anthropic', id: 'claude-sonnet-5-5', label: 'Sonnet 5.5', hint: 'default: faster than 5, same price' },
   { provider: 'anthropic', id: 'claude-sonnet-5', label: 'Sonnet 5', hint: 'smarter, thinking off' },
   { provider: 'anthropic', id: 'claude-opus-5', label: 'Opus 5', hint: 'smartest, slowest' },
   { provider: 'anthropic', id: 'claude-fable-5-1', label: 'Fable 5.1', hint: 'top tier, 10x Haiku price' },
@@ -20,11 +21,11 @@ export const MODEL_OPTIONS: ModelOption[] = [
   { provider: 'openai', id: 'gpt-5-mini', label: 'GPT-5 mini', hint: 'OpenAI direct, minimal reasoning' },
 ]
 
-export const DEFAULT_MODEL: ModelOption = MODEL_OPTIONS.find((m) => m.id === 'claude-sonnet-5') ?? {
+export const DEFAULT_MODEL: ModelOption = MODEL_OPTIONS.find((m) => m.id === 'claude-sonnet-5-5') ?? {
   provider: 'anthropic',
-  id: 'claude-sonnet-5',
-  label: 'Sonnet 5',
-  hint: 'smarter, thinking off',
+  id: 'claude-sonnet-5-5',
+  label: 'Sonnet 5.5',
+  hint: 'default: faster than 5, same price',
 }
 
 export function isProvider(s: string): s is Provider {

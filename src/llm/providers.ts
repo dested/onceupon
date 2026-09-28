@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import type { Provider, Usage } from './models'
 import { RelayProvider } from '~/backend/relay-provider'
+import { fastThinking } from './anthropic-thinking'
 
 /** One text block of the user message. `cache: true` marks a prompt-cache breakpoint (Anthropic). */
 export interface PromptBlock {
@@ -50,9 +51,6 @@ class AnthropicProvider implements LlmProvider {
   }
 
   async *stream(req: LlmRequest): AsyncGenerator<LlmChunk, void, void> {
-    // Sonnet 5 and Opus 5 run adaptive thinking by default; we want first tokens fast, so switch it off.
-    const thinkingOff =
-      /fable-5|mythos-5|sonnet-5|opus-5|opus-4-8|opus-4-7|sonnet-4-6|opus-4-6/.test(this.model)
     const stream = this.client.messages.stream(
       {
         model: this.model,
@@ -68,7 +66,8 @@ class AnthropicProvider implements LlmProvider {
             ),
           },
         ],
-        ...(thinkingOff ? { thinking: { type: 'disabled' } } : {}),
+        // First tokens fast: the lowest thinking setting each model accepts.
+        ...fastThinking(this.model),
       },
       { signal: req.signal }
     )

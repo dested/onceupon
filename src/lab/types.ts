@@ -215,7 +215,7 @@ export const campaignConfigSchema = z.object({
 export type CampaignConfig = z.infer<typeof campaignConfigSchema>
 
 export const DEFAULT_CAMPAIGN_CONFIG: CampaignConfig = {
-  drawModel: 'claude-sonnet-5',
+  drawModel: 'claude-sonnet-5-5',
   judgeModel: 'claude-opus-5-5',
   editorModel: 'claude-opus-5-5',
   blindModel: 'claude-sonnet-5',

@@ -11,6 +11,7 @@ import * as sessions from './sessions'
 import { prisma } from './prisma'
 import { estimateCost, usdToMicros } from './pricing'
 import { maskText } from './mask'
+import { fastThinking } from './anthropic-thinking'
 import type { DrawChunk, DrawUsage } from '../../../packages/shared/src/api'
 
 const drawSchema = z.object({
@@ -27,9 +28,6 @@ const drawSchema = z.object({
 
 type DrawBody = z.infer<typeof drawSchema>
 
-// Sonnet 5 / Opus 5 run adaptive thinking by default; the studio wants first tokens fast (see
-// root src/llm/providers.ts, which uses the same regex).
-const THINKING_OFF = /fable-5|mythos-5|sonnet-5|opus-5|opus-4-8|opus-4-7|sonnet-4-6|opus-4-6/
 
 const utcMidnight = (): Date => {
   const now = new Date()
@@ -107,7 +105,7 @@ async function streamDraw(
             ),
           },
         ],
-        ...(THINKING_OFF.test(model) ? { thinking: { type: 'disabled' } } : {}),
+        ...fastThinking(model),
       },
       { signal: controller.signal }
     )
