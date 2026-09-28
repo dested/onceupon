@@ -14,7 +14,7 @@ import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import { Scene } from '~/engine/scene'
 import type { Command } from '~/engine/types'
-import { realClock } from '~/engine/clock'
+import { VirtualClock } from '~/engine/clock'
 import { estimateCost } from '~/llm/models'
 import { protoFactory } from '~/proto/registry'
 import { benchSet, type BenchStory } from '~/proto/stories'
@@ -34,6 +34,8 @@ if (!dialectId) {
 const model = args['model'] ?? 'claude-sonnet-5-5'
 const run = args['run'] ?? `${new Date().toISOString().slice(0, 10)}-${dialectId}`
 const conc = Number(args['conc'] ?? 4)
+/** between = thinking between_tools (Sonnet 5.5's lowest); adaptive-low = adaptive + effort low. */
+const thinkingMode = args['thinking'] ?? 'between'
 const stories = benchSet(args['set'] ?? 'quick')
 const key = process.env['VITE_ANTHROPIC_API_KEY']
 if (!key) throw new Error('VITE_ANTHROPIC_API_KEY missing (.env.local)')
@@ -45,7 +47,10 @@ const INK = new Set(['shapesAdded', 'shapesReset', 'bg', 'fx'])
 
 async function benchStory(story: BenchStory): Promise<BenchFile> {
   const scene = new Scene()
-  const dialect = protoFactory(dialectId)(scene, { moderation: true, clock: realClock })
+  // Virtual time (Bun has no window timers): delayed commands (a pose ending) fire between beats,
+  // as they would while the child keeps talking.
+  const clock = new VirtualClock()
+  const dialect = protoFactory(dialectId)(scene, { moderation: true, clock })
   const apply = (cmd: Command): boolean => {
     let ink = false
     for (const ev of scene.apply(cmd)) if (INK.has(ev.k)) ink = true
@@ -103,7 +108,9 @@ async function benchStory(story: BenchStory): Promise<BenchFile> {
             ),
           },
         ],
-        thinking: { type: 'between_tools' },
+        ...(thinkingMode === 'adaptive-low'
+          ? { thinking: { type: 'adaptive' as const, display: 'omitted' as const }, output_config: { effort: 'low' as const } }
+          : { thinking: { type: 'between_tools' as const } }),
       })
       let buf = ''
       for await (const ev of stream) {
@@ -129,6 +136,7 @@ async function benchStory(story: BenchStory): Promise<BenchFile> {
       error = e instanceof Error ? e.message : String(e)
     }
     const doneMs = performance.now() - t0
+    clock.advanceTo(clock.now() + 20000)
     beats.push({
       words,
       lines,
