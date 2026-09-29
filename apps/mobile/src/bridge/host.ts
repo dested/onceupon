@@ -78,6 +78,7 @@ export const BRIDGE_NAMES = [
   'orientation.lock',
   'review.request',
   'notify.permission',
+  'speech.available',
   'speech.start',
   'speech.stop',
 ] as const satisfies readonly BridgeName[]

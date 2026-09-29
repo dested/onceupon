@@ -21,6 +21,7 @@ import { buildDebugReport } from './debug-report'
 import { appStore, resolveStt, type SttKind } from './store'
 import { createOpenAiRealtimeRecognizer, isLiveModel } from '~/speech/openai-realtime'
 import { createDeepgramRecognizer } from '~/speech/deepgram'
+import { APPLE_UNAVAILABLE, appleEarsEngine, createAppleRecognizer, type AppleEngine, type AppleRecognizer } from '~/speech/apple'
 import { currentMicStream, warmMic } from '~/speech/pcm-mic'
 import {
   getStory,
@@ -107,6 +108,17 @@ function currentProvider(): LlmProvider | null {
   return makeProvider(settings.provider, settings.model, settings.keys)
 }
 
+/** The on-device recognizers speak en-US for now (the app ships in English). */
+const EARS_LOCALE = 'en-US'
+
+/**
+ * SpeechAnalyzer finalizes a segment at each pause and streams the tail like the live cloud models;
+ * SFSpeechRecognizer rewrites one growing segment the way Chrome does.
+ */
+function appleTrackerOptions(engine: AppleEngine): TrackerOptions {
+  return engine === 'analyzer' ? DEEPGRAM_TRACKER : CHROME_TRACKER
+}
+
 /** Tracker rules for the ears the relay handed us (hosted mode; the vendor is not in settings). */
 function hostedTrackerOptions(ears: EarsToken | null): TrackerOptions {
   if (!ears) return CHROME_TRACKER
@@ -121,6 +133,10 @@ export class LiveSession {
   readonly director: Director
   readonly audio = new CrayonAudio()
   private recognizer: Recognizer | null = null
+  /** The on-device (shell) recognizer when that is the one listening; it also records the voice clip. */
+  private appleRec: AppleRecognizer | null = null
+  /** On-device ears failed to start this story: use the cloud vendor from now on. */
+  private appleFailed = false
   private tracker: TranscriptTracker
   private tickTimer = 0
   /** Last time the mic level read as a voice (streaming recognizers only; Chrome reports no level). */
@@ -192,7 +208,8 @@ export class LiveSession {
     this.meter = HOSTED ? new StoryMeter(this.story.id, this.meterHandlers()) : null
     activeMeter = this.meter
     appStore.set({
-      micSupported: speechSupported() || resolveStt(appStore.get().settings) !== 'browser',
+      // Hosted ears come from the server (cloud) or the shell (on-device), never only Web Speech.
+      micSupported: HOSTED || speechSupported() || resolveStt(appStore.get().settings) !== 'browser',
       status: 'idle',
       ending: false,
       ended: false,
@@ -475,8 +492,11 @@ export class LiveSession {
       onReady: () => {
         if (this.wantListening) appStore.set({ listening: true, micStarting: false })
         this.meter?.setListening(true)
-        const stream = currentMicStream()
-        if (stream) this.voice.start(stream, this.now())
+        if (this.appleRec) this.voice.startExternal(this.appleRec, this.now())
+        else {
+          const stream = currentMicStream()
+          if (stream) this.voice.start(stream, this.now())
+        }
         this.lastWordsAt = performance.now()
         this.nudged = false
       },
@@ -494,6 +514,15 @@ export class LiveSession {
         }))
       },
       onError: (err) => {
+        if (err.startsWith(APPLE_UNAVAILABLE)) {
+          // The iPad could not listen on-device (old OS, model download failed): cloud ears instead.
+          this.appleFailed = true
+          this.recognizer = null
+          this.appleRec = null
+          appStore.set((s) => ({ warnings: [...s.warnings.slice(-9), err] }))
+          if (this.wantListening) void this.startListening()
+          return
+        }
         if (
           err === 'not-allowed' ||
           err === 'service-not-allowed' ||
@@ -539,19 +568,36 @@ export class LiveSession {
     void this.audio.start()
     const settings = appStore.get().settings
     if (HOSTED && this.meter) {
+      const cfg = appStore.get().config
+      const apple: AppleEngine | null =
+        cfg?.onDeviceEars && !this.appleFailed ? await appleEarsEngine(EARS_LOCALE) : null
       let start: SessionStart
       try {
-        start = await this.meter.ensureStarted(appStore.get().config?.earsVendor ?? 'browser')
+        start = await this.meter.ensureStarted(apple ? 'apple' : (cfg?.earsVendor ?? 'browser'))
       } catch (e) {
         this.handleStartError(e)
         return
       }
-      const ears = start.ears
-      const kind: SttKind = ears ? ears.vendor : 'browser'
+      let ears = start.ears
+      // The session was opened for on-device ears that then failed: mint cloud ears for it now.
+      if (!apple && !ears && this.appleFailed) {
+        try {
+          ears = await this.meter.refreshEars()
+        } catch {
+          ears = null
+        }
+      }
+      const kind: SttKind = apple ? 'apple' : ears ? ears.vendor : 'browser'
       this.setRecognizer(
         kind,
         () => {
           const handlers = this.recognizerHandlers(kind !== 'browser')
+          if (kind === 'apple') {
+            const rec = createAppleRecognizer(handlers, { locale: EARS_LOCALE, record: true })
+            this.appleRec = rec
+            return rec
+          }
+          this.appleRec = null
           if (kind === 'openai')
             return createOpenAiRealtimeRecognizer(handlers, {
               apiKey: ears?.token ?? '',
@@ -569,7 +615,7 @@ export class LiveSession {
             })
           return createRecognizer(handlers)
         },
-        hostedTrackerOptions(ears)
+        apple ? appleTrackerOptions(apple) : hostedTrackerOptions(ears)
       )
       if (!this.recognizer) {
         appStore.set((s) => ({ warnings: [...s.warnings, 'speech recognition needs Chrome'] }))

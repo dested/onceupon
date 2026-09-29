@@ -77,11 +77,28 @@ export interface BridgeApi {
     output: { status: 'granted' | 'denied' | 'undetermined' }
   }
   /**
-   * On-device speech recognition (SFSpeechRecognizer). Results arrive as `speech.result` events,
-   * then `speech.end`; failures as `speech.error`. `available: false` when the OS cannot do it.
+   * On-device speech recognition: SpeechAnalyzer on iPadOS 26+ (`analyzer`), else on-device
+   * SFSpeechRecognizer (`sfspeech`). `speech.available` never prompts for permission.
    */
-  'speech.start': { input: { locale: string; onDevice: boolean }; output: { available: boolean } }
-  'speech.stop': { input: Record<string, never>; output: Record<string, never> }
+  'speech.available': {
+    input: { locale: string }
+    output: { engine: SpeechEngine | null; permission: 'granted' | 'denied' | 'undetermined' }
+  }
+  /**
+   * Starts listening (asks for mic + speech permission the first time; the analyzer may download
+   * its language model once). Results arrive as `speech.result`, loudness as `speech.level`, then
+   * `speech.end`; failures as `speech.error`. With `record` the shell keeps the audio for the clip.
+   * `available: false` when the OS cannot do it (older shells ignore `record` and omit `engine`).
+   */
+  'speech.start': {
+    input: { locale: string; onDevice: boolean; record?: boolean }
+    output: { available: boolean; engine?: SpeechEngine }
+  }
+  /** Stops listening; `clip` is the recorded audio of this span when `record` was set. */
+  'speech.stop': {
+    input: Record<string, never>
+    output: { clip?: { base64: string; mime: string; ms: number } | null }
+  }
 }
 
 /** Event payloads pushed by the shell (`BridgeEvent.data`), per event name. */
@@ -95,7 +112,13 @@ export interface BridgeEventMap {
   'speech.result': { results: Array<{ transcript: string; isFinal: boolean }>; isFinal: boolean }
   'speech.end': Record<string, never>
   'speech.error': { code: string; message: string }
+  /** Mic loudness 0..1, about 10x a second while listening. */
+  'speech.level': { level: number }
+  /** The recognizer is capturing and understanding audio (after any model download). */
+  'speech.ready': Record<string, never>
 }
+
+export type SpeechEngine = 'analyzer' | 'sfspeech'
 
 export type BridgeName = keyof BridgeApi
 export type BridgeInput<K extends BridgeName> = BridgeApi[K]['input']
@@ -125,6 +148,8 @@ export const BRIDGE_EVENT_NAMES = [
   'speech.result',
   'speech.end',
   'speech.error',
+  'speech.level',
+  'speech.ready',
 ] as const satisfies readonly BridgeEventName[]
 // Fails to compile if BridgeEventMap gains an event missing from BRIDGE_EVENT_NAMES.
 type MissingEvent = Exclude<BridgeEventName, (typeof BRIDGE_EVENT_NAMES)[number]>

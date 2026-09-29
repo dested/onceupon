@@ -26,9 +26,15 @@ export interface VoiceClipMeta {
 /** In order of preference; the first the platform can record. mp4/aac replays and muxes everywhere. */
 const MIME_CANDIDATES = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'] as const
 
+/** Something else recorded the span (the shell's on-device ears own the mic); hands the clip over at stop. */
+export interface ExternalClipSource {
+  takeClip(): Promise<{ blob: Blob; ms: number } | null>
+}
+
 /** Records the child's voice while the mic is open. One clip per listening span. */
 export class VoiceRecorder {
   private rec: MediaRecorder | null = null
+  private external: { source: ExternalClipSource; t: number } | null = null
   private chunks: Blob[] = []
   private tRecord = 0
   private startedAt = 0
@@ -61,7 +67,18 @@ export class VoiceRecorder {
     rec.start(1000)
   }
 
+  /** The span is recorded elsewhere; `stop()` collects it from `source`. */
+  startExternal(source: ExternalClipSource, tRecord: number): void {
+    if (this.rec || this.external) return
+    this.external = { source, t: tRecord }
+  }
+
   stop(): Promise<{ t: number; ms: number; blob: Blob } | null> {
+    const ext = this.external
+    if (ext) {
+      this.external = null
+      return ext.source.takeClip().then((c) => (c && c.blob.size > 0 ? { t: ext.t, ms: c.ms, blob: c.blob } : null))
+    }
     const rec = this.rec
     if (!rec) return Promise.resolve(null)
     this.rec = null
@@ -85,7 +102,7 @@ export class VoiceRecorder {
   }
 
   get recording(): boolean {
-    return this.rec !== null
+    return this.rec !== null || this.external !== null
   }
 }
 

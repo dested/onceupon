@@ -8,7 +8,8 @@
 import type { PackId } from './packs'
 
 export type Platform = 'ios' | 'android' | 'web'
-export type EarsVendor = 'deepgram' | 'openai' | 'browser'
+/** `apple` = the iPad's on-device recognizer through the shell (free, no token); `browser` = Web Speech. */
+export type EarsVendor = 'deepgram' | 'openai' | 'apple' | 'browser'
 export type EndReason = 'the-end' | 'sleepy' | 'silence'
 
 export type ApiErrorCode =
@@ -48,7 +49,10 @@ export interface DeviceState {
 }
 
 export interface ClientConfig {
-  earsVendor: Exclude<EarsVendor, 'browser'>
+  /** The cloud vendor (web, older shells, or when on-device ears are unavailable). */
+  earsVendor: 'deepgram' | 'openai'
+  /** Prefer the shell's on-device recognizer when it has one (iPad). */
+  onDeviceEars: boolean
   model: string
   dialect: 'kit' | 'sketch' | 'ops' | 'json' | 'lines'
   freeFirstStorySec: number

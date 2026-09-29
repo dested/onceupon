@@ -46,7 +46,8 @@ export async function startSession(
   })
 
   let ears: EarsToken | null = null
-  if (fresh.balanceSec > 0 && input.ears !== 'browser') {
+  // On-device (apple) and browser ears need no cloud credential.
+  if (fresh.balanceSec > 0 && (input.ears === 'deepgram' || input.ears === 'openai')) {
     ears = await mintEarsWithFallback(flags, earsTtl(fresh.balanceSec))
   }
 

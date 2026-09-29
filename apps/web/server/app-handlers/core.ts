@@ -23,6 +23,7 @@ const platform: z.ZodType<AppApi['device.register']['input']['platform']> = z.en
 const earsVendor: z.ZodType<AppApi['session.start']['input']['ears']> = z.enum([
   'deepgram',
   'openai',
+  'apple',
   'browser',
 ])
 const endReason: z.ZodType<AppApi['session.stop']['input']['ended']> = z
@@ -104,6 +105,7 @@ export const coreHandlers: Handlers = {
     const origin = env.PUBLIC_ORIGIN
     const config: ClientConfig = {
       earsVendor: pickEarsVendor(flags) ?? flags.earsVendor,
+      onDeviceEars: flags.onDeviceEars,
       model: flags.model,
       dialect: flags.dialect,
       freeFirstStorySec: flags.freeFirstStorySec,

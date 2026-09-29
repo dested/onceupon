@@ -132,7 +132,7 @@ model StorySession {
   deviceId    String    @map("device_id")
   device      Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   storyId     String    @map("story_id")
-  earsVendor  String    @map("ears_vendor") // deepgram | openai | browser
+  earsVendor  String    @map("ears_vendor") // deepgram | openai | apple | browser
   status      String    @default("open") // open | closed | exhausted
   endReason   String?   @map("end_reason") // the-end | sleepy | silence
   chargedSec  Int       @default(0) @map("charged_sec")

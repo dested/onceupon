@@ -9,7 +9,7 @@ import { saveVideo } from './media'
 import { netState } from './net'
 import { blobDelete, blobGet, blobPut, storiesDelete, storiesList, storiesPut } from './storage'
 import { haptic, openUrl, shareFile, shareUrl } from './share'
-import { speechStart, speechStop } from './speech'
+import { speechAvailable, speechStart, speechStop } from './speech'
 import { awakeSet, notifyPermission, orientationLock, reviewRequest } from './system'
 
 // The studio's first render reports `ready`; that is when we hide the native splash.
@@ -47,6 +47,7 @@ export function createHandlers(): Handlers {
     'orientation.lock': orientationLock,
     'review.request': reviewRequest,
     'notify.permission': notifyPermission,
+    'speech.available': speechAvailable,
     'speech.start': speechStart,
     'speech.stop': speechStop,
   }

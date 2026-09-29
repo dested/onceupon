@@ -8,6 +8,8 @@ export const FLAG_DEFAULTS = {
   weeklyFreeSec: 60,
   weeklyRefillDay: 6,
   earsVendor: 'deepgram' as 'deepgram' | 'openai',
+  /** iPad shells use the on-device recognizer (free) instead of minting cloud ears. */
+  onDeviceEars: true,
   model: 'claude-sonnet-5-5',
   dialect: 'kit' as 'kit' | 'sketch' | 'ops' | 'json' | 'lines',
   purchasesPaused: false,
@@ -32,6 +34,7 @@ const flagsObject = z.object({
   weeklyFreeSec: int0,
   weeklyRefillDay: z.number().int().min(0).max(6),
   earsVendor: z.enum(['deepgram', 'openai']),
+  onDeviceEars: z.boolean(),
   model: z.string().min(1),
   dialect: z.enum(['kit', 'sketch', 'ops', 'json', 'lines']),
   purchasesPaused: z.boolean(),

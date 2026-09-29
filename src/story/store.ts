@@ -17,7 +17,7 @@ export type { ClientConfig, EndReason, PackId }
 export const STT_MODES = ['auto', 'browser', 'openai', 'deepgram'] as const
 export type SttMode = (typeof STT_MODES)[number]
 
-export type SttKind = 'browser' | 'openai' | 'deepgram'
+export type SttKind = 'browser' | 'openai' | 'deepgram' | 'apple'
 
 export interface Settings {
   provider: Provider
@@ -50,7 +50,7 @@ export function resolveStt(s: Settings): SttKind {
 
 /** Vendor list price per minute of audio, by resolved ears and model. */
 export function sttRateFor(kind: SttKind, model: string): number {
-  if (kind === 'browser') return 0
+  if (kind === 'browser' || kind === 'apple') return 0
   if (kind === 'openai') return /live/.test(model) ? 0.017 : 0.006
   return 0.0077 // deepgram nova-3 streaming, list
 }
