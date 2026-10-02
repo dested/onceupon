@@ -14,6 +14,7 @@ type SearchRow = {
   platform: string
   balanceSec: number
   paying: boolean
+  comped: boolean
   blocked: boolean
   createdAt: string
   lastSeenAt: string
@@ -49,9 +50,10 @@ export function LedgerPage() {
       header: 'State',
       cell: (r) => (
         <span className="flex gap-1">
+          {r.comped && <Pill tone="lilac">comped</Pill>}
           {r.paying && <Pill tone="green">paying</Pill>}
           {r.blocked && <Pill tone="red">blocked</Pill>}
-          {!r.paying && !r.blocked && <span className="text-ink-soft">free</span>}
+          {!r.paying && !r.comped && !r.blocked && <span className="text-ink-soft">free</span>}
         </span>
       ),
     },
@@ -117,6 +119,7 @@ function DeviceDetail({ data, onDone }: { data: DeviceData; onDone: () => void }
   const [minutesField, setMinutesField] = useState('')
   const [adjustReason, setAdjustReason] = useState('')
   const [blockReason, setBlockReason] = useState('')
+  const [compReason, setCompReason] = useState('')
 
   const adjust = useMutation(
     trpc.admin.ledger.adjust.mutationOptions({
@@ -128,6 +131,14 @@ function DeviceDetail({ data, onDone }: { data: DeviceData; onDone: () => void }
     })
   )
   const block = useMutation(trpc.admin.ledger.block.mutationOptions({ onSuccess: onDone }))
+  const comp = useMutation(
+    trpc.admin.ledger.comp.mutationOptions({
+      onSuccess: () => {
+        setCompReason('')
+        onDone()
+      },
+    })
+  )
   const reset = useMutation(trpc.admin.ledger.resetFreeStory.mutationOptions({ onSuccess: onDone }))
 
   const entryCols: Column<DeviceData['entries'][number]>[] = [
@@ -173,6 +184,7 @@ function DeviceDetail({ data, onDone }: { data: DeviceData; onDone: () => void }
           <div>
             <div className="flex items-center gap-2">
               <span className="font-scrawl text-3xl text-ink">{dev.code}</span>
+              {dev.comped && <Pill tone="lilac">comped</Pill>}
               {dev.paying && <Pill tone="green">paying</Pill>}
               {dev.blocked && <Pill tone="red">blocked</Pill>}
               <Pill>{dev.platform}</Pill>
@@ -191,9 +203,14 @@ function DeviceDetail({ data, onDone }: { data: DeviceData; onDone: () => void }
         {dev.blockedReason && (
           <p className="mt-2 font-hand text-base text-crayon-red">Blocked: {dev.blockedReason}</p>
         )}
+        {dev.comped && (
+          <p className="mt-2 font-hand text-base text-ink-soft">
+            Comped{dev.compedReason ? `: ${dev.compedReason}` : ''}. Stories are free and never debited.
+          </p>
+        )}
 
         {/* Actions */}
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border-[3px] border-ink bg-paper-deep/40 p-3">
             <div className="mb-2 font-hand text-base text-ink">Adjust minutes</div>
             <div className="flex flex-col gap-2">
@@ -249,6 +266,37 @@ function DeviceDetail({ data, onDone }: { data: DeviceData; onDone: () => void }
                 </ConfirmButton>
               </div>
             )}
+          </div>
+
+          <div className="rounded-2xl border-[3px] border-ink bg-paper-deep/40 p-3">
+            <div className="mb-2 font-hand text-base text-ink">{dev.comped ? 'Comped' : 'Comp'}</div>
+            {dev.comped ? (
+              <ConfirmButton
+                tone="yellow"
+                confirmLabel="remove comp?"
+                disabled={comp.isPending}
+                onConfirm={() => comp.mutate({ deviceId: dev.id, comped: false, reason: '' })}>
+                Remove comp
+              </ConfirmButton>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <div className="font-hand text-sm text-ink-soft">Unlimited free stories, voice sharing unlocked</div>
+                <input
+                  className={FIELD}
+                  placeholder="reason"
+                  value={compReason}
+                  onChange={(e) => setCompReason(e.target.value)}
+                />
+                <ConfirmButton
+                  tone="lilac"
+                  confirmLabel="comp?"
+                  disabled={comp.isPending || compReason.trim().length === 0}
+                  onConfirm={() => comp.mutate({ deviceId: dev.id, comped: true, reason: compReason.trim() })}>
+                  Comp device
+                </ConfirmButton>
+              </div>
+            )}
+            {comp.isError && <p className="font-hand text-sm text-crayon-red">{errorMessage(comp.error)}</p>}
           </div>
 
           <div className="rounded-2xl border-[3px] border-ink bg-paper-deep/40 p-3">

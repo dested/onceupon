@@ -90,6 +90,9 @@ model Device {
   freeStoryUsed Boolean   @default(false) @map("free_story_used")
   weeklyGrantAt DateTime? @map("weekly_grant_at")
   paying        Boolean   @default(false)
+  /// Comped by an admin: stories are free and never debited (unlimited), and it counts as paying for perks.
+  comped        Boolean   @default(false)
+  compedReason  String?   @map("comped_reason")
   shareVoice    Boolean   @default(false) @map("share_voice")
   blocked       Boolean   @default(false)
   blockedReason String?   @map("blocked_reason")

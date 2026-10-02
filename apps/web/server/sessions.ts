@@ -19,8 +19,18 @@ const utcMidnight = (): Date => {
 const earsTtl = (balanceSec: number): number => clamp(balanceSec + 30, 30, 3600)
 
 /**
+ * What a comped device is told it has left. Comped stories are never debited; reporting a large
+ * constant keeps every client (including shells built before `comped` existed) out of the sleepy path.
+ */
+export const COMPED_REMAINING_SEC = 100 * 3600
+
+/** Seconds left as the client should see them: the balance, or the comped constant. */
+const remainingFor = (device: Device, balanceSec: number): number =>
+  device.comped ? COMPED_REMAINING_SEC : balanceSec
+
+/**
  * Open a story session. Gated by the read-only / paused flags, the per-day session cap, and a
- * positive balance (after applying any due weekly grant). Mints an ears token when the client asked
+ * positive balance (after applying any due weekly grant; comped devices skip the balance). Mints an ears token when the client asked
  * for a streaming vendor and one is configured.
  */
 export async function startSession(
@@ -39,7 +49,8 @@ export async function startSession(
   }
 
   const fresh = await ledger.applyWeeklyGrant(device, flags)
-  if (fresh.balanceSec <= 0) throw new ApiError(402, 'exhausted', 'out of minutes')
+  if (!fresh.comped && fresh.balanceSec <= 0) throw new ApiError(402, 'exhausted', 'out of minutes')
+  const remainingSec = remainingFor(fresh, fresh.balanceSec)
 
   const session = await prisma.storySession.create({
     data: { deviceId: fresh.id, storyId: input.storyId, earsVendor: input.ears },
@@ -47,8 +58,8 @@ export async function startSession(
 
   let ears: EarsToken | null = null
   // On-device (apple) and browser ears need no cloud credential.
-  if (fresh.balanceSec > 0 && (input.ears === 'deepgram' || input.ears === 'openai')) {
-    ears = await mintEarsWithFallback(flags, earsTtl(fresh.balanceSec))
+  if (input.ears === 'deepgram' || input.ears === 'openai') {
+    ears = await mintEarsWithFallback(flags, earsTtl(remainingSec))
   }
 
   if (!fresh.freeStoryUsed) {
@@ -57,7 +68,7 @@ export async function startSession(
 
   return {
     sessionId: session.id,
-    remainingSec: fresh.balanceSec,
+    remainingSec,
     ears,
     model: flags.model,
     dialect: flags.dialect,
@@ -72,6 +83,21 @@ async function ownedOpenSession(device: Device, sessionId: string): Promise<Stor
   return session
 }
 
+/**
+ * Charge `seconds` of a session to the device, or nothing when it is comped. Returns what was charged
+ * and the balance afterwards.
+ */
+async function charge(
+  device: Device,
+  sessionId: string,
+  seconds: number,
+  note: string | null
+): Promise<{ charged: number; balanceSec: number }> {
+  if (seconds > 0 && !device.comped) return ledger.debit(device.id, 'debit', seconds, sessionId, note)
+  const d = await prisma.device.findUniqueOrThrow({ where: { id: device.id } })
+  return { charged: 0, balanceSec: d.balanceSec }
+}
+
 /** Meter one beat: charge the listened seconds (clamped), advance the session, report the balance. */
 export async function beat(
   device: Device,
@@ -80,22 +106,18 @@ export async function beat(
 ): Promise<{ remainingSec: number; exhausted: boolean }> {
   await ownedOpenSession(device, sessionId)
   const ms = clamp(listeningMs, 0, 90_000)
-  const seconds = Math.ceil(ms / 1000)
-  const balanceSec =
-    seconds > 0
-      ? (await ledger.debit(device.id, 'debit', seconds, sessionId, null)).balanceSec
-      : (await prisma.device.findUniqueOrThrow({ where: { id: device.id } })).balanceSec
-  const exhausted = balanceSec <= 0
+  const { charged, balanceSec } = await charge(device, sessionId, Math.ceil(ms / 1000), null)
+  const exhausted = !device.comped && balanceSec <= 0
   await prisma.storySession.update({
     where: { id: sessionId },
     data: {
-      chargedSec: { increment: seconds },
+      chargedSec: { increment: charged },
       listenedMs: { increment: ms },
       lastBeatAt: new Date(),
       ...(exhausted ? { status: 'exhausted' } : {}),
     },
   })
-  return { remainingSec: balanceSec, exhausted }
+  return { remainingSec: remainingFor(device, balanceSec), exhausted }
 }
 
 /**
@@ -109,14 +131,8 @@ export async function typed(
   text: string
 ): Promise<{ remainingSec: number; exhausted: boolean; chargedSec: number }> {
   await ownedOpenSession(device, sessionId)
-  const { charged, balanceSec } = await ledger.debit(
-    device.id,
-    'debit',
-    typedChargeSec(text),
-    sessionId,
-    'typed'
-  )
-  const exhausted = balanceSec <= 0
+  const { charged, balanceSec } = await charge(device, sessionId, typedChargeSec(text), 'typed')
+  const exhausted = !device.comped && balanceSec <= 0
   await prisma.storySession.update({
     where: { id: sessionId },
     data: {
@@ -126,7 +142,7 @@ export async function typed(
       ...(exhausted ? { status: 'exhausted' } : {}),
     },
   })
-  return { remainingSec: balanceSec, exhausted, chargedSec: charged }
+  return { remainingSec: remainingFor(device, balanceSec), exhausted, chargedSec: charged }
 }
 
 /** Close a session (idempotent). Charges the final span, marks the end, reports the balance. */
@@ -142,25 +158,21 @@ export async function stopSession(
   }
   if (session.status !== 'open') {
     const d = await prisma.device.findUniqueOrThrow({ where: { id: device.id } })
-    return { remainingSec: d.balanceSec }
+    return { remainingSec: remainingFor(device, d.balanceSec) }
   }
   const ms = clamp(listeningMs, 0, 90_000)
-  const seconds = Math.ceil(ms / 1000)
-  const balanceSec =
-    seconds > 0
-      ? (await ledger.debit(device.id, 'debit', seconds, sessionId, null)).balanceSec
-      : (await prisma.device.findUniqueOrThrow({ where: { id: device.id } })).balanceSec
+  const { charged, balanceSec } = await charge(device, sessionId, Math.ceil(ms / 1000), null)
   await prisma.storySession.update({
     where: { id: sessionId },
     data: {
-      chargedSec: { increment: seconds },
+      chargedSec: { increment: charged },
       listenedMs: { increment: ms },
-      status: balanceSec <= 0 ? 'exhausted' : 'closed',
+      status: !device.comped && balanceSec <= 0 ? 'exhausted' : 'closed',
       endedAt: new Date(),
       endReason: ended,
     },
   })
-  return { remainingSec: balanceSec }
+  return { remainingSec: remainingFor(device, balanceSec) }
 }
 
 /** A fresh ears token mid-session (the previous one expired). */
@@ -168,8 +180,8 @@ export async function earsTokenFor(device: Device, sessionId: string): Promise<E
   const flags = await getFlags()
   await ownedOpenSession(device, sessionId)
   const d = await prisma.device.findUniqueOrThrow({ where: { id: device.id } })
-  if (d.balanceSec <= 0) throw new ApiError(402, 'exhausted', 'out of minutes')
-  const token = await mintEarsWithFallback(flags, earsTtl(d.balanceSec))
+  if (!d.comped && d.balanceSec <= 0) throw new ApiError(402, 'exhausted', 'out of minutes')
+  const token = await mintEarsWithFallback(flags, earsTtl(remainingFor(d, d.balanceSec)))
   if (!token) throw new ApiError(503, 'upstream', 'could not get an ears token')
   return token
 }

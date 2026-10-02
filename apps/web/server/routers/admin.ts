@@ -39,6 +39,11 @@ export const adminRouter = router({
       .mutation(({ input, ctx }) =>
         q.setBlocked(input.deviceId, input.blocked, input.reason, ctx.session.user.email)
       ),
+    comp: adminProcedure
+      .input(z.object({ deviceId: z.string().min(1), comped: z.boolean(), reason: z.string().default('') }))
+      .mutation(({ input, ctx }) =>
+        q.setComped(input.deviceId, input.comped, input.reason, ctx.session.user.email)
+      ),
     resetFreeStory: adminProcedure
       .input(z.object({ deviceId: z.string().min(1) }))
       .mutation(({ input, ctx }) => q.resetFreeStory(input.deviceId, ctx.session.user.email)),

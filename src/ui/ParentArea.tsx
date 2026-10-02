@@ -37,6 +37,7 @@ export function ParentArea() {
   const hosted = useApp((s) => s.hosted)
   const balanceSec = useApp((s) => s.balanceSec)
   const paying = useApp((s) => s.paying)
+  const comped = useApp((s) => s.comped)
   const shareVoice = useApp((s) => s.shareVoice)
   const deviceCode = useApp((s) => s.deviceCode)
   const sound = useApp((s) => s.settings.sound)
@@ -191,9 +192,13 @@ export function ParentArea() {
           {/* Minutes */}
           <h3 className={heading}>Minutes</h3>
           <div className="font-scrawl text-5xl leading-none text-ink" data-testid="parent-balance">
-            {formatMinutes(balanceSec)}
+            {comped ? 'Unlimited' : formatMinutes(balanceSec)}
           </div>
-          <p className="mt-1 font-hand text-base text-ink-soft">next free minute top-up: {formatNextWeekly(nextWeekly)}</p>
+          {comped ? (
+            <p className="mt-1 font-hand text-base text-ink-soft">this crayon is on the house</p>
+          ) : (
+            <p className="mt-1 font-hand text-base text-ink-soft">next free minute top-up: {formatNextWeekly(nextWeekly)}</p>
+          )}
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <StickerButton tone="yellow" tilt={-1} onClick={() => appStore.set({ paywallOpen: true })} data-testid="parent-buy">
               Buy minutes

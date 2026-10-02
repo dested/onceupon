@@ -85,6 +85,7 @@ async function run(): Promise<void> {
   appStore.set({
     balanceSec: state.balanceSec,
     paying: state.paying,
+    comped: state.comped,
     shareVoice: state.shareVoice,
     deviceCode: state.code,
     lastPack: state.lastPack,
@@ -119,6 +120,7 @@ export async function refreshDevice(): Promise<DeviceState | null> {
     appStore.set({
       balanceSec: state.balanceSec,
       paying: state.paying,
+    comped: state.comped,
       shareVoice: state.shareVoice,
       deviceCode: state.code,
       lastPack: state.lastPack,
@@ -134,6 +136,7 @@ export async function setShareVoice(on: boolean): Promise<void> {
   appStore.set({
     balanceSec: state.balanceSec,
     paying: state.paying,
+    comped: state.comped,
     shareVoice: state.shareVoice,
     deviceCode: state.code,
     lastPack: state.lastPack,

@@ -84,7 +84,7 @@ export async function createShare(
 ): Promise<AppApi['share.create']['output']> {
   const { record, childName, voice, coverPng } = input
 
-  if (voice && !(device.paying && device.shareVoice)) {
+  if (voice && !((device.paying || device.comped) && device.shareVoice)) {
     throw new ApiError(403, 'consent_required', 'Voice sharing needs a paying account with consent')
   }
   if (childName && childName.length > MAX_CHILD_NAME) {

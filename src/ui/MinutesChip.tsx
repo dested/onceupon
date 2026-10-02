@@ -12,6 +12,7 @@ export function MinutesChip() {
   const remainingSec = useApp((s) => s.remainingSec)
   const balanceSec = useApp((s) => s.balanceSec)
   const sleepy = useApp((s) => s.sleepy)
+  const comped = useApp((s) => s.comped)
   if (!hosted) return null
 
   const seconds = remainingSec ?? balanceSec
@@ -26,11 +27,11 @@ export function MinutesChip() {
       type="button"
       className={`minutes-chip ${sleepy ? 'is-sleepy' : ''}`}
       onClick={open}
-      aria-label={`${formatMinutes(seconds)} of story time left, open grown-up area`}
+      aria-label={comped ? 'unlimited story time, open grown-up area' : `${formatMinutes(seconds)} of story time left, open grown-up area`}
       data-testid="minutes-chip">
       <Clock size={15} strokeWidth={2.6} aria-hidden="true" />
-      <span>{formatMinutes(seconds)}</span>
-      {sleepy && (
+      <span>{comped ? 'unlimited' : formatMinutes(seconds)}</span>
+      {sleepy && !comped && (
         <span className="minutes-chip-z" aria-hidden="true">
           z
         </span>

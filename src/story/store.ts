@@ -130,8 +130,10 @@ export interface AppState {
   balanceSec: number
   /** Seconds left in the current story session; null until a session starts. */
   remainingSec: number | null
-  /** Has ever bought a pack or redeemed a gift (unlocks share-with-voice). */
+  /** Has ever bought a pack or redeemed a gift, or is comped (unlocks share-with-voice). */
   paying: boolean
+  /** Comped by an admin: unlimited free stories, no minutes shown. */
+  comped: boolean
   /** Parent turned on "share with voice". */
   shareVoice: boolean
   /** 8-char device code shown to the parent for the web shop / support. */
@@ -338,6 +340,7 @@ export const appStore = new Store<AppState>({
   balanceSec: 0,
   remainingSec: null,
   paying: false,
+  comped: false,
   shareVoice: false,
   deviceCode: '',
   lastPack: null,

@@ -85,8 +85,8 @@ export const coreHandlers: Handlers = {
 
   'device.consent': deviceHandler<'device.consent'>(consentInput, async (input, ctx) => {
     const flags = await getFlags()
-    // Turning it on requires a paying device; turning it off is always allowed.
-    if (input.shareVoice && !ctx.device.paying) {
+    // Turning it on requires a paying (or comped) device; turning it off is always allowed.
+    if (input.shareVoice && !ctx.device.paying && !ctx.device.comped) {
       throw new ApiError(403, 'consent_required', 'buy a pack to share with voice')
     }
     const updated = await prisma.device.update({

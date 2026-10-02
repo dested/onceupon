@@ -276,6 +276,7 @@ export async function ledgerSearch(q: string) {
     platform: d.platform,
     balanceSec: d.balanceSec,
     paying: d.paying,
+    comped: d.comped,
     blocked: d.blocked,
     createdAt: d.createdAt.toISOString(),
     lastSeenAt: d.lastSeenAt.toISOString(),
@@ -300,6 +301,8 @@ export async function ledgerDevice(deviceId: string) {
       appVersion: device.appVersion,
       balanceSec: device.balanceSec,
       paying: device.paying,
+      comped: device.comped,
+      compedReason: device.compedReason,
       blocked: device.blocked,
       blockedReason: device.blockedReason,
       freeStoryUsed: device.freeStoryUsed,
@@ -353,6 +356,16 @@ export async function setBlocked(deviceId: string, blocked: boolean, reason: str
   })
   await logAudit(actor, blocked ? 'device.block' : 'device.unblock', deviceId, { reason })
   return { blocked: device.blocked, balanceSec: device.balanceSec }
+}
+
+/** Comp a device (free, unmetered stories) or take the comp away. The balance is left as it was. */
+export async function setComped(deviceId: string, comped: boolean, reason: string, actor: string) {
+  const device = await prisma.device.update({
+    where: { id: deviceId },
+    data: { comped, compedReason: comped ? reason : null },
+  })
+  await logAudit(actor, comped ? 'device.comp' : 'device.uncomp', deviceId, { reason })
+  return { comped: device.comped }
 }
 
 export async function resetFreeStory(deviceId: string, actor: string) {

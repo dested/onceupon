@@ -37,8 +37,10 @@ export interface DeviceState {
   /** 8 characters, shown to the parent (support, web shop, redeem on the site). */
   code: string
   balanceSec: number
-  /** Has ever bought a pack or redeemed a gift (unlocks "share with voice"). */
+  /** Has ever bought a pack or redeemed a gift, or is comped (unlocks "share with voice"). */
   paying: boolean
+  /** Comped by an admin: stories are free and unmetered; the studio shows no minutes. */
+  comped: boolean
   /** Parent turned on "share with voice" after the consent notice. */
   shareVoice: boolean
   freeStoryUsed: boolean
