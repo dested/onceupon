@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { inferRouterOutputs } from '@trpc/server'
 import { useTRPC } from '~/lib/trpc'
 import type { AppRouter } from '../../../server/router'
@@ -8,28 +8,22 @@ import { AsyncBlock, ConfirmButton, DataTable, Pill, Section, type Column } from
 import { FIELD, StickerButton } from '~/components/paper'
 import { clock, count, dateTime, money, relative } from './format'
 
-type SearchRow = {
-  id: string
-  code: string
-  platform: string
-  balanceSec: number
-  paying: boolean
-  comped: boolean
-  blocked: boolean
-  createdAt: string
-  lastSeenAt: string
-}
+type DevicesOut = inferRouterOutputs<AppRouter>['admin']['ledger']['devices']
+type DeviceRow = DevicesOut['rows'][number]
+type Filter = 'all' | 'paying' | 'comped' | 'free' | 'blocked'
+const FILTERS: Filter[] = ['all', 'paying', 'comped', 'free', 'blocked']
 
 export function LedgerPage() {
   const trpc = useTRPC()
   const qc = useQueryClient()
   const [term, setTerm] = useState('')
   const [submitted, setSubmitted] = useState('')
+  const [filter, setFilter] = useState<Filter>('all')
+  const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<string | null>(null)
 
-  const search = useQuery(
-    trpc.admin.ledger.search.queryOptions({ q: submitted }, { enabled: submitted.length > 0 })
-  )
+  const listInput = { q: submitted, filter, page }
+  const list = useQuery(trpc.admin.ledger.devices.queryOptions(listInput, { placeholderData: keepPreviousData }))
   const device = useQuery(
     trpc.admin.ledger.device.queryOptions(
       { deviceId: selected ?? '' },
@@ -39,13 +33,25 @@ export function LedgerPage() {
 
   function refresh() {
     if (selected) qc.invalidateQueries({ queryKey: trpc.admin.ledger.device.queryKey({ deviceId: selected }) })
-    if (submitted) qc.invalidateQueries({ queryKey: trpc.admin.ledger.search.queryKey({ q: submitted }) })
+    qc.invalidateQueries({ queryKey: trpc.admin.ledger.devices.queryKey() })
   }
 
-  const cols: Column<SearchRow>[] = [
+  function open(id: string) {
+    setSelected(id)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const cols: Column<DeviceRow>[] = [
     { header: 'Code', cell: (r) => <span className="font-scrawl">{r.code}</span> },
-    { header: 'Platform', cell: (r) => <span className="capitalize">{r.platform}</span> },
-    { header: 'Balance', align: 'right', cell: (r) => clock(r.balanceSec) },
+    {
+      header: 'Platform',
+      cell: (r) => (
+        <span className="capitalize">
+          {r.platform}
+          {r.appVersion ? <span className="text-ink-soft"> v{r.appVersion}</span> : null}
+        </span>
+      ),
+    },
     {
       header: 'State',
       cell: (r) => (
@@ -57,12 +63,16 @@ export function LedgerPage() {
         </span>
       ),
     },
+    { header: 'Balance', align: 'right', cell: (r) => (r.comped ? '∞' : clock(r.balanceSec)) },
+    { header: 'Stories', align: 'right', cell: (r) => count(r.stories) },
+    { header: 'Heard', align: 'right', cell: (r) => clock(Math.round(r.listenedMs / 1000)) },
+    { header: 'Joined', align: 'right', cell: (r) => relative(r.createdAt) },
     { header: 'Last seen', align: 'right', cell: (r) => relative(r.lastSeenAt) },
     {
       header: '',
       align: 'right',
       cell: (r) => (
-        <StickerButton tone="blue" tilt={-1} onClick={() => setSelected(r.id)}>
+        <StickerButton tone={r.id === selected ? 'yellow' : 'blue'} tilt={-1} onClick={() => open(r.id)}>
           Open
         </StickerButton>
       ),
@@ -72,14 +82,23 @@ export function LedgerPage() {
   return (
     <>
       <PageHeader title="Ledger" />
+
+      {selected !== null && (
+        <AsyncBlock query={device} isEmpty={(d) => d === null}>
+          {(d) => (d === null ? <p className="font-hand text-ink-soft">Device not found</p> : (
+            <DeviceDetail data={d} onDone={refresh} onClose={() => setSelected(null)} />
+          ))}
+        </AsyncBlock>
+      )}
+
       <Section>
         <form
           onSubmit={(e) => {
             e.preventDefault()
             setSubmitted(term.trim())
-            setSelected(null)
+            setPage(0)
           }}
-          className="flex flex-wrap gap-2">
+          className="flex flex-wrap items-center gap-2">
           <input
             className={`${FIELD} max-w-md`}
             placeholder="Device code, install id, gift code, or receipt id"
@@ -89,31 +108,83 @@ export function LedgerPage() {
           <StickerButton type="submit" tone="yellow" tilt={-1}>
             Search
           </StickerButton>
+          {submitted.length > 0 && (
+            <StickerButton
+              type="button"
+              tone="paper"
+              tilt={1}
+              onClick={() => {
+                setTerm('')
+                setSubmitted('')
+                setPage(0)
+              }}>
+              Clear
+            </StickerButton>
+          )}
         </form>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {FILTERS.map((f) => (
+            <StickerButton
+              key={f}
+              tone={f === filter ? 'blue' : 'paper'}
+              tilt={0}
+              onClick={() => {
+                setFilter(f)
+                setPage(0)
+              }}>
+              <span className="capitalize">{f}</span>
+            </StickerButton>
+          ))}
+        </div>
       </Section>
 
-      {submitted.length > 0 && (
-        <Section title="Matches">
-          <AsyncBlock query={search} isEmpty={(rows) => rows.length === 0}>
-            {(rows) => <DataTable columns={cols} rows={rows} getKey={(r) => r.id} empty="No devices found" />}
-          </AsyncBlock>
-        </Section>
-      )}
-
-      {selected !== null && (
-        <AsyncBlock query={device} isEmpty={(d) => d === null}>
-          {(d) => (d === null ? <p className="font-hand text-ink-soft">Device not found</p> : (
-            <DeviceDetail data={d} onDone={refresh} />
-          ))}
+      <Section title={list.data ? `Devices · ${count(list.data.total)}` : 'Devices'}>
+        <AsyncBlock query={list} isEmpty={(d) => d.rows.length === 0}>
+          {(d) => (
+            <>
+              <DataTable columns={cols} rows={d.rows} getKey={(r) => r.id} empty="No devices" />
+              <Pager page={page} pageSize={d.pageSize} total={d.total} onPage={setPage} />
+            </>
+          )}
         </AsyncBlock>
-      )}
+      </Section>
     </>
+  )
+}
+
+function Pager({
+  page,
+  pageSize,
+  total,
+  onPage,
+}: {
+  page: number
+  pageSize: number
+  total: number
+  onPage: (p: number) => void
+}) {
+  const pages = Math.max(1, Math.ceil(total / pageSize))
+  if (pages === 1) return null
+  const from = page * pageSize + 1
+  const to = Math.min(total, (page + 1) * pageSize)
+  return (
+    <div className="mt-3 flex items-center justify-end gap-3 font-hand text-base text-ink-soft">
+      <span>
+        {count(from)}–{count(to)} of {count(total)}
+      </span>
+      <StickerButton tone="paper" tilt={-1} disabled={page === 0} onClick={() => onPage(page - 1)}>
+        Prev
+      </StickerButton>
+      <StickerButton tone="paper" tilt={1} disabled={page >= pages - 1} onClick={() => onPage(page + 1)}>
+        Next
+      </StickerButton>
+    </div>
   )
 }
 
 type DeviceData = NonNullable<inferRouterOutputs<AppRouter>['admin']['ledger']['device']>
 
-function DeviceDetail({ data, onDone }: { data: DeviceData; onDone: () => void }) {
+function DeviceDetail({ data, onDone, onClose }: { data: DeviceData; onDone: () => void; onClose: () => void }) {
   const trpc = useTRPC()
   const dev = data.device
   const [minutesField, setMinutesField] = useState('')
@@ -194,9 +265,14 @@ function DeviceDetail({ data, onDone }: { data: DeviceData; onDone: () => void }
               {dev.appVersion ? ` · v${dev.appVersion}` : ''}
             </div>
           </div>
-          <div className="text-right">
-            <div className="font-hand text-base text-ink-soft">Balance</div>
-            <div className="font-scrawl text-[34px] leading-none text-ink tabular-nums">{clock(dev.balanceSec)}</div>
+          <div className="flex items-start gap-4">
+            <div className="text-right">
+              <div className="font-hand text-base text-ink-soft">Balance</div>
+              <div className="font-scrawl text-[34px] leading-none text-ink tabular-nums">{clock(dev.balanceSec)}</div>
+            </div>
+            <StickerButton tone="paper" tilt={1} onClick={onClose}>
+              Close
+            </StickerButton>
           </div>
         </div>
 

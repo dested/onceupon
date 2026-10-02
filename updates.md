@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-10-02 — Admin Ledger lists every device
+Sal: "ledger needs to show all the devices". Ledger opens on all devices (last seen first, 50 per page, total count), filter tabs all/paying/comped/free/blocked, search narrows the same list (code, install id, id prefix, gift code, receipt id); columns add version, stories, heard, joined; the opened device renders above the list with Close. `ledger.search` → `ledger.devices` (`ledgerDevices`). Typecheck green; query smoke-tested on local Postgres.
+Touched: apps/web/server/{admin-queries.ts,routers/admin.ts}, apps/web/src/app/admin/ledger.tsx
+
 ## 2026-10-02 — Admin comp: mark a device as free/unlimited
 Sal: "mark someone as paid so they can use the app for free". `Device.comped` + `compedReason`; admin Ledger → device → Comp (reason, audited `device.comp`/`device.uncomp`), lilac `comped` pill in search and detail. Comped sessions skip the balance gate, never debit (beats, typed, stop; `listenedMs` still logged), report `remainingSec` 360000 so old clients never go sleepy, ears TTL 1 h; `DeviceState.paying` is true for comped (voice sharing) plus a new `comped` field; studio chip and grown-ups show "unlimited". Typecheck green in studio, web, mobile; smoke-tested on local Postgres (0 balance, 0 debits, session closed). Not committed or deployed.
 Touched: apps/web/prisma/schema.prisma, apps/web/server/{sessions,device,shares,admin-queries}.ts, apps/web/server/routers/admin.ts, apps/web/server/app-handlers/core.ts, apps/web/src/app/admin/ledger.tsx, packages/shared/src/api.ts, src/backend/device.ts, src/story/store.ts, src/ui/{MinutesChip,ParentArea}.tsx, cliffnotes.md

@@ -250,37 +250,77 @@ export async function usage(days: number) {
 
 // ================================================================ ledger
 
-export async function ledgerSearch(q: string) {
+export const DEVICE_FILTERS = ['all', 'paying', 'comped', 'free', 'blocked'] as const
+export type DeviceFilter = (typeof DEVICE_FILTERS)[number]
+export const DEVICE_PAGE_SIZE = 50
+
+const filterWhere: Record<DeviceFilter, Prisma.DeviceWhereInput> = {
+  all: {},
+  paying: { paying: true },
+  comped: { comped: true },
+  free: { paying: false, comped: false },
+  blocked: { blocked: true },
+}
+
+/**
+ * Every device, most recently seen first, one page at a time. `q` narrows by device code, install id,
+ * device id prefix, or the device behind a gift code / receipt id.
+ */
+export async function ledgerDevices(q: string, filter: DeviceFilter, page: number) {
   const term = q.trim()
-  if (!term) return []
-  const [giftDev, purch] = await Promise.all([
-    prisma.giftCode.findFirst({ where: { code: term }, select: { redeemedByDeviceId: true } }),
-    prisma.purchase.findFirst({ where: { externalId: term }, select: { deviceId: true } }),
-  ])
-  const extraIds = [giftDev?.redeemedByDeviceId, purch?.deviceId].filter((x): x is string => Boolean(x))
-  const devices = await prisma.device.findMany({
-    where: {
+  let search: Prisma.DeviceWhereInput = {}
+  if (term) {
+    const [giftDev, purch] = await Promise.all([
+      prisma.giftCode.findFirst({ where: { code: term }, select: { redeemedByDeviceId: true } }),
+      prisma.purchase.findFirst({ where: { externalId: term }, select: { deviceId: true } }),
+    ])
+    const extraIds = [giftDev?.redeemedByDeviceId, purch?.deviceId].filter((x): x is string => Boolean(x))
+    search = {
       OR: [
         { code: { contains: term, mode: 'insensitive' } },
         { installId: { contains: term } },
         { id: { startsWith: term } },
         ...(extraIds.length ? [{ id: { in: extraIds } }] : []),
       ],
-    },
-    orderBy: { lastSeenAt: 'desc' },
-    take: 20,
-  })
-  return devices.map((d) => ({
-    id: d.id,
-    code: d.code,
-    platform: d.platform,
-    balanceSec: d.balanceSec,
-    paying: d.paying,
-    comped: d.comped,
-    blocked: d.blocked,
-    createdAt: d.createdAt.toISOString(),
-    lastSeenAt: d.lastSeenAt.toISOString(),
-  }))
+    }
+  }
+  const where: Prisma.DeviceWhereInput = { AND: [search, filterWhere[filter]] }
+  const [total, devices] = await Promise.all([
+    prisma.device.count({ where }),
+    prisma.device.findMany({
+      where,
+      orderBy: { lastSeenAt: 'desc' },
+      skip: page * DEVICE_PAGE_SIZE,
+      take: DEVICE_PAGE_SIZE,
+      include: { _count: { select: { sessions: true } } },
+    }),
+  ])
+  const listened = devices.length
+    ? await prisma.storySession.groupBy({
+        by: ['deviceId'],
+        where: { deviceId: { in: devices.map((d) => d.id) } },
+        _sum: { listenedMs: true },
+      })
+    : []
+  const listenedBy = new Map(listened.map((r) => [r.deviceId, r._sum.listenedMs ?? 0]))
+  return {
+    total,
+    pageSize: DEVICE_PAGE_SIZE,
+    rows: devices.map((d) => ({
+      id: d.id,
+      code: d.code,
+      platform: d.platform,
+      appVersion: d.appVersion,
+      balanceSec: d.balanceSec,
+      paying: d.paying,
+      comped: d.comped,
+      blocked: d.blocked,
+      stories: d._count.sessions,
+      listenedMs: listenedBy.get(d.id) ?? 0,
+      createdAt: d.createdAt.toISOString(),
+      lastSeenAt: d.lastSeenAt.toISOString(),
+    })),
+  }
 }
 
 export async function ledgerDevice(deviceId: string) {

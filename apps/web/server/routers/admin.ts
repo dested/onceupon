@@ -17,7 +17,15 @@ export const adminRouter = router({
   costs: adminProcedure.input(daysInput).query(({ input }) => q.costs(input.days)),
 
   ledger: router({
-    search: adminProcedure.input(z.object({ q: z.string() })).query(({ input }) => q.ledgerSearch(input.q)),
+    devices: adminProcedure
+      .input(
+        z.object({
+          q: z.string().default(''),
+          filter: z.enum(q.DEVICE_FILTERS).default('all'),
+          page: z.number().int().min(0).default(0),
+        })
+      )
+      .query(({ input }) => q.ledgerDevices(input.q, input.filter, input.page)),
     device: adminProcedure
       .input(z.object({ deviceId: z.string().min(1) }))
       .query(({ input }) => q.ledgerDevice(input.deviceId)),
