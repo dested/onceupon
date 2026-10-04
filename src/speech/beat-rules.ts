@@ -6,7 +6,7 @@ import {
   PHRASE_TRACKER,
   type TrackerOptions,
 } from './recognition'
-import { resolveStt, type Settings } from '~/story/store'
+import { resolveStt, type Settings, type SttKind } from '~/story/store'
 
 /**
  * When does a thought become a beat? The tracker's release rules per recognizer, plus the
@@ -21,9 +21,11 @@ export const VOICE_LEVEL = 0.2
 /** How long after the last loud frame the child still counts as talking. */
 export const VOICE_HOLD_MS = 400
 
-/** The release rules the tracker runs for these settings. */
-export function trackerOptionsFor(settings: Settings): TrackerOptions {
-  const kind = resolveStt(settings)
+/** The release rules the tracker runs for these settings (`kind` when the session fell back to other ears). */
+export function trackerOptionsFor(
+  settings: Settings,
+  kind: SttKind = resolveStt(settings)
+): TrackerOptions {
   if (kind === 'openai') return isLiveModel(settings.sttModel) ? LIVE_TRACKER : PHRASE_TRACKER
   if (kind === 'deepgram') return DEEPGRAM_TRACKER
   return CHROME_TRACKER

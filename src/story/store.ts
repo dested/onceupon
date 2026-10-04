@@ -19,6 +19,16 @@ export type SttMode = (typeof STT_MODES)[number]
 
 export type SttKind = 'browser' | 'openai' | 'deepgram' | 'apple'
 
+/**
+ * Which ears the iPad app listens with (Grown-ups): `auto` is the shell's own pick when the server
+ * allows on-device ears, an engine name asks the shell for that one, `cloud` skips on-device ears.
+ */
+export const EARS_ENGINE_PREFS = ['auto', 'analyzer', 'sfspeech', 'whistle', 'cloud'] as const
+export type EarsEnginePref = (typeof EARS_ENGINE_PREFS)[number]
+export function isEarsEnginePref(v: string): v is EarsEnginePref {
+  return EARS_ENGINE_PREFS.some((p) => p === v)
+}
+
 export interface Settings {
   provider: Provider
   model: string
@@ -38,6 +48,8 @@ export interface Settings {
   sttRateOverride: number | null
   /** Microphone device id (OpenAI or Deepgram ears; Chrome's recognizer always uses the default). */
   micDeviceId: string
+  /** Hosted iPad app only: the on-device engine to listen with. */
+  earsEngine: EarsEnginePref
 }
 
 export const DEFAULT_STT_MODEL = 'gpt-live-transcribe'
@@ -213,6 +225,7 @@ const settingsSchema = z.object({
   sttRatePerMin: z.number().optional(),
   sttRateOverride: z.number().nullable().optional(),
   micDeviceId: z.string().optional(),
+  earsEngine: z.string().optional(),
 })
 
 const SETTINGS_KEY = 'onceupon.settings'
@@ -237,6 +250,7 @@ function loadSettings(): Settings {
     deepgramModel: DEFAULT_DEEPGRAM_MODEL,
     sttRateOverride: null,
     micDeviceId: '',
+    earsEngine: 'auto',
   }
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
@@ -272,6 +286,7 @@ function loadSettings(): Settings {
       deepgramModel: d.deepgramModel || DEFAULT_DEEPGRAM_MODEL,
       sttRateOverride,
       micDeviceId: d.micDeviceId ?? '',
+      earsEngine: d.earsEngine && isEarsEnginePref(d.earsEngine) ? d.earsEngine : 'auto',
     }
   } catch {
     return base

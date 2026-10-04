@@ -1,17 +1,20 @@
 import { Directory, File, Paths } from 'expo-file-system'
 import { ExpoSpeechRecognitionModule, type ExpoSpeechRecognitionResultEvent } from 'expo-speech-recognition'
 import { z } from 'zod'
-import type { SpeechEngine } from '../../../../../packages/shared/src/bridge'
-import { analyzerAvailable, onDeviceEars } from '../../../modules/on-device-ears'
+import { SPEECH_ENGINES, type SpeechEngine } from '../../../../../packages/shared/src/bridge'
+import { analyzerAvailable, onDeviceEars, type EarsNativeModule } from '../../../modules/on-device-ears'
+import { whistleAvailable, whistleEars } from '../../../modules/whistle-ears'
 import { parseInput, type Emit, type Handler } from '../host'
 
-// On-device ears (free, no network after the first model download). Two engines behind one contract:
+// On-device ears (free, no network after the first model download). Three engines behind one contract:
 // - `analyzer`: SpeechAnalyzer on iPadOS 26+ (modules/on-device-ears), segments finalize as the child
 //   pauses, the live tail streams as volatile text;
 // - `sfspeech`: on-device SFSpeechRecognizer (expo-speech-recognition) on older iPadOS, one growing
-//   segment that turns final when recognition stops.
-// Both push `speech.result` in the studio's RecResult shape plus `speech.level` / `speech.ready`, and
-// with `record` both keep the span's audio: `speech.stop` hands it back as base64 (the studio's voice
+//   segment that turns final when recognition stops;
+// - `whistle`: the bundled Cactus Whistle model (modules/whistle-ears), same events as the analyzer;
+//   never picked by the shell itself, only when the studio asks for it.
+// All push `speech.result` in the studio's RecResult shape plus `speech.level` / `speech.ready`, and
+// with `record` all keep the span's audio: `speech.stop` hands it back as base64 (the studio's voice
 // clip; its own mic stays closed while these ears listen).
 
 interface Session {
@@ -54,9 +57,14 @@ async function readClip(uri: string | null, mime: string, ms: number): Promise<{
   }
 }
 
-function listenAnalyzer(emit: Emit): Session['subs'] {
-  const mod = onDeviceEars()
-  if (!mod) return []
+/** The native module behind an engine that has one (sfspeech runs through expo-speech-recognition). */
+function nativeEars(engine: SpeechEngine): EarsNativeModule | null {
+  if (engine === 'analyzer') return onDeviceEars()
+  if (engine === 'whistle') return whistleEars()
+  return null
+}
+
+function listenNative(mod: EarsNativeModule, emit: Emit): Session['subs'] {
   return [
     mod.addListener('onReady', () => emit('speech.ready', {})),
     mod.addListener('onResult', (e) => {
@@ -101,43 +109,58 @@ function listenSfSpeech(emit: Emit, s: Session): void {
   )
 }
 
-async function pickEngine(locale: string, onDevice: boolean): Promise<SpeechEngine | null> {
-  if (await analyzerAvailable(locale)) return 'analyzer'
+/** Every engine this iPad can run for the locale, in the shell's own order of preference. */
+async function availableEngines(locale: string, onDevice: boolean): Promise<SpeechEngine[]> {
+  const out: SpeechEngine[] = []
+  if (await analyzerAvailable(locale)) out.push('analyzer')
   const mod = ExpoSpeechRecognitionModule
-  if (!mod.isRecognitionAvailable()) return null
-  if (onDevice && !mod.supportsOnDeviceRecognition()) return null
-  return 'sfspeech'
+  if (mod.isRecognitionAvailable() && (!onDevice || mod.supportsOnDeviceRecognition())) out.push('sfspeech')
+  if (await whistleAvailable(locale)) out.push('whistle')
+  return out
+}
+
+/** The asked-for engine when it can run, else the shell's pick (never whistle by itself). */
+function pickEngine(engines: SpeechEngine[], want?: SpeechEngine): SpeechEngine | null {
+  if (want && engines.includes(want)) return want
+  return engines.find((e) => e !== 'whistle') ?? null
 }
 
 const availableSchema = z.object({ locale: z.string().min(2) })
 export const speechAvailable: Handler<'speech.available'> = async (input) => {
   const { locale } = parseInput(availableSchema, input)
-  const engine = await pickEngine(locale, true)
+  const engines = await availableEngines(locale, true)
+  const engine = pickEngine(engines)
   const mic = await ExpoSpeechRecognitionModule.getMicrophonePermissionsAsync()
   const permission = mic.granted ? 'granted' : mic.canAskAgain ? 'undetermined' : 'denied'
-  return { engine, permission }
+  return { engine, engines, permission }
 }
 
-const startSchema = z.object({ locale: z.string().min(2), onDevice: z.boolean(), record: z.boolean().optional() })
+const startSchema = z.object({
+  locale: z.string().min(2),
+  onDevice: z.boolean(),
+  record: z.boolean().optional(),
+  engine: z.enum(SPEECH_ENGINES).optional(),
+})
 export const speechStart: Handler<'speech.start'> = async (input, ctx) => {
-  const { locale, onDevice, record = false } = parseInput(startSchema, input)
-  const engine = await pickEngine(locale, onDevice)
+  const { locale, onDevice, record = false, engine: want } = parseInput(startSchema, input)
+  const engine = pickEngine(await availableEngines(locale, onDevice), want)
   if (!engine) return { available: false }
   endSession()
   const s: Session = { engine, subs: [], record, audioEnd: null, startedAt: Date.now() }
 
-  if (engine === 'analyzer') {
-    const mod = onDeviceEars()
+  if (engine !== 'sfspeech') {
+    const mod = nativeEars(engine)
     if (!mod) return { available: false }
-    s.subs = listenAnalyzer(ctx.emit)
+    s.subs = listenNative(mod, ctx.emit)
     session = s
-    const path = record ? new File(clipDir(), `span-${Date.now()}.m4a`).uri : null
+    // The analyzer writes AAC, whistle 16 kHz PCM.
+    const path = record ? new File(clipDir(), `span-${Date.now()}.${engine === 'whistle' ? 'wav' : 'm4a'}`).uri : null
     try {
       await mod.start(locale, path)
     } catch (e) {
       endSession()
       const message = e instanceof Error ? e.message : String(e)
-      ctx.emit('speech.error', { code: /not-allowed/.test(message) ? 'not-allowed' : 'analyzer', message })
+      ctx.emit('speech.error', { code: /not-allowed/.test(message) ? 'not-allowed' : engine, message })
       return { available: false }
     }
     return { available: true, engine }
@@ -165,11 +188,12 @@ export const speechStart: Handler<'speech.start'> = async (input, ctx) => {
 export const speechStop: Handler<'speech.stop'> = async () => {
   const s = session
   if (!s) return { clip: null }
-  if (s.engine === 'analyzer') {
-    const mod = onDeviceEars()
+  if (s.engine !== 'sfspeech') {
+    const mod = nativeEars(s.engine)
     const out = mod ? await mod.stop() : null
     endSession()
-    return { clip: s.record && out ? await readClip(out.uri, 'audio/mp4', out.ms) : null }
+    const mime = s.engine === 'whistle' ? 'audio/wav' : 'audio/mp4'
+    return { clip: s.record && out ? await readClip(out.uri, mime, out.ms) : null }
   }
   ExpoSpeechRecognitionModule.stop()
   const end = s.audioEnd ? await Promise.race([s.audioEnd, new Promise<null>((r) => setTimeout(() => r(null), 3000))]) : null

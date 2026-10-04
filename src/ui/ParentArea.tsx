@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
-import { appStore, persistSettings, useApp } from '~/story/store'
+import { appStore, isEarsEnginePref, persistSettings, useApp, type EarsEnginePref } from '~/story/store'
+import { appleEars, type AppleEngine } from '~/speech/apple'
 import { openExternal, redeemGift, restorePurchases } from '~/backend/purchases'
 import { APP_SHELL } from '~/backend/config'
 import { listShares, unpublishShare } from '~/backend/share'
@@ -9,6 +10,15 @@ import { ApiError } from '~/backend/api'
 import { formatMinutes, takeParentFocus } from './hosted'
 import { PaperCard, StickerButton } from './bits'
 import type { ShareSummary } from '../../packages/shared/src/api'
+
+/** The ears picker: each choice and the shell engine it needs (null = always offered). */
+const EARS_OPTIONS: Array<{ pref: EarsEnginePref; label: string; engine: AppleEngine | null }> = [
+  { pref: 'auto', label: 'Automatic', engine: null },
+  { pref: 'analyzer', label: 'Apple SpeechAnalyzer', engine: 'analyzer' },
+  { pref: 'sfspeech', label: 'Apple dictation', engine: 'sfspeech' },
+  { pref: 'whistle', label: 'Whistle', engine: 'whistle' },
+  { pref: 'cloud', label: 'Cloud', engine: null },
+]
 
 /**
  * The grown-up area (always reached through the parental gate): minutes and buying, gift codes, the
@@ -41,6 +51,7 @@ export function ParentArea() {
   const shareVoice = useApp((s) => s.shareVoice)
   const deviceCode = useApp((s) => s.deviceCode)
   const sound = useApp((s) => s.settings.sound)
+  const earsEngine = useApp((s) => s.settings.earsEngine)
   const config = useApp((s) => s.config)
 
   const [nextWeekly, setNextWeekly] = useState<string | null>(null)
@@ -51,6 +62,7 @@ export function ParentArea() {
   const [giftMsg, setGiftMsg] = useState('')
   const [giftError, setGiftError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [earsOffer, setEarsOffer] = useState<AppleEngine[] | null>(null)
   const [consentOpen, setConsentOpen] = useState(false)
   const [voiceBusy, setVoiceBusy] = useState(false)
   const [voiceError, setVoiceError] = useState('')
@@ -73,6 +85,7 @@ export function ParentArea() {
     void listShares()
       .then(setShares)
       .catch(() => setShares([]))
+    if (APP_SHELL) void appleEars('en-US').then((offer) => setEarsOffer(offer.engines))
     const focus = takeParentFocus()
     if (focus === 'redeem') window.setTimeout(() => giftRef.current?.scrollIntoView({ behavior: 'smooth' }), 120)
   }, [open])
@@ -155,6 +168,14 @@ export function ParentArea() {
         setUnpublishBusy('')
         setUnpublishId(null)
       })
+  }
+
+  const setEarsEngine = (next: EarsEnginePref): void => {
+    appStore.set((s) => {
+      const settings = { ...s.settings, earsEngine: next }
+      persistSettings(settings)
+      return { settings }
+    })
   }
 
   const toggleSound = (): void => {
@@ -348,6 +369,30 @@ export function ParentArea() {
               />
               Crayon sounds
             </label>
+            {APP_SHELL && (
+              <>
+                <label className="mt-4 mb-1 block font-hand text-lg text-ink-soft" htmlFor="parent-ears">
+                  Ears (applies the next time the microphone starts)
+                </label>
+                <select
+                  id="parent-ears"
+                  value={earsEngine}
+                  className="w-full rounded-xl border-[3px] border-ink bg-white px-3 py-2 font-hand text-lg text-ink outline-none"
+                  onChange={(e) => {
+                    if (isEarsEnginePref(e.target.value)) setEarsEngine(e.target.value)
+                  }}
+                  data-testid="parent-ears">
+                  {EARS_OPTIONS.map((o) => {
+                    const missing = o.engine !== null && earsOffer !== null && !earsOffer.includes(o.engine)
+                    return (
+                      <option key={o.pref} value={o.pref} disabled={missing && o.pref !== earsEngine}>
+                        {missing ? `${o.label} (not on this iPad)` : o.label}
+                      </option>
+                    )
+                  })}
+                </select>
+              </>
+            )}
             <StickerButton
               tone="paper"
               tilt={-1}

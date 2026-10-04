@@ -22,6 +22,9 @@ declare class OnDeviceEarsNative extends NativeModule<EarsEvents> {
   stop(): Promise<{ uri: string; ms: number } | null>
 }
 
+/** The native shape both ears modules share (modules/whistle-ears speaks it too). */
+export type EarsNativeModule = OnDeviceEarsNative
+
 let cached: OnDeviceEarsNative | null | undefined
 
 /** The SpeechAnalyzer module, or null off-iOS and in builds from before it existed. */

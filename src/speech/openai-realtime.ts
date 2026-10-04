@@ -213,6 +213,11 @@ export function createOpenAiRealtimeRecognizer(
     socket.onerror = () => handlers.onError('realtime socket error')
     socket.onclose = (ev) => {
       if (!stopped) handlers.onError(`realtime closed (${ev.code})`)
+      // The socket is gone: free the mic and let start() run again (a retry is a no-op while running).
+      if (ws === socket) {
+        stopped = true
+        teardown()
+      }
       handlers.onEnd()
     }
 
@@ -244,9 +249,10 @@ export function createOpenAiRealtimeRecognizer(
         else if (pending.length < 600) pending.push(buf)
       },
     })
-    if (stopped) {
+    // Stopped, or the socket died and a later start() owns the recognizer now: this mic is nobody's.
+    if (stopped || ws !== socket) {
       mic.stop()
-      return teardown()
+      return
     }
     pcmMic = mic
     if (ready) handlers.onReady()
@@ -256,6 +262,8 @@ export function createOpenAiRealtimeRecognizer(
     start: () => {
       if (!stopped) return
       start().catch((e: unknown) => {
+        stopped = true
+        teardown()
         handlers.onError(e instanceof Error ? e.message : String(e))
         handlers.onEnd()
       })

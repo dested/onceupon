@@ -78,20 +78,27 @@ export interface BridgeApi {
   }
   /**
    * On-device speech recognition: SpeechAnalyzer on iPadOS 26+ (`analyzer`), else on-device
-   * SFSpeechRecognizer (`sfspeech`). `speech.available` never prompts for permission.
+   * SFSpeechRecognizer (`sfspeech`); `whistle` (the bundled Cactus Whistle model) only when asked
+   * for. `engine` is the one the shell picks by itself, `engines` every one it could run (absent on
+   * shells from before the list). `speech.available` never prompts for permission.
    */
   'speech.available': {
     input: { locale: string }
-    output: { engine: SpeechEngine | null; permission: 'granted' | 'denied' | 'undetermined' }
+    output: {
+      engine: SpeechEngine | null
+      engines?: SpeechEngine[]
+      permission: 'granted' | 'denied' | 'undetermined'
+    }
   }
   /**
    * Starts listening (asks for mic + speech permission the first time; the analyzer may download
    * its language model once). Results arrive as `speech.result`, loudness as `speech.level`, then
    * `speech.end`; failures as `speech.error`. With `record` the shell keeps the audio for the clip.
    * `available: false` when the OS cannot do it (older shells ignore `record` and omit `engine`).
+   * `engine` asks for one engine; the shell falls back to its own pick when it cannot run it.
    */
   'speech.start': {
-    input: { locale: string; onDevice: boolean; record?: boolean }
+    input: { locale: string; onDevice: boolean; record?: boolean; engine?: SpeechEngine }
     output: { available: boolean; engine?: SpeechEngine }
   }
   /** Stops listening; `clip` is the recorded audio of this span when `record` was set. */
@@ -118,7 +125,8 @@ export interface BridgeEventMap {
   'speech.ready': Record<string, never>
 }
 
-export type SpeechEngine = 'analyzer' | 'sfspeech'
+export const SPEECH_ENGINES = ['analyzer', 'sfspeech', 'whistle'] as const
+export type SpeechEngine = (typeof SPEECH_ENGINES)[number]
 
 export type BridgeName = keyof BridgeApi
 export type BridgeInput<K extends BridgeName> = BridgeApi[K]['input']

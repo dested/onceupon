@@ -18,10 +18,10 @@ import {
 } from '~/speech/recognition'
 import { trackerOptionsFor, VOICE_HOLD_MS, VOICE_LEVEL } from '~/speech/beat-rules'
 import { buildDebugReport } from './debug-report'
-import { appStore, resolveStt, type SttKind } from './store'
+import { appStore, resolveStt, type Settings, type SttKind } from './store'
 import { createOpenAiRealtimeRecognizer, isLiveModel } from '~/speech/openai-realtime'
 import { createDeepgramRecognizer } from '~/speech/deepgram'
-import { APPLE_UNAVAILABLE, appleEarsEngine, createAppleRecognizer, type AppleEngine, type AppleRecognizer } from '~/speech/apple'
+import { APPLE_UNAVAILABLE, appleEars, createAppleRecognizer, type AppleEngine, type AppleRecognizer } from '~/speech/apple'
 import { currentMicStream, warmMic } from '~/speech/pcm-mic'
 import {
   getStory,
@@ -113,7 +113,8 @@ const EARS_LOCALE = 'en-US'
 
 /**
  * SpeechAnalyzer finalizes a segment at each pause and streams the tail like the live cloud models;
- * SFSpeechRecognizer rewrites one growing segment the way Chrome does.
+ * SFSpeechRecognizer rewrites one growing segment the way Chrome does, and so does Whistle's live
+ * tail (the whole utterance is decoded again every ~0.4 s until a pause commits it).
  */
 function appleTrackerOptions(engine: AppleEngine): TrackerOptions {
   return engine === 'analyzer' ? DEEPGRAM_TRACKER : CHROME_TRACKER
@@ -137,6 +138,15 @@ export class LiveSession {
   private appleRec: AppleRecognizer | null = null
   /** On-device ears failed to start this story: use the cloud vendor from now on. */
   private appleFailed = false
+  /** The engine the current on-device recognizer was asked to use (undefined = the shell's pick). */
+  private appleForced: AppleEngine | undefined
+  /** The current recognizer reported ready since the last mic tap. */
+  private earsReady = false
+  /** Cloud ears that died before ever listening this story (no credits, bad key, blocked socket). */
+  private readonly failedEars = new Set<SttKind>()
+  private lastEarsError = ''
+  /** Bumped per recognizer built, so a dead recognizer's late callbacks are ignored. */
+  private earsGen = 0
   private tracker: TranscriptTracker
   private tickTimer = 0
   /** Last time the mic level read as a voice (streaming recognizers only; Chrome reports no level). */
@@ -473,13 +483,18 @@ export class LiveSession {
   private sttKind: SttKind | null = null
 
   private recognizerHandlers(streaming: boolean): RecognizerHandlers {
+    const gen = ++this.earsGen
+    const stale = (): boolean => gen !== this.earsGen
     return {
       onResult: (results) => {
         this.tracker.onResult(results, performance.now())
         appStore.set({ transcriptInterim: cleanText(this.tracker.interim) })
       },
       onEnd: () => {
-        if (this.wantListening) {
+        if (stale()) return
+        if (this.wantListening && streaming && !this.earsReady) {
+          this.earsFailed()
+        } else if (this.wantListening) {
           this.tracker.reset()
           window.setTimeout(
             () => {
@@ -490,6 +505,8 @@ export class LiveSession {
         } else appStore.set({ listening: false, micStarting: false, micLevel: 0 })
       },
       onReady: () => {
+        if (stale()) return
+        this.earsReady = true
         if (this.wantListening) appStore.set({ listening: true, micStarting: false })
         this.meter?.setListening(true)
         if (this.appleRec) this.voice.startExternal(this.appleRec, this.now())
@@ -514,6 +531,8 @@ export class LiveSession {
         }))
       },
       onError: (err) => {
+        if (stale()) return
+        this.lastEarsError = err
         if (err.startsWith(APPLE_UNAVAILABLE)) {
           // The iPad could not listen on-device (old OS, model download failed): cloud ears instead.
           this.appleFailed = true
@@ -553,6 +572,37 @@ export class LiveSession {
     this.sttKind = kind
   }
 
+  /** The ears a bring-your-own-key story listens with: the setting, minus any that failed this story. */
+  private byoEars(settings: Settings): SttKind | null {
+    if (settings.stt !== 'auto') return this.failedEars.has(settings.stt) ? null : settings.stt
+    const chain: SttKind[] = []
+    if (settings.keys.openai) chain.push('openai')
+    if (settings.keys.deepgram) chain.push('deepgram')
+    chain.push('browser')
+    return chain.find((k) => !this.failedEars.has(k)) ?? null
+  }
+
+  /**
+   * Cloud ears died before they ever listened. Without this the mic sat on "just a little moment"
+   * for good. Bring-your-own-key on auto moves to the next ears; otherwise the mic stops and says so.
+   */
+  private earsFailed(): void {
+    const kind = this.sttKind
+    const why = this.lastEarsError.slice(0, 90)
+    if (kind) this.failedEars.add(kind)
+    this.recognizer?.abort()
+    this.recognizer = null
+    this.earsGen++
+    const next = HOSTED ? null : this.byoEars(appStore.get().settings)
+    if (next && (next !== 'browser' || speechSupported())) {
+      this.showNote(`${kind ?? 'cloud'} ears did not start (${why}); using ${next}`, 7000)
+      void this.startListening()
+      return
+    }
+    this.stopListening()
+    this.showNote(HOSTED ? 'the crayon cannot hear right now' : `ears did not start: ${why}`, 7000)
+  }
+
   private handleStartError(e: unknown): void {
     if (e instanceof ApiError && e.code === 'exhausted') {
       appStore.set({ paywallOpen: true })
@@ -569,8 +619,20 @@ export class LiveSession {
     const settings = appStore.get().settings
     if (HOSTED && this.meter) {
       const cfg = appStore.get().config
-      const apple: AppleEngine | null =
-        cfg?.onDeviceEars && !this.appleFailed ? await appleEarsEngine(EARS_LOCALE) : null
+      const pref = settings.earsEngine
+      let apple: AppleEngine | null = null
+      // A named engine was asked for in Grown-ups: start that one, not the shell's own pick.
+      let forced: AppleEngine | undefined
+      if (!this.appleFailed && pref !== 'cloud' && (cfg?.onDeviceEars || pref !== 'auto')) {
+        const offer = await appleEars(EARS_LOCALE)
+        if (pref !== 'auto' && offer.engines.includes(pref)) {
+          apple = pref
+          forced = pref
+        } else {
+          apple = cfg?.onDeviceEars ? offer.engine : null
+          if (pref !== 'auto') this.showNote(`${pref} ears are not available here, using ${apple ?? 'cloud'}`, 6000)
+        }
+      }
       let start: SessionStart
       try {
         start = await this.meter.ensureStarted(apple ? 'apple' : (cfg?.earsVendor ?? 'browser'))
@@ -588,12 +650,18 @@ export class LiveSession {
         }
       }
       const kind: SttKind = apple ? 'apple' : ears ? ears.vendor : 'browser'
+      // The ears setting changed mid-story: the recognizer is still `apple`, but for another engine.
+      if (kind === 'apple' && this.recognizer && this.sttKind === 'apple' && this.appleForced !== forced) {
+        this.recognizer.abort()
+        this.recognizer = null
+      }
+      this.appleForced = forced
       this.setRecognizer(
         kind,
         () => {
           const handlers = this.recognizerHandlers(kind !== 'browser')
           if (kind === 'apple') {
-            const rec = createAppleRecognizer(handlers, { locale: EARS_LOCALE, record: true })
+            const rec = createAppleRecognizer(handlers, { locale: EARS_LOCALE, record: true, engine: forced })
             this.appleRec = rec
             return rec
           }
@@ -625,7 +693,7 @@ export class LiveSession {
       return
     }
 
-    const kind = resolveStt(settings)
+    const kind = this.byoEars(settings) ?? resolveStt(settings)
     this.setRecognizer(
       kind,
       () => {
@@ -647,7 +715,7 @@ export class LiveSession {
           })
         return createRecognizer(handlers)
       },
-      trackerOptionsFor(settings)
+      trackerOptionsFor(settings, kind)
     )
     if (!this.recognizer) {
       appStore.set((s) => ({
@@ -663,6 +731,7 @@ export class LiveSession {
 
   private beginListening(): void {
     this.wantListening = true
+    this.earsReady = false
     this.tracker.reset()
     this.listenT0 = performance.now()
     appStore.set({ micStarting: true, sttLog: [], micLevel: 0 })

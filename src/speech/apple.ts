@@ -1,11 +1,12 @@
 /**
  * The iPad's on-device ears through the native shell (SpeechAnalyzer on iPadOS 26+, else on-device
- * SFSpeechRecognizer). Free and offline after the first model download. Same Recognizer shape as the
+ * SFSpeechRecognizer; Whistle, the bundled Cactus model, when the ears setting asks for it). Free and offline after the first model download. Same Recognizer shape as the
  * streaming recognizers; results, loudness and readiness arrive as bridge events. The shell owns the
  * mic while these ears listen, so it also records the span: `takeClip()` hands the voice clip over
  * after `stop()` (the studio's VoiceRecorder collects it through ExternalClipSource).
  */
 import { z } from 'zod'
+import { SPEECH_ENGINES } from '../../packages/shared/src/bridge'
 import { base64ToBlob, bridgeCall, hasBridge, onBridgeEvent } from '~/backend/bridge'
 import type { ExternalClipSource } from '~/story/voice'
 import type { RecResult, Recognizer, RecognizerHandlers } from './recognition'
@@ -16,26 +17,37 @@ const resultSchema = z.object({
 const levelSchema = z.object({ level: z.number() })
 const errorSchema = z.object({ code: z.string(), message: z.string() })
 const availableSchema = z.object({
-  engine: z.enum(['analyzer', 'sfspeech']).nullable(),
+  engine: z.enum(SPEECH_ENGINES).nullable(),
+  engines: z.array(z.enum(SPEECH_ENGINES)).optional(),
   permission: z.enum(['granted', 'denied', 'undetermined']),
 })
-const startSchema = z.object({ available: z.boolean(), engine: z.enum(['analyzer', 'sfspeech']).optional() })
+const startSchema = z.object({ available: z.boolean(), engine: z.enum(SPEECH_ENGINES).optional() })
 const stopSchema = z.object({
   clip: z.object({ base64: z.string(), mime: z.string(), ms: z.number() }).nullable().optional(),
 })
 
-export type AppleEngine = 'analyzer' | 'sfspeech'
+export type AppleEngine = (typeof SPEECH_ENGINES)[number]
 
-/** The on-device engine this shell offers for `locale`, or null (web, old shell, unsupported OS). Never throws. */
-export async function appleEarsEngine(locale: string): Promise<AppleEngine | null> {
-  if (!hasBridge()) return null
+export interface AppleEarsOffer {
+  /** The engine the shell picks by itself, or null (web, old shell, unsupported OS, mic denied). */
+  engine: AppleEngine | null
+  /** Every engine the shell can run; one of these can be asked for by name. */
+  engines: AppleEngine[]
+}
+
+/** The on-device engines this shell offers for `locale`. Never throws. */
+export async function appleEars(locale: string): Promise<AppleEarsOffer> {
+  const none: AppleEarsOffer = { engine: null, engines: [] }
+  if (!hasBridge()) return none
   try {
     const out = availableSchema.safeParse(await bridgeCall('speech.available', { locale }))
-    if (!out.success || out.data.permission === 'denied') return null
-    return out.data.engine
+    if (!out.success || out.data.permission === 'denied') return none
+    const { engine } = out.data
+    // Shells from before the list offer only their own pick.
+    return { engine, engines: out.data.engines ?? (engine ? [engine] : []) }
   } catch {
     // shells from before speech.available (or no shell): not offered
-    return null
+    return none
   }
 }
 
@@ -48,7 +60,7 @@ export interface AppleRecognizer extends Recognizer, ExternalClipSource {
 
 export function createAppleRecognizer(
   handlers: RecognizerHandlers,
-  opts: { locale: string; record: boolean }
+  opts: { locale: string; record: boolean; engine?: AppleEngine }
 ): AppleRecognizer {
   let unsubs: Array<() => void> = []
   let running = false
@@ -110,7 +122,12 @@ export function createAppleRecognizer(
       ended = false
       stopping = null
       subscribe()
-      void bridgeCall('speech.start', { locale: opts.locale, onDevice: true, record: opts.record })
+      void bridgeCall('speech.start', {
+        locale: opts.locale,
+        onDevice: true,
+        record: opts.record,
+        ...(opts.engine ? { engine: opts.engine } : {}),
+      })
         .then((raw) => {
           const out = startSchema.safeParse(raw)
           if (!out.success || !out.data.available) {

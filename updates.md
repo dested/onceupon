@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-10-03 — Whistle on-device ears + ears picker (branch whistle-ears)
+Sal: "lets give it a try. give me a way to toggle the engines in the app". New local Expo module `whistle-ears` (Swift, Cactus Whistle on the needle engine, rolling-window pseudo-streaming, 16 kHz wav clip), shell engine `whistle` behind `speech.*` (`engines` on available, `engine` on start), Grown-ups → Ears picker (`settings.earsEngine`). Typecheck green in studio and mobile, mobile tests pass. Swift never compiled (EAS only); not committed: `src/story/session.ts` also carries another session's uncommitted cloud-ears-fallback edits.
+Touched: apps/mobile/modules/whistle-ears/*, apps/mobile/modules/on-device-ears/index.ts, apps/mobile/src/bridge/handlers/speech.ts, packages/shared/src/bridge.ts, src/speech/apple.ts, src/story/{session,store}.ts, src/ui/ParentArea.tsx, cliffnotes.md
+
 ## 2026-10-02 — Admin Ledger lists every device
 Sal: "ledger needs to show all the devices". Ledger opens on all devices (last seen first, 50 per page, total count), filter tabs all/paying/comped/free/blocked, search narrows the same list (code, install id, id prefix, gift code, receipt id); columns add version, stories, heard, joined; the opened device renders above the list with Close. `ledger.search` → `ledger.devices` (`ledgerDevices`). Typecheck green; query smoke-tested on local Postgres.
 Touched: apps/web/server/{admin-queries.ts,routers/admin.ts}, apps/web/src/app/admin/ledger.tsx
