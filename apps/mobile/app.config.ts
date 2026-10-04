@@ -1,4 +1,5 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config'
+import { type ConfigPlugin, withAppDelegate, withInfoPlist } from 'expo/config-plugins'
 
 // The Expo config loader transpiles this file in isolation and resolves requires with Node's CJS
 // resolver, which cannot import the extensionless TS at ../../packages/shared/src/brand. So the
@@ -23,82 +24,144 @@ const SPEECH_USAGE = `${BRAND.name} turns your child's spoken story into words s
 // The splash image's paper tone (sampled from the generated icon) so the letterbox matches the art.
 const SPLASH_PAPER = '#f9f0d0'
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
-  ...config,
-  name: BRAND.name,
-  slug: 'squiggletale',
-  scheme: BRAND.scheme,
-  version: '1.0.0',
-  orientation: 'default',
-  userInterfaceStyle: 'light',
-  // Root view color (expo-system-ui) so rotation and the keyboard never flash white.
-  backgroundColor: PAPER,
-  icon: './assets/icon.png',
-  // The splash is configured through the expo-splash-screen plugin below (SDK 54+ removed the
-  // top-level `splash` key from the config type).
-  assetBundlePatterns: ['**/*'],
-  ios: {
-    bundleIdentifier: BRAND.bundleId,
-    supportsTablet: true,
-    requireFullScreen: true,
-    buildNumber: '1',
-    infoPlist: {
-      NSMicrophoneUsageDescription: MIC_USAGE,
-      // No WKAppBoundDomains: with that key present WebKit disables user scripts, script message
-      // handlers and evaluateJavaScript on any navigation it does not treat as app-bound (file:// never
-      // is), which silently removed window.ReactNativeWebView and broke the whole bridge.
-      ITSAppUsesNonExemptEncryption: false,
-      UISupportedInterfaceOrientations: [
-        'UIInterfaceOrientationLandscapeLeft',
-        'UIInterfaceOrientationLandscapeRight',
-        'UIInterfaceOrientationPortrait',
-      ],
-      'UISupportedInterfaceOrientations~ipad': [
-        'UIInterfaceOrientationPortrait',
-        'UIInterfaceOrientationPortraitUpsideDown',
-        'UIInterfaceOrientationLandscapeLeft',
-        'UIInterfaceOrientationLandscapeRight',
-      ],
+// The iOS 27 SDK (Xcode 27) ends the app at launch unless it adopts the UIScene life cycle. Expo 57
+// ships the scene delegate (EXExpoAppSceneDelegate) but its prebuild template does not wire it, so
+// the AppDelegate becomes the factory provider and stops creating the window; the scene delegate
+// starts React Native. Same plugin as pickleball's app.config.ts. Drop it once the Expo template
+// adopts scenes itself.
+const WINDOW_BLOCK =
+  /\n#if os\(iOS\) \|\| os\(tvOS\)\n\s*window = UIWindow\(frame: UIScreen\.main\.bounds\)\n\s*factory\.startReactNative\([\s\S]*?\)\n#endif\n/
+const APP_DELEGATE_DECL = 'class AppDelegate: ExpoAppDelegate {'
+
+const withSceneLifecycle: ConfigPlugin = (cfg) =>
+  withInfoPlist(
+    withAppDelegate(cfg, (mod) => {
+      const src = mod.modResults.contents
+      if (src.includes('ExpoReactNativeFactoryProvider')) return mod
+      if (
+        mod.modResults.language !== 'swift' ||
+        !src.includes(APP_DELEGATE_DECL) ||
+        !WINDOW_BLOCK.test(src)
+      ) {
+        throw new Error(
+          'withSceneLifecycle: AppDelegate.swift no longer matches the Expo 57 template; update the plugin'
+        )
+      }
+      mod.modResults.contents = src
+        .replace(
+          APP_DELEGATE_DECL,
+          'class AppDelegate: ExpoAppDelegate, ExpoReactNativeFactoryProvider {'
+        )
+        .replace(
+          WINDOW_BLOCK,
+          '\n    // The window and React Native start in EXExpoAppSceneDelegate (scene life cycle).\n'
+        )
+      return mod
+    }),
+    (mod) => {
+      mod.modResults.UIApplicationSceneManifest = {
+        UIApplicationSupportsMultipleScenes: false,
+        UISceneConfigurations: {
+          UIWindowSceneSessionRoleApplication: [
+            {
+              UISceneConfigurationName: 'Default Configuration',
+              UISceneDelegateClassName: 'EXExpoAppSceneDelegate',
+            },
+          ],
+        },
+      }
+      return mod
+    }
+  )
+
+export default ({ config }: ConfigContext): ExpoConfig =>
+  withSceneLifecycle({
+    ...config,
+    name: BRAND.name,
+    slug: 'squiggletale',
+    scheme: BRAND.scheme,
+    version: '1.0.0',
+    orientation: 'default',
+    userInterfaceStyle: 'light',
+    // Root view color (expo-system-ui) so rotation and the keyboard never flash white.
+    backgroundColor: PAPER,
+    icon: './assets/icon.png',
+    // The splash is configured through the expo-splash-screen plugin below (SDK 54+ removed the
+    // top-level `splash` key from the config type).
+    assetBundlePatterns: ['**/*'],
+    ios: {
+      bundleIdentifier: BRAND.bundleId,
+      supportsTablet: true,
+      requireFullScreen: true,
+      buildNumber: '1',
+      infoPlist: {
+        NSMicrophoneUsageDescription: MIC_USAGE,
+        // No WKAppBoundDomains: with that key present WebKit disables user scripts, script message
+        // handlers and evaluateJavaScript on any navigation it does not treat as app-bound (file:// never
+        // is), which silently removed window.ReactNativeWebView and broke the whole bridge.
+        ITSAppUsesNonExemptEncryption: false,
+        UISupportedInterfaceOrientations: [
+          'UIInterfaceOrientationLandscapeLeft',
+          'UIInterfaceOrientationLandscapeRight',
+          'UIInterfaceOrientationPortrait',
+        ],
+        'UISupportedInterfaceOrientations~ipad': [
+          'UIInterfaceOrientationPortrait',
+          'UIInterfaceOrientationPortraitUpsideDown',
+          'UIInterfaceOrientationLandscapeLeft',
+          'UIInterfaceOrientationLandscapeRight',
+        ],
+      },
+      config: { usesNonExemptEncryption: false },
     },
-    config: { usesNonExemptEncryption: false },
-  },
-  android: {
-    package: BRAND.bundleId,
-    adaptiveIcon: { foregroundImage: './assets/icon.png', backgroundColor: PAPER },
-  },
-  updates: {
-    url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
-    enabled: true,
-    checkAutomatically: 'ON_LOAD',
-    fallbackToCacheTimeout: 0,
-  },
-  runtimeVersion: { policy: 'appVersion' },
-  plugins: [
-    'expo-iap',
-    'expo-updates',
-    'expo-secure-store',
-    ['expo-splash-screen', { image: './assets/splash.png', backgroundColor: SPLASH_PAPER, resizeMode: 'contain' }],
-    'expo-dev-client',
-    // Add-only Photos access for saving exported videos; never the full-library read permission.
-    [
-      'expo-media-library',
-      { photosPermission: false, savePhotosPermission: PHOTOS_ADD_USAGE, granularPermissions: ['video'] },
+    android: {
+      package: BRAND.bundleId,
+      adaptiveIcon: { foregroundImage: './assets/icon.png', backgroundColor: PAPER },
+    },
+    updates: {
+      url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+      enabled: true,
+      checkAutomatically: 'ON_LOAD',
+      fallbackToCacheTimeout: 0,
+    },
+    runtimeVersion: { policy: 'appVersion' },
+    plugins: [
+      'expo-iap',
+      'expo-updates',
+      'expo-secure-store',
+      [
+        'expo-splash-screen',
+        { image: './assets/splash.png', backgroundColor: SPLASH_PAPER, resizeMode: 'contain' },
+      ],
+      'expo-dev-client',
+      // Add-only Photos access for saving exported videos; never the full-library read permission.
+      [
+        'expo-media-library',
+        {
+          photosPermission: false,
+          savePhotosPermission: PHOTOS_ADD_USAGE,
+          granularPermissions: ['video'],
+        },
+      ],
+      // Audio session control only; the WebView records, so no background audio modes.
+      [
+        'expo-audio',
+        {
+          microphonePermission: MIC_USAGE,
+          enableBackgroundPlayback: false,
+          enableBackgroundRecording: false,
+        },
+      ],
+      'expo-web-browser',
+      'expo-localization',
+      'expo-screen-orientation',
+      'expo-system-ui',
+      // Installed for later; the app never prompts on its own (kids app, grown-up action only).
+      'expo-notifications',
+      [
+        'expo-speech-recognition',
+        { speechRecognitionPermission: SPEECH_USAGE, microphonePermission: MIC_USAGE },
+      ],
     ],
-    // Audio session control only; the WebView records, so no background audio modes.
-    [
-      'expo-audio',
-      { microphonePermission: MIC_USAGE, enableBackgroundPlayback: false, enableBackgroundRecording: false },
-    ],
-    'expo-web-browser',
-    'expo-localization',
-    'expo-screen-orientation',
-    'expo-system-ui',
-    // Installed for later; the app never prompts on its own (kids app, grown-up action only).
-    'expo-notifications',
-    [
-      'expo-speech-recognition',
-      { speechRecognitionPermission: SPEECH_USAGE, microphonePermission: MIC_USAGE },
-    ],
-  ],
-  extra: { eas: { projectId: EAS_PROJECT_ID } },
-})
+    extra: { eas: { projectId: EAS_PROJECT_ID } },
+  })
