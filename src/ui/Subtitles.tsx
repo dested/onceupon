@@ -1,8 +1,10 @@
 import { useApp } from '~/story/store'
 
 /**
- * The child's words in one line along the bottom, newest words always visible: the text floats
- * right inside a clipped box, so old words slide off the left edge instead of wrapping over the art.
+ * The child's words along the bottom, wrapped so the whole sentence can be read on a phone too. The
+ * box holds three lines at most and grows upward: the newest two stay solid, the line above them
+ * fades out and anything older is clipped (`.subtitles` in app.css), so the words never pile up
+ * over the art.
  * Three states, so it is obvious what the crayon is up to: words already drawn in ink, the words
  * being drawn right now on a yellow crayon highlight, and words heard but not sent yet in grey.
  */
@@ -16,12 +18,13 @@ export function Subtitles({ className = '' }: { className?: string }) {
   // transcriptFinal always ends with `<drawing> <queued>` (they were fed in that order).
   const live = [drawing, queued].filter(Boolean).join(' ')
   const done = live && final.endsWith(live) ? final.slice(0, final.length - live.length).trimEnd() : final
-  const doneTail = done.length > 200 ? done.slice(-200) : done
+  // Keep the tail short, starting on a whole word (the cut is visible now that the text wraps).
+  const doneTail = done.length > 200 ? done.slice(-200).replace(/^\S*\s+/, '') : done
   const waiting = [queued, interim].filter(Boolean).join(' ')
   return (
-    <div className={`pointer-events-none absolute overflow-hidden ${className}`}>
+    <div className={`subtitles pointer-events-none absolute overflow-hidden ${className}`}>
       <p
-        className="float-right rounded-xl bg-paper/80 px-4 py-1 font-hand text-2xl leading-tight whitespace-nowrap text-ink"
+        className="max-w-full shrink-0 rounded-xl bg-paper/80 px-4 py-1 font-hand leading-tight text-ink"
         data-testid="subtitles">
         {doneTail}
         {drawing && (

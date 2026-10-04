@@ -99,7 +99,7 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
           )}
         </div>
       )}
-      <Subtitles className="bottom-[calc(6rem+var(--sab))] left-[calc(1.5rem+var(--sal))] right-[calc(1.5rem+var(--sar))] h-11" />
+      <Subtitles className="bottom-[calc(6rem+var(--sab))] left-[calc(1.5rem+var(--sal))] right-[calc(1.5rem+var(--sar))]" />
       <div className="absolute right-[calc(1.5rem+var(--sar))] bottom-[calc(1.5rem+var(--sab))] left-[calc(1.5rem+var(--sal))] flex items-center gap-4" data-testid="scrubber">
         {ended ? (
           <StickerButton tone="yellow" tilt={0} onClick={again} className="shrink-0">

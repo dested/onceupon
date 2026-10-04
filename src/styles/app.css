@@ -460,13 +460,22 @@ button {
 .has-story .paper-bottomline > span:first-child {
   visibility: hidden;
 }
+/* Subtitles: up to three wrapped lines, anchored to the bottom. Lines are 1.25em (leading-tight) and
+   the pill has 0.25rem of padding above and below: the newest two lines are solid, the third fades. */
+.subtitles {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  font-size: 24px;
+  max-height: calc(3.75em + 0.5rem);
+  -webkit-mask-image: linear-gradient(to top, #000 calc(2.5em + 0.25rem), transparent calc(3.75em + 0.5rem));
+  mask-image: linear-gradient(to top, #000 calc(2.5em + 0.25rem), transparent calc(3.75em + 0.5rem));
+}
 .story-subtitles {
   bottom: 37px;
   left: 7%;
   right: 7%;
-  height: 42px;
-}
-.story-subtitles p {
   font-size: 26px;
 }
 .story-note {
@@ -1003,8 +1012,6 @@ button {
   .story-subtitles {
     left: 4%;
     right: 4%;
-  }
-  .story-subtitles p {
     font-size: 21px;
   }
   .story-controls {

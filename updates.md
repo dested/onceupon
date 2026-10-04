@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-10-03 — Subtitles wrap and fade (branch whistle-ears)
+Sal (on iPhone): "i cant see my sentence ... make it fade out or a better thing". Subtitles wrap, three lines at most growing upward: newest two solid, the third fades (mask), older clipped; tail starts on a whole word. Checked in the browser at full width and squeezed to 360px. Also this session: scene life cycle plugin in apps/mobile/app.config.ts (Xcode 27 builds quit at launch without it), Mac build script ~/code/squiggle-run.sh.
+Touched: src/ui/{Subtitles,ReplayScreen}.tsx, src/styles/app.css, apps/mobile/app.config.ts, cliffnotes.md
+
 ## 2026-10-03 — Whistle on-device ears + ears picker (branch whistle-ears)
 Sal: "lets give it a try. give me a way to toggle the engines in the app". New local Expo module `whistle-ears` (Swift, Cactus Whistle on the needle engine, rolling-window pseudo-streaming, 16 kHz wav clip), shell engine `whistle` behind `speech.*` (`engines` on available, `engine` on start), Grown-ups → Ears picker (`settings.earsEngine`). Typecheck green in studio and mobile, mobile tests pass. Swift never compiled (EAS only); not committed: `src/story/session.ts` also carries another session's uncommitted cloud-ears-fallback edits.
 Touched: apps/mobile/modules/whistle-ears/*, apps/mobile/modules/on-device-ears/index.ts, apps/mobile/src/bridge/handlers/speech.ts, packages/shared/src/bridge.ts, src/speech/apple.ts, src/story/{session,store}.ts, src/ui/ParentArea.tsx, cliffnotes.md

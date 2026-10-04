@@ -116,7 +116,7 @@ src/
   ui/
     StoryScreen.tsx        iPad picture-book layout, mic dock, options, expandable typing/page trays, new-story confirmation and ending actions
     StoryWelcome.tsx       decorative SVG crayon and empty-page invitation; never enters saved drawings
-    Subtitles.tsx          one clipped line along the bottom; newest words stay visible (float-right trick)
+    Subtitles.tsx          wrapped words along the bottom, three lines at most, growing upward: newest two solid, the third fades, older clipped (`.subtitles` in app.css)
     SpendChip.tsx          running $ / calls / time-to-first-stroke, visible with the development drawing lab
     Filmstrip.tsx          thumbnails of earlier pages, top-left
     SettingsPanel.tsx      provider/model picker + API key
