@@ -1,0 +1,88 @@
+/* The AI consent card (src/ui/ConsentCard.tsx) and the dock's "a grown-up needs to say yes" state.
+   The card reuses .new-story-dialog (paper, ink border, offset shadow, scrolls inside itself). It lives
+   in the top layer outside .story-studio, so the studio accents it uses are declared here too. */
+
+.new-story-dialog.consent-card {
+  --studio-purple: #7b5c91;
+  --studio-sage: #dce7d5;
+  --studio-muted: #796d60;
+  width: min(560px, calc(100vw - 36px - var(--sal) - var(--sar)));
+  padding: 28px 30px 20px;
+}
+.new-story-dialog.consent-card h2 {
+  font-size: 28px;
+  color: var(--studio-purple);
+}
+.new-story-dialog.consent-card > .consent-copy {
+  display: block;
+  margin: 14px 0 20px;
+  text-align: left;
+}
+.consent-card .consent-copy p {
+  margin: 0 0 12px;
+  font-size: 19px;
+  line-height: 1.4;
+  color: var(--color-ink);
+}
+.consent-card .consent-copy p:last-child {
+  margin-bottom: 0;
+}
+.consent-card .consent-error {
+  margin: -6px 0 14px;
+  font-size: 18px;
+  color: var(--color-crayon-red);
+}
+.consent-card .consent-actions {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+.consent-card .consent-actions .studio-button {
+  min-width: 132px;
+  background: var(--color-paper);
+}
+.consent-card .consent-actions .consent-agree {
+  background: var(--studio-sage);
+  transform: rotate(-1deg);
+}
+.consent-card .consent-link {
+  display: inline-block;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  font-size: 18px;
+  color: var(--studio-purple);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 599px) {
+  .consent-card {
+    padding: 22px 18px 14px;
+  }
+  .new-story-dialog.consent-card h2 {
+    font-size: 24px;
+  }
+  .consent-card .consent-copy p {
+    font-size: 17px;
+  }
+}
+
+/* The mic dock while consent is missing: the words and one grown-up button instead of the mic. */
+.consent-dock {
+  gap: 16px;
+}
+.consent-dock .mic-copy {
+  align-items: flex-start;
+  gap: 8px;
+}
+.consent-dock .consent-ask {
+  background: var(--studio-lilac);
+  transform: rotate(-1.5deg);
+}
+@media (max-width: 599px) {
+  .consent-dock .mic-copy strong {
+    font-size: 19px;
+  }
+}

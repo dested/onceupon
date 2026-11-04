@@ -40,6 +40,7 @@ import { cleanText, setModeration } from './clean'
 import { splitTheEnd } from './the-end'
 import { HOSTED } from '~/backend/config'
 import { ApiError } from '~/backend/api'
+import { consentRequired } from '~/backend/consent'
 import { StoryMeter, type MeterHandlers } from '~/backend/meter'
 import { VoicePlayer, VoiceRecorder } from '~/story/voice'
 import { playCoachLine } from '~/tutorial/coach'
@@ -372,8 +373,10 @@ export class LiveSession {
         if (sleepy && !wasSleepy) this.showNote('the crayon is getting sleepy…', 5000)
       },
       onExhausted: () => this.endStory('sleepy'),
-      onError: (code, message) =>
-        appStore.set((s) => ({ warnings: [...s.warnings.slice(-9), `meter: ${message} (${code})`] })),
+      onError: (code, message) => {
+        appStore.set((s) => ({ warnings: [...s.warnings.slice(-9), `meter: ${message} (${code})`] }))
+        if (code === 'consent_required') this.consentLost()
+      },
     }
   }
 
@@ -603,8 +606,16 @@ export class LiveSession {
     this.showNote(HOSTED ? 'the crayon cannot hear right now' : `ears did not start: ${why}`, 7000)
   }
 
+  /** The server has no grown-up yes for this device: stop and show the "Not now" state. */
+  private consentLost(): void {
+    this.stopListening()
+    consentRequired()
+  }
+
   private handleStartError(e: unknown): void {
-    if (e instanceof ApiError && e.code === 'exhausted') {
+    if (e instanceof ApiError && e.code === 'consent_required') {
+      this.consentLost()
+    } else if (e instanceof ApiError && e.code === 'exhausted') {
       appStore.set({ paywallOpen: true })
     } else if (e instanceof ApiError && (e.code === 'paused' || e.code === 'read_only')) {
       this.showNote('the crayon is taking a nap, try again soon', 5000)

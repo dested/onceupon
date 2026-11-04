@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { bridgeCall, installBridge, onBridgeEvent } from '~/backend/bridge'
 import { HOSTED, NATIVE } from '~/backend/config'
 import { initDevice, sendAttributionOnce } from '~/backend/device'
+import { loadConsent } from '~/backend/consent'
 import { initStorage } from '~/story/storage'
 import { appStore } from '~/story/store'
 import { setAwake } from '~/backend/awake'
@@ -17,7 +18,10 @@ export async function boot(): Promise<void> {
   installBridge()
   await initStorage()
   // kv lives in the storage backend, so registration starts once it is picked.
-  if (HOSTED) void initDevice()
+  if (HOSTED) {
+    void loadConsent()
+    void initDevice()
+  }
 
   window.addEventListener('online', () => appStore.set({ online: true }))
   window.addEventListener('offline', () => appStore.set({ online: false }))

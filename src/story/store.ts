@@ -164,6 +164,12 @@ export interface AppState {
   tutorialOpen: boolean
   /** Bumped to ask the UI to run the parent gate (a math challenge before parent-only actions). */
   gateRequest: number
+  /** A grown-up said "I agree" on the consent card (kv `aiConsent`): story words may go to Claude. */
+  aiConsent: boolean
+  /** "Not now" (or the server said `consent_required`): mic and typing stay off until a grown-up says yes. */
+  consentBlocked: boolean
+  /** The consent card is showing. */
+  consentOpen: boolean
 }
 
 export interface SttTrace {
@@ -367,6 +373,9 @@ export const appStore = new Store<AppState>({
   shareOpen: false,
   tutorialOpen: false,
   gateRequest: 0,
+  aiConsent: false,
+  consentBlocked: false,
+  consentOpen: false,
 })
 
 export function useApp<S>(selector: (s: AppState) => S): S {

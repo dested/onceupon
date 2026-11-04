@@ -4,6 +4,7 @@ import { api } from './api'
 import { getKv, setKv } from '~/story/storage'
 import { addMaskWords } from '~/story/clean'
 import { appStore } from '~/story/store'
+import { reconcileConsent } from './consent'
 import type { DeviceState, Platform } from '../../packages/shared/src/api'
 
 /**
@@ -74,6 +75,19 @@ async function ensureToken(): Promise<void> {
   deviceToken = token
 }
 
+/** Copy a DeviceState from the server into the store (and reconcile the AI consent with it). */
+function applyDeviceState(state: DeviceState): void {
+  appStore.set({
+    balanceSec: state.balanceSec,
+    paying: state.paying,
+    comped: state.comped,
+    shareVoice: state.shareVoice,
+    deviceCode: state.code,
+    lastPack: state.lastPack,
+  })
+  void reconcileConsent(state.aiConsent)
+}
+
 async function run(): Promise<void> {
   await tokenStep
   if (deviceToken === null) throw new Error('no device token')
@@ -82,15 +96,8 @@ async function run(): Promise<void> {
     api('config', {}),
     api('mask.list', {}),
   ])
-  appStore.set({
-    balanceSec: state.balanceSec,
-    paying: state.paying,
-    comped: state.comped,
-    shareVoice: state.shareVoice,
-    deviceCode: state.code,
-    lastPack: state.lastPack,
-    config,
-  })
+  applyDeviceState(state)
+  appStore.set({ config })
   addMaskWords(masks.words)
 }
 
@@ -117,14 +124,7 @@ export async function initDevice(): Promise<void> {
 export async function refreshDevice(): Promise<DeviceState | null> {
   try {
     const state = await api('device.state', {})
-    appStore.set({
-      balanceSec: state.balanceSec,
-      paying: state.paying,
-    comped: state.comped,
-      shareVoice: state.shareVoice,
-      deviceCode: state.code,
-      lastPack: state.lastPack,
-    })
+    applyDeviceState(state)
     return state
   } catch {
     return null
@@ -133,14 +133,7 @@ export async function refreshDevice(): Promise<DeviceState | null> {
 
 export async function setShareVoice(on: boolean): Promise<void> {
   const state = await api('device.consent', { shareVoice: on })
-  appStore.set({
-    balanceSec: state.balanceSec,
-    paying: state.paying,
-    comped: state.comped,
-    shareVoice: state.shareVoice,
-    deviceCode: state.code,
-    lastPack: state.lastPack,
-  })
+  applyDeviceState(state)
 }
 
 /** Apple AdServices attribution, once per install (native only). Best-effort; never throws. */

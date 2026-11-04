@@ -22,7 +22,8 @@ import {
 } from 'lucide-react'
 import { LiveSession } from '~/story/session'
 import { appStore, persistSettings, useApp } from '~/story/store'
-import { getKv, getStory, listStories, setKv } from '~/story/storage'
+import { getStory, listStories } from '~/story/storage'
+import { ensureConsent } from '~/backend/consent'
 import { Subtitles } from './Subtitles'
 import { Filmstrip } from './Filmstrip'
 import { SettingsPanel } from './SettingsPanel'
@@ -62,6 +63,7 @@ export function StoryScreen() {
   const sleepy = useApp((s) => s.sleepy)
   const remainingSec = useApp((s) => s.remainingSec)
   const balanceSec = useApp((s) => s.balanceSec)
+  const consentBlocked = useApp((s) => s.hosted && s.consentBlocked)
   const offline = hosted && !online
   const [typed, setTyped] = useState('')
   const [typing, setTyping] = useState(false)
@@ -124,22 +126,24 @@ export function StoryScreen() {
       session.stopListening()
       return
     }
-    // Apple wants a grown-up gate before the first microphone permission prompt on a device.
-    if (hosted) {
-      void getKv('micGateDone').then((done) => {
-        if (done !== null) {
-          startMic(session)
-          return
-        }
-        void gate().then((ok) => {
-          if (!ok) return
-          void setKv('micGateDone', '1')
-          startMic(session)
-        })
-      })
-      return
-    }
-    startMic(session)
+    // The first time: parental gate → AI consent card → (the mic permission prompt). Hosted only.
+    void ensureConsent().then((ok) => {
+      if (ok) startMic(session)
+    })
+  }
+  const submitTyped = (): void => {
+    const text = typed.trim()
+    if (!text) return
+    void ensureConsent().then((ok) => {
+      if (!ok) return
+      sessionRef.current?.typeWords(text)
+      setTyped('')
+    })
+  }
+  /** "Not now" state: the grown-up button runs the gate, then the same card. */
+  const askGrownUp = (): void => {
+    setTyping(false)
+    void ensureConsent()
   }
   const newStory = () => {
     confirmRef.current?.close()
@@ -411,7 +415,9 @@ export function StoryScreen() {
                 {endReason === 'sleepy' && (
                   <button
                     className="studio-button sleepy-more"
-                    onClick={() => void gate().then((ok) => ok && appStore.set({ paywallOpen: true }))}
+                    onClick={() =>
+                      void gate().then((ok) => ok && appStore.set({ paywallOpen: true }))
+                    }
                     data-testid="more-minutes">
                     <Plus size={21} />
                     More minutes
@@ -422,7 +428,10 @@ export function StoryScreen() {
                   Play it again
                 </button>
                 {hosted && endReason === 'the-end' && (
-                  <button className="studio-button" onClick={shareStory} data-testid="send-to-grandma">
+                  <button
+                    className="studio-button"
+                    onClick={shareStory}
+                    data-testid="send-to-grandma">
                     <Share2 size={21} />
                     Send to grandma
                   </button>
@@ -440,7 +449,11 @@ export function StoryScreen() {
                   className="studio-button"
                   onClick={newStory}
                   disabled={hosted && endReason === 'sleepy' && balanceSec === 0}
-                  title={hosted && endReason === 'sleepy' && balanceSec === 0 ? 'no minutes left' : undefined}>
+                  title={
+                    hosted && endReason === 'sleepy' && balanceSec === 0
+                      ? 'no minutes left'
+                      : undefined
+                  }>
                   <Plus size={21} />
                   New story
                 </button>
@@ -449,7 +462,9 @@ export function StoryScreen() {
           </div>
         ) : (
           <>
-            <div className={`end-reminder ${sleepy ? 'is-sleepy' : ''}`}>
+            <div
+              className={`end-reminder ${sleepy ? 'is-sleepy' : ''}`}
+              style={consentBlocked ? { visibility: 'hidden' } : undefined}>
               <Star size={19} />
               {sleepy ? (
                 <span>
@@ -468,46 +483,66 @@ export function StoryScreen() {
                 </span>
               )}
             </div>
-            <div className="mic-dock">
-              <button
-                onClick={toggleMic}
-                disabled={!micSupported || offline}
-                aria-label={
-                  listening
-                    ? 'Stop listening'
-                    : micStarting
-                      ? 'Cancel microphone'
-                      : 'Start listening'
-                }
-                aria-pressed={listening}
-                data-testid="mic"
-                className={`story-mic ${micStarting ? 'mic-starting' : ''}`}>
-                <span className="mic-ring" aria-hidden="true" />
-                {listening ? (
-                  <Pause size={34} strokeWidth={2.6} fill="currentColor" />
-                ) : (
-                  <Mic size={37} strokeWidth={2.3} />
-                )}
-              </button>
-              {offline ? (
-                <div className="offline-note" role="status" data-testid="offline-note">
-                  The crayon needs the internet to draw new stories. Your saved stories still play.
-                </div>
-              ) : (
+            {consentBlocked ? (
+              <div className="mic-dock consent-dock" data-testid="consent-dock">
                 <div className="mic-copy">
-                  <strong data-testid="status">{micTitle}</strong>
-                  <span>{micHint}</span>
-                  {listening && (
-                    <div className="voice-wave" aria-label="Microphone level" data-testid="mic-level">
-                      {[0.4, 0.7, 1, 0.6, 0.85, 0.5, 0.9, 0.65, 0.35].map((height, i) => (
-                        <i key={i} style={{ height: `${4 + height * micLevel * 19}px` }} />
-                      ))}
-                    </div>
-                  )}
+                  <strong data-testid="status">A grown-up needs to say yes first</strong>
+                  <button
+                    type="button"
+                    className="studio-button consent-ask"
+                    onClick={askGrownUp}
+                    data-testid="ask-grown-up">
+                    <Users size={21} />
+                    Ask a grown-up
+                  </button>
                 </div>
-              )}
-            </div>
-            {!offline && (
+              </div>
+            ) : (
+              <div className="mic-dock">
+                <button
+                  onClick={toggleMic}
+                  disabled={!micSupported || offline}
+                  aria-label={
+                    listening
+                      ? 'Stop listening'
+                      : micStarting
+                        ? 'Cancel microphone'
+                        : 'Start listening'
+                  }
+                  aria-pressed={listening}
+                  data-testid="mic"
+                  className={`story-mic ${micStarting ? 'mic-starting' : ''}`}>
+                  <span className="mic-ring" aria-hidden="true" />
+                  {listening ? (
+                    <Pause size={34} strokeWidth={2.6} fill="currentColor" />
+                  ) : (
+                    <Mic size={37} strokeWidth={2.3} />
+                  )}
+                </button>
+                {offline ? (
+                  <div className="offline-note" role="status" data-testid="offline-note">
+                    The crayon needs the internet to draw new stories. Your saved stories still
+                    play.
+                  </div>
+                ) : (
+                  <div className="mic-copy">
+                    <strong data-testid="status">{micTitle}</strong>
+                    <span>{micHint}</span>
+                    {listening && (
+                      <div
+                        className="voice-wave"
+                        aria-label="Microphone level"
+                        data-testid="mic-level">
+                        {[0.4, 0.7, 1, 0.6, 0.85, 0.5, 0.9, 0.65, 0.35].map((height, i) => (
+                          <i key={i} style={{ height: `${4 + height * micLevel * 19}px` }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {!offline && !consentBlocked && (
               <button
                 className={`studio-button keyboard-button ${typing ? 'is-selected' : ''}`}
                 onClick={() => setTyping(!typing)}
@@ -518,16 +553,13 @@ export function StoryScreen() {
                 <span>Or type</span>
               </button>
             )}
-            {!offline && typing && (
+            {!offline && !consentBlocked && typing && (
               <form
                 id="story-type-form"
                 className="story-type-form"
                 onSubmit={(e) => {
                   e.preventDefault()
-                  if (typed.trim()) {
-                    sessionRef.current?.typeWords(typed.trim())
-                    setTyped('')
-                  }
+                  submitTyped()
                 }}>
                 <label htmlFor="story-words">What happens in your story?</label>
                 <div>

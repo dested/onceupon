@@ -7,6 +7,7 @@ import { APP_SHELL } from '~/backend/config'
 import { listShares, unpublishShare } from '~/backend/share'
 import { refreshDevice, setShareVoice } from '~/backend/device'
 import { ApiError } from '~/backend/api'
+import { askConsent, withdrawConsent } from '~/backend/consent'
 import { formatMinutes, takeParentFocus } from './hosted'
 import { PaperCard, StickerButton } from './bits'
 import type { ShareSummary } from '../../packages/shared/src/api'
@@ -53,6 +54,7 @@ export function ParentArea() {
   const sound = useApp((s) => s.settings.sound)
   const earsEngine = useApp((s) => s.settings.earsEngine)
   const config = useApp((s) => s.config)
+  const aiConsent = useApp((s) => s.aiConsent)
 
   const [nextWeekly, setNextWeekly] = useState<string | null>(null)
   const [restoreBusy, setRestoreBusy] = useState(false)
@@ -69,6 +71,8 @@ export function ParentArea() {
   const [shares, setShares] = useState<ShareSummary[] | null>(null)
   const [unpublishId, setUnpublishId] = useState<string | null>(null)
   const [unpublishBusy, setUnpublishBusy] = useState('')
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiError, setAiError] = useState('')
   const giftRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -81,6 +85,7 @@ export function ParentArea() {
     setConsentOpen(false)
     setVoiceError('')
     setUnpublishId(null)
+    setAiError('')
     void refreshDevice().then((state) => setNextWeekly(state?.nextWeeklyAt ?? null))
     void listShares()
       .then(setShares)
@@ -153,6 +158,19 @@ export function ParentArea() {
       .then(() => setConsentOpen(false))
       .catch(() => setVoiceError('Could not save that; try again'))
       .finally(() => setVoiceBusy(false))
+  }
+
+  /** "Drawing with AI": Turn on shows the consent card (this area is already behind the gate). */
+  const toggleAi = (): void => {
+    setAiError('')
+    if (!aiConsent) {
+      void askConsent()
+      return
+    }
+    setAiBusy(true)
+    void withdrawConsent()
+      .catch(() => setAiError('Could not save that; try again'))
+      .finally(() => setAiBusy(false))
   }
 
   const doUnpublish = (id: string): void => {
@@ -229,6 +247,25 @@ export function ParentArea() {
             </button>
           </div>
           {restoreMsg && <p className={okLine}>{restoreMsg}</p>}
+
+          {/* Drawing with AI (the consent card's yes) */}
+          <div className={sectionDivide}>
+            <h3 className={heading}>Drawing with AI</h3>
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              <span className="font-scrawl text-3xl leading-none text-ink" data-testid="ai-consent-state">
+                {aiConsent ? 'On' : 'Off'}
+              </span>
+              <StickerButton
+                tone={aiConsent ? 'paper' : 'green'}
+                tilt={-1}
+                onClick={toggleAi}
+                disabled={aiBusy}
+                data-testid="ai-consent-toggle">
+                {aiBusy ? 'Saving…' : aiConsent ? 'Turn off' : 'Turn on'}
+              </StickerButton>
+            </div>
+            {aiError && <p className={errorLine}>{aiError}</p>}
+          </div>
 
           {/* Gift code */}
           <div className={sectionDivide} ref={giftRef}>
