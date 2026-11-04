@@ -68,7 +68,7 @@ export function DeleteDataPage() {
           </form>
 
           <p className="mt-6 font-hand text-lg text-ink-soft">
-            You can also delete every story on the iPad from My stories, and uninstalling removes
+            You can also delete every story on the device from My stories, and uninstalling removes
             everything stored on the device.
           </p>
         </PaperCard>

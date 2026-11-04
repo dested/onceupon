@@ -5,8 +5,8 @@ import { Head } from './seo'
 import { Section } from './site-parts'
 
 const CHECKLIST = [
-  'Check the iPad is online. Live drawing needs an internet connection.',
-  'Check the microphone permission in iPad Settings, under Squiggletale.',
+  'Check the iPhone or iPad is online. Drawing needs an internet connection.',
+  'In Settings, under Squiggletale, turn on Microphone and Speech Recognition.',
   'Check there are minutes left, under Grown-ups in the app.',
 ]
 

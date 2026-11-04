@@ -12,6 +12,11 @@ export const BRAND = {
   /** The public domain (Sal's, registered 2026-09-23); `origin`/`domain` flip to it with the domain move. */
   publicDomain: 'squiggletale.com',
   company: 'QuickGame',
+  /** The operator named in the privacy policy (COPPA notice: name, postal address, phone, email). */
+  legalName: 'QuickGame World Inc.',
+  /** Required before App Store submission (COPPA operator notice); empty strings are left out of the page. */
+  postalAddress: '',
+  phone: '',
   supportEmail: 'sal@quickga.me',
   bundleId: 'com.quickgame.squiggletale',
   /** Deep-link scheme of the native shell. */
