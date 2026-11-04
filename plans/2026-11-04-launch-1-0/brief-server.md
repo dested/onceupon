@@ -37,3 +37,9 @@ Re-read this file and the Standing answers + Phase 3 decisions in /w/code/onceup
 **Commits.** `bash ~/.claude/sal/bin/commit-paths.sh "<msg> (server)" <your paths>`, one per item group.
 
 **Report** (≤ 10 lines, per ready): `ready server <item> <sha>`, what was verified with exit codes, flags that are DB-overridable, anything left, questions with recs.
+
+**Added 2026-11-04 (Phase 3 decision 4b): free tier on Haiku.**
+- Flag `freeModel` in FLAG_DEFAULTS, default `'claude-sonnet-5-5'` until the haiku lane passes (the lead flips it to `'claude-haiku-5-5'`), validated like `model`. `model` stays the paid model.
+- Relay picks the model per draw: a device with any ledger credit that isn't a free grant (Apple or Stripe pack, gift code, comp) → `flags.model`, else `flags.freeModel`. The chosen model drives the reserve estimate, the stream, `estimateCost` and the CallLog row. No schema change unless you must (ask first).
+- CallLog `skip`: a relayed line counts as a skip when the trimmed line matches `/^(skip\b|#\s*nothing\b)/i`.
+- Tests: free device → freeModel; pack credit → model; comp → model; a `# nothing` reply logs skip.
