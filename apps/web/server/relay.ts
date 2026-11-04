@@ -21,8 +21,12 @@ import type { DrawChunk, DrawUsage } from '../../../packages/shared/src/api'
 const MAX_USER_BLOCKS = 100
 const MAX_USER_CHARS = 40_000
 const MAX_TOKENS = 1600
-/** No first token this long after the call starts: end it as `upstream` / `slow` (V-10). */
-const FIRST_TOKEN_DEADLINE_MS = 6_000
+/**
+ * No first token this long after the call starts: end it as `upstream` / `slow` (V-10). 8 s, not 6:
+ * Haiku 5.5 on adaptive-low thinking streams nothing until it has thought, and its worst first token
+ * on the 2026-11-04 bench was 4.5 s (lab/proto/2026-11-04-haiku2-v17-*).
+ */
+const FIRST_TOKEN_DEADLINE_MS = 8_000
 /** Calls a session may make per charged minute, plus a grace for the start of a story (V-01). */
 const CALLS_PER_CHARGED_MINUTE = 12
 const CALL_GRACE = 3

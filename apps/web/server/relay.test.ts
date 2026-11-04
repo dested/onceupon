@@ -154,13 +154,13 @@ describe('relay limits', () => {
     expect(log?.outputTokens ?? 0).toBeGreaterThan(0)
   })
 
-  test('no first token in 6 s ends the call as upstream/slow', async () => {
+  test('no first token in 8 s ends the call as upstream/slow', async () => {
     const d = await newDevice({ consent: true })
     const sessionId = await startStory(d.token)
     fake.mode = 'slow'
     const t0 = Date.now()
     const r = await draw(d.token, sessionId)
-    expect(Date.now() - t0).toBeLessThan(9_000)
+    expect(Date.now() - t0).toBeLessThan(9_900)
     const err = r.chunks.find((c) => c.k === 'error')
     expect(err).toEqual({ k: 'error', code: 'upstream', message: 'slow' })
   }, 15_000)
