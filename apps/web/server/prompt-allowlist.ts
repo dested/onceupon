@@ -15,6 +15,10 @@ import { log } from './logger'
  * the shell's bundled studio and tabs left open across a deploy. Nobody appends anything by hand.
  * The row is not a FLAG_DEFAULTS key, so the admin flags page neither shows nor edits it.
  *
+ * Only the production deployment (NODE_ENV=production, the Drydock image) writes the row. Anywhere
+ * else (dev servers, scripts, tests) the boot hashes are accepted in memory only, so a local,
+ * unreleased prompt never lands in whatever database the env points at.
+ *
  * The modules are imported by a computed path on purpose: apps/web's `~/` alias points at apps/web/src,
  * so a static import of the studio's tree would not typecheck here. Bun runs the TS directly and
  * resolves the studio's own `~/` alias from the root tsconfig. Exports are read as `unknown` and
@@ -59,6 +63,16 @@ async function studioPrompts(): Promise<Array<{ dialect: Dialect; text: string }
 
 let promptSource: () => Promise<Array<{ dialect: Dialect; text: string }>> = studioPrompts
 let loading: Promise<Map<string, string>> | null = null
+let persistOverride: boolean | null = null
+
+/** True when this boot may write its hashes into the row: the production deployment only. */
+const persistsBootHashes = (): boolean => persistOverride ?? process.env.NODE_ENV === 'production'
+
+/** Tests choose whether boot writes the row (true = production behaviour); null restores NODE_ENV. */
+export function setPersistPromptsForTests(persist: boolean | null): void {
+  persistOverride = persist
+  loading = null
+}
 
 /** Tests stand in for the studio's prompt modules (a "reboot" with an edited prompt); null restores them. */
 export function setStudioPromptsForTests(prompts: Array<{ dialect: Dialect; text: string }> | null): void {
@@ -89,7 +103,8 @@ async function load(): Promise<Map<string, string>> {
     }
   }
   const all = [...known, ...added]
-  if (added.length > 0) {
+  const persist = persistsBootHashes()
+  if (added.length > 0 && persist) {
     await prisma.flag.upsert({
       where: { key: KNOWN_PROMPTS_KEY },
       create: { key: KNOWN_PROMPTS_KEY, value: all, updatedBy: 'boot' },
@@ -97,7 +112,10 @@ async function load(): Promise<Map<string, string>> {
     })
   }
   const byHash = new Map<string, string>(all.map((k) => [k.sha256, k.dialect]))
-  log.info(`[relay] prompt allow-list: ${byHash.size} known prompts, ${added.length} new this boot`)
+  log.info(
+    `[relay] prompt allow-list: ${byHash.size} known prompts, ${added.length} new this boot` +
+      (persist ? '' : ' (not production: kept in memory, row not written)')
+  )
   return byHash
 }
 

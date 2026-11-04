@@ -24,6 +24,7 @@ import {
   dialectOfSystem,
   KNOWN_PROMPTS_KEY,
   reloadPromptAllowListForTests,
+  setPersistPromptsForTests,
   setStudioPromptsForTests,
 } from './prompt-allowlist'
 import * as path from 'node:path'
@@ -336,6 +337,7 @@ describe('free tier model (decision 4b)', () => {
 describe('known prompt hashes', () => {
   test('a prompt that ran before an edit and a reboot is still accepted', async () => {
     try {
+      setPersistPromptsForTests(true) // the production deployment
       // Boot 1 ships the old prompt; boot 2 (after the edit) ships the new one.
       setStudioPromptsForTests([{ dialect: 'kit', text: 'kit prompt, release 1' }])
       expect(await dialectOfSystem('kit prompt, release 1')).toBe('kit')
@@ -356,6 +358,33 @@ describe('known prompt hashes', () => {
       expect(Object.keys(await getFlags())).not.toContain(KNOWN_PROMPTS_KEY)
     } finally {
       setStudioPromptsForTests(null)
+      setPersistPromptsForTests(null)
+    }
+  })
+
+  test('outside production the boot hashes are accepted in memory and the row is never written', async () => {
+    try {
+      setPersistPromptsForTests(false)
+      setStudioPromptsForTests([{ dialect: 'kit', text: 'local, unreleased kit prompt' }])
+      expect(await dialectOfSystem('local, unreleased kit prompt')).toBe('kit')
+      expect(await prisma.flag.findUnique({ where: { key: KNOWN_PROMPTS_KEY } })).toBe(null)
+
+      // Hashes production already stored are still accepted here.
+      const stored = 'a'.repeat(64)
+      await prisma.flag.create({
+        data: {
+          key: KNOWN_PROMPTS_KEY,
+          value: [{ dialect: 'sketch', sha256: stored, firstSeen: 'x' }],
+          updatedBy: 'boot',
+        },
+      })
+      setStudioPromptsForTests([{ dialect: 'kit', text: 'another local kit prompt' }])
+      expect(await dialectOfSystem('another local kit prompt')).toBe('kit')
+      const row = await prisma.flag.findUniqueOrThrow({ where: { key: KNOWN_PROMPTS_KEY } })
+      expect(row.value).toEqual([{ dialect: 'sketch', sha256: stored, firstSeen: 'x' }])
+    } finally {
+      setStudioPromptsForTests(null)
+      setPersistPromptsForTests(null)
     }
   })
 
