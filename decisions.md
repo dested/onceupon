@@ -183,3 +183,14 @@ key and bill exposed); keeping Haiku default (Sonnet's picture is the thing wort
 **Why:** With `WKAppBoundDomains` in Info.plist, WebKit disables WKUserScript, script message handlers and evaluateJavaScript on navigations it does not treat as app-bound (and `file://` never is), which removed `window.ReactNativeWebView` and turned the shell into a plain browser. Navigation is confined in JS instead (`onShouldStartLoadWithRequest`: only `/app` and file/about stay in the WebView). In the app, purchases are StoreKit only: no "buy on the web" link, no web-shop navigation, even if the bridge is down (`APP_SHELL`), per App Store rules.
 **Rejected:** keeping the key and setting `limitsNavigationsToAppBoundDomains` (offline `file://` copy would still lose the bridge).
 
+## 2026-11-04 — Free minutes draw with Haiku 5.5; bought minutes with Sonnet 5.5
+
+Sal: "haiku for free and one of the upsells is a smarter model and show them side by side pictures". `freeModel` flag defaults to `claude-haiku-5-5`, `model` (paying or comped devices) stays `claude-sonnet-5-5` (`drawModelFor` in apps/web/server/device.ts). Haiku runs adaptive thinking at effort low (both `anthropic-thinking.ts` copies): with thinking disabled it left 0-2 of 38 hard beats blank. Kit prompt v17 passes kid safety 10/10 on both models. The paywall shows the owl drawn both ways ("Free" / "With minutes"). No model or vendor name appears anywhere a parent or child sees.
+**Why:** Haiku is about 15x cheaper per minute ($0.001 vs $0.017-0.022) and faster to first ink (p50 0.8 s vs 1.3 s); the smarter crayon is the reason to buy.
+**Rejected:** a per-story "smarter crayon" toggle that burns minutes faster (1.1 at the earliest: nothing clever around money in a first submission).
+
+## 2026-11-04 — Minutes are talking time
+
+The meter stops counting after 8 s of quiet and resumes when the child is heard again (final words, interim words or mic level); the 30 s nudge and 60 s end stay. A story where nothing got drawn is not saved and its closing card offers no replay, share or video.
+**Why:** a child who stops to think lost a minute of paid time to silence that costs us nothing (the ears run on the device).
+

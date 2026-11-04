@@ -129,7 +129,7 @@ src/
     SharePlayer.tsx        public player behind share links (`?player=<id>`; `&embed=1` = paper only, inside the website's book; `player=tutorial` = the bundled demo)
     ParentGate.tsx         grown-up gate (spoken-number sum) before purchases, link-outs, first mic use
     ParentArea.tsx         balance, buy, restore, gift redeem, family code, share-with-voice consent, shares list, tutorial, links
-    Paywall.tsx            sleepy-crayon paywall / rebuy screen (packs, restore, redeem, web shop)
+    Paywall.tsx            sleepy-crayon paywall / rebuy screen (owl pair free vs with minutes from src/assets/paywall/, packs, restore, Privacy/Terms behind the gate; redeem on web only)
     ShareCard.tsx          after The End: name, include voice, make link, share sheet, download video
     MinutesChip.tsx        remaining minutes tag in the header (coral when sleepy)
     Offline.tsx            offline note/banner
@@ -173,7 +173,7 @@ scripts/                   one-off dev scripts (author-intro.ts: intro page draw
 | what counts as not-for-kids          | `src/llm/prompt.ts` "For a small child" (the model judges, answers `skip`); `src/story/clean.ts` word masker       |
 | what the debug report contains       | `src/story/debug-report.ts`; button in `DebugPanel.tsx` (`copy-report`), also `window.__onceupon.report()`                    |
 | when a thought becomes a beat        | `src/speech/beat-rules.ts` (tracker options per recognizer, voice hold), `recognition.ts` `TranscriptTracker.tick`         |
-| the mp4 export (look, timing, codecs) | `src/export/mp4.ts` (stepper, encoders, mux), `src/export/frame.ts` (book, overlays, logo, end card); spec `features/mp4-export.md` |
+| the mp4 export (look, timing, codecs) | `src/export/mp4.ts` (stepper, encoders, mux, Cancel + 10 s stall), `src/export/frame.ts` (book, overlays, app icon from `src/assets/brand/app-icon.jpg`, end card); spec `features/mp4-export.md` |
 | ears cost / spend chip               | `src/story/store.ts` `Spend.audioMs`, `effectiveSttRate`/`sttRateFor`, `settings.sttRateOverride`; `SpendChip.tsx` |
 | the studio ↔ server contract         | `packages/shared/src/api.ts` (types) → `apps/web/server/app-handlers/*.ts` (zod + logic) → `src/backend/api.ts` (client) |
 | the studio ↔ shell bridge            | `packages/shared/src/bridge.ts` → `apps/mobile/src/bridge/{host.ts,handlers/*}` (native) → `src/backend/bridge.ts` (studio) |

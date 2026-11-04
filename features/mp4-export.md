@@ -13,12 +13,13 @@ ending on a "Made with Squiggletale" card. Made entirely in the browser; nothing
 
 - The replay screen has a download icon in its top-right toolbar; the closing card after The End has a "Download video" button (the live story is saved first).
 - Clicking it shows a paper card near the bottom of the screen, above the replay scrubber: "Making your video", a crayon-yellow progress bar with a percentage and the phase (drawing every page / adding the crayon sounds / wrapping it up), and "cancel". The UI stays responsive; the replay keeps playing.
-- Cancel stops the export at the next frame and closes the card; nothing downloads.
+- Cancel works at every wait (frame loop, encoder backpressure, flush, audio render): the card closes and nothing downloads. An encoder that holds work but produces no output for 10 s fails the export with "Couldn't make the video. Try again later." and a Close button, never a frozen 0%.
+- In the app shell a grown-up passes the parental gate before the export starts (it ends in the system share sheet).
 - When done the browser downloads `<story-title-slug>.mp4` and the card says "Your video is in your downloads" with the size, then disappears after 3 s.
 - A browser without WebCodecs H.264 gets "This browser cannot make videos yet"; any other failure gets "The video got stuck. Try again?" (details in the console).
-- The video: 1280x800, 30 fps, H.264 (High, Main or Baseline, whichever the browser can encode; hardware encoder preferred, see Design notes), AAC 128 kbps stereo 48 kHz (Opus if AAC is not encodable, no audio track if neither). About 6.4 MB for 15 s, 13.8 MB for 34 s.
-- Picture: the drawing screen's book (warm tabletop, coral cover with the stitched spine rings, cream paper), the 160x100 world filling the paper exactly, a "Made by you" tag top-right, the page number bottom-left, the Squiggletale logo bottom-right on every frame (a placeholder wordmark until there is a real logo; the idle crayon rests left of it), the replay's paper caption pill with the latest words chunk near the top of the page.
-- Timing matches replay: events play at the replay's capped-gap times (`replaySchedule`); page turns, effects, bubbles, idle motion, the crayon cursor and The End finale all appear as in replay. After the last event the video runs until the page is still, holds 1.5 s, then crossfades (0.35 s) into a 2 s end card: "Made with Squiggletale" in the scrawl hand on fresh paper, inside the same book.
+- The video: 1280x800, 30 fps, H.264 (High, Main or Baseline, whichever the browser can encode; hardware encoder preferred, see Design notes), AAC 128 kbps stereo 48 kHz, or no audio track when the browser can't encode AAC (Photos and most players refuse Opus-in-mp4). About 6.4 MB for 15 s, 13.8 MB for 34 s.
+- Picture: the drawing screen's book (warm tabletop, coral cover with the stitched spine rings, cream paper), the 160x100 world filling the paper exactly, no tag and no page number, the app icon bottom-right on every frame (`src/assets/brand/app-icon.jpg`; the idle crayon rests left of it), the replay's subtitles with the latest words.
+- Timing matches replay: events play at the replay's capped-gap times (`replaySchedule`); page turns, effects, bubbles, idle motion, the crayon cursor and The End finale all appear as in replay. After the last event the video runs until the page is still, holds 1.5 s, then crossfades (0.35 s) into a 2 s end card: "Made with" / "Squiggletale" in the scrawl hand with two sparkles and the public domain (`BRAND.publicDomain`) under it, on fresh paper inside the same book. The End finale on a dark page (night sky) is light lettering with a dark outline, as in the studio and replay; the end card sits on paper and keeps dark ink.
 - Audio: the engine's own crayon scratch (loudness follows the reveal, as live) and a page-flip whoosh per page turn, rendered offline with the story's seed.
 - Deterministic: the same record renders the same frames and audio every time (virtual clock, seeded noise, no `Math.random`, CPU canvases). Two exports differ only in the container's creation times (~10 bytes).
 
@@ -33,6 +34,4 @@ ending on a "Made with Squiggletale" card. Made entirely in the browser; nothing
 
 ## Open questions
 
-- Keep the "Made by you" tag and page number in the video, or a cleaner page?
-- The real logo: `drawLogo()` in `src/export/frame.ts` is the one place to swap it in.
-- Website version renders the same stepper in headless Chrome (production plan); not built here.
+- AAC on WKWebView and the stall path are unverified on real hardware (simulator only so far).

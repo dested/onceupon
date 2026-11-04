@@ -1,5 +1,9 @@
 # Updates
 
+## 2026-11-04 — Launch 1.0 run, phase 3 (bosun; plan plans/2026-11-04-launch-1-0.md)
+Sal: audit, test on the mini's sims, fix, submit; then "haiku for free… smarter model" upsell, "use the owl pair". Server: consent, rate limits, retention, prompt allow-list, flags, purchases survive device deletion. Studio: consent card without vendor names, ears notes in the dock, paywall (owl pair, Privacy/Terms, no badge), video export cancel + stall, replay in the book with one line, The End on dark pages, phones and reduced motion. Shell: real speech availability, splash crop. Free tier on Haiku 5.5 (adaptive low), relay first-token cut 8 s, meter counts talking time only. Blind test artifact https://claude.ai/artifact/TVBmFchzLDcNaN8yMNmY2r. Server tests 37/37, typechecks 0.
+Touched: apps/web/server/**, src/{story,ui,export,engine,llm}/**, apps/mobile/**, features/mp4-export.md, verify.md, cliffnotes.md, decisions.md
+
 ## 2026-10-03 — Subtitles wrap and fade (branch whistle-ears)
 Sal (on iPhone): "i cant see my sentence ... make it fade out or a better thing". Subtitles wrap, three lines at most growing upward: newest two solid, the third fades (mask), older clipped; tail starts on a whole word. Checked in the browser at full width and squeezed to 360px. Also this session: scene life cycle plugin in apps/mobile/app.config.ts (Xcode 27 builds quit at launch without it), Mac build script ~/code/squiggle-run.sh.
 Touched: src/ui/{Subtitles,ReplayScreen}.tsx, src/styles/app.css, apps/mobile/app.config.ts, cliffnotes.md

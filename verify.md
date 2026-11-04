@@ -65,13 +65,13 @@ Direct engine check without a model: `window.__onceupon.director.execute('{"op":
 ## Replay and bookshelf [cheap]
 
 1. Book icon → a card for the story above with a cover.
-2. Play → drawing replays; each heard chunk appears as a paper caption near the top (`[data-testid=narration]`) as it is reached. Bottom bar: pause/play and a slider (`[data-testid=scrubber]` shows `i/n`). Drag the slider: the page jumps to that point fully drawn and keeps playing; pause holds the position; at the end the button reads "again".
+2. Play → drawing replays inside the studio's book; the words show once, in the subtitles at the bottom of the page, as they are reached (no top caption). Bottom bar: pause/play and a slider (`[data-testid=scrubber]`, no counter). Drag the slider: the page jumps to that point fully drawn and keeps playing; pause holds the position; at the end the button reads "Play again". A night-sky story ends with light "The End" lettering with a dark outline.
 3. Delete → "sure?" → card gone. Inside a replay, the trash icon top-right → "delete this story?" → back on the shelf without it. "clear N empty" (top-right of the shelf, only when 0-word stories exist) → confirm → they are gone.
 
 ## MP4 export [cheap]
 
 1. Replay any saved story → download icon top-right → the "Making your video" card shows a yellow bar, a phase and "cancel"; the replay keeps playing. When it finishes the card says "Your video is in your downloads" and the browser downloads `<title-slug>.mp4`. The closing card after "The End" has the same action as "Download video".
-2. Cancel mid-way → the card closes and nothing downloads.
+2. Cancel at any point (0% included) → the card closes and nothing downloads. An encoder stall shows "Couldn't make the video. Try again later." within about 10 s.
 3. `ffprobe -v error -show_entries format=duration:stream=codec_name,profile,width,height,r_frame_rate,sample_rate,channels -of compact <file>` → h264 1280x800 30/1 + aac 48000 2ch; duration ≈ replay length + settle + 1.5 s hold + 2 s end card.
 4. Look: storybook border and spine rings, caption pill, "Made by you" top-right, page number bottom-left, logo chip bottom-right on every frame, end card "Made with Squiggletale".
 
