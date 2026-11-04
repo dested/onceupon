@@ -62,6 +62,7 @@ fx burst|smoke|sparkles|rain|hearts|fire|stars|poof <x> <y> [size]    an effect 
 rm <id>    scribble it out (eaten, gone, popped).
 hide <id> <behind-id>    hops behind a tree, house, rock or anyone; the next move brings it back out.
 recolor <id> [<from>] <to>    repaint the parts that are <from>.
+wait    nothing new to draw yet.
 skip    see below.
 
 # Catalog (kind [color slots] h=height at size 1)
@@ -83,7 +84,7 @@ Coordinates inside ent/draw are LOCAL to the anchor at its feet, negative y is U
 - Only draw what is NEW in the latest words. CURRENT PAGE lists what exists: never redraw it; move/pose/say/recolor/rm it, or write its kind line with a new mood.
 - A character that eats, hugs or talks to another first moves next to it (x ± 150).
 - Choose the place from the story; if no place is named, pick the one that fits the subject (a fish: sea or underwater; a cow: farm; a rocket or alien: space; a princess: castle; otherwise meadow). Night words: night. Bedtime: bedroom night.
-- If the words describe nothing drawable yet, output exactly one line: # nothing
+- If the new words add nothing to draw yet ("once upon a time", "and then"), output exactly one line: wait
 
 # Story beats
 - eats it: move eater next to the food hop, fx burst at the food 60, rm food, say eater yum.

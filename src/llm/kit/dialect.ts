@@ -76,6 +76,13 @@ const isPose = (s: string): s is Pose => (POSES as readonly string[]).includes(s
 const POSE_ALIAS: Record<string, Pose> = { sitting: 'sit', sits: 'sit', sleeping: 'sleep', asleep: 'sleep', lying: 'sleep', flying: 'fly', swimming: 'swim' }
 const MOOD_ALIAS: Record<string, Mood> = { scared: 'surprised', shocked: 'surprised', crying: 'sad', mad: 'angry', tired: 'sleepy', smiling: 'happy', excited: 'happy' }
 
+/**
+ * A skip line (trimmed): `skip`, or a comment whose whole content is "nothing" (`# nothing`,
+ * `#Nothing.`). Not a longer comment that starts with "nothing": "# Nothing is drawn, but ... I'll
+ * draw it gently" was followed by a fine drawing. The relay's CallLog uses the same test.
+ */
+export const KIT_SKIP_RE = /^(skip\b|#\s*nothing[\s.!]*$)/i
+
 export class KitDialect implements Dialect {
   readonly id = 'kit'
   readonly system: string
@@ -104,8 +111,12 @@ export class KitDialect implements Dialect {
     this.inner.later = fn
   }
 
+  /**
+   * `skip`, or a whole-line "nothing" comment: Haiku 5.5 sometimes answers unfit words with
+   * `# nothing` instead of `skip` (model-bench 2026-11-04), and those words must still leave the story.
+   */
   isSkip(line: string): boolean {
-    return /^skip\b/i.test(line.trim())
+    return KIT_SKIP_RE.test(line.trim())
   }
 
   reset(): void {
@@ -126,6 +137,8 @@ export class KitDialect implements Dialect {
     if (!line || line.startsWith('#') || line.startsWith('//')) return { ok: true, cmds: [] }
     const toks = tokenize(line)
     const verb = toks[0]?.text.toLowerCase() ?? ''
+    // `wait`: the words so far describe nothing drawable yet (the prompt's no-op; not a skip).
+    if (verb === 'wait' && toks.length === 1) return { ok: true, cmds: [] }
     try {
       if (verb === 'place') return this.placeLine(toks.slice(1))
       if (verb === 'hide') return this.hideLine(toks.slice(1), line)
