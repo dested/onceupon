@@ -22,7 +22,7 @@ engineering shape: `plans/2026-09-22-launch-build.md`.
 | Path                  | What                                                                                                            | Run                                                                                                                                  |
 | --------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `/` (root)            | the studio: engine, dialects, story loop, UI, lab                                                               | `bun run dev` 7710 (lab session), `bun run dev:hosted` 7711, `bun run build:hosted` → `dist-hosted/index.html`                      |
-| `apps/web`            | sal-starter: website, `/api/app/*` for the studio, `/api/share/*`, `/admin`, serves the studio at `/app/`       | `cd apps/web && bun run dev` 7720; `bun run db:push`; `.env` from `.env.example` (DATABASE_URL, keys, ADMIN_EMAILS, Stripe, Apple) |
+| `apps/web`            | sal-starter: website, `/api/app/*` for the studio, `/api/share/*`, `/admin`, serves the studio at `/app/`       | `cd apps/web && bun run dev` 7720; `bun run db:push`; `.env` from `.env.example` (DATABASE_URL, keys, ADMIN_EMAILS, Stripe, Apple); tests: `cd apps/web && bun run test` (local Postgres `onceupon_srv` only, fake Anthropic on :7739) |
 | `apps/mobile`         | Expo shell (iPad first): WebView on the hosted studio, bridge, StoreKit 2, EAS Update                            | `bunx tsc --noEmit`, `bun test`, `bun run sync-studio`, `eas build` / `eas update` (EAS project `@quickgame/squiggletale`)          |
 | `packages/shared/src` | dependency-free contracts: `brand.ts` (name, origin, bundle id), `packs.ts`, `api.ts` (studio ↔ server), `typed.ts` (typed-words charge rule), `bridge.ts` (studio ↔ shell) | imported by relative path from all three                                                                                    |
 
@@ -181,6 +181,10 @@ scripts/                   one-off dev scripts (author-intro.ts: intro page draw
 | purchases (Apple / Stripe / gifts)   | `apps/web/server/{apple,stripe,gifts,webhooks}.ts`; client `src/backend/purchases.ts`, `src/ui/Paywall.tsx`       |
 | share links and the share page       | `apps/web/server/{shares,share-routes}.ts`, page `apps/web/src/app/share.tsx`, player `src/ui/SharePlayer.tsx`, client `src/backend/share.ts` |
 | the drawing relay / ears tokens      | `apps/web/server/{relay,ears}.ts`; studio side `src/backend/relay-provider.ts`, `session.ts` `startListening`   |
+| app-API rate limits                  | `apps/web/server/rate-limit.ts`: in-memory per-IP fixed windows (first X-Forwarded-For hop): device.register 10/h, `/api/app/*` 300/min (draw exempt), share.create 20/h, shop/gift checkout + redeemOnWeb 10/min; over → 429 `cap` |
+| what the server deletes and when     | `apps/web/server/retention.ts` (daily, `jobs.ts`): skipWords nulled after 30 d; CallLog, closed StorySession, AppleNotification deleted after 180 d; devices unseen 548 d with balance ≤ 0 and not comped deleted (their Purchase rows stay, deviceId null) |
+| which prompts the relay forwards     | `apps/web/server/prompt-allowlist.ts`: sha256 of the system prompt must be in the hidden Flag row `knownPromptHashes`; each production boot hashes `src/llm/{kit,sketch}/prompt.ts` and upserts, so every prompt that ever ran stays accepted (prompt edits need no server change) |
+| server flags (admin → Settings)      | `apps/web/server/flags.ts` defaults, DB-overridable: `model` (paying/comped devices), `freeModel` (everyone else), freeFirstStorySec 300, weeklyFreeSec 180, silenceNudgeMs 30000, silenceEndMs 60000, dailySpendStopCents 7500 (free devices get 503 paused above it), cloudEars false (never on iOS) |
 | admin portal                         | `apps/web/server/routers/admin.ts` + `admin-queries.ts`, pages `apps/web/src/app/admin/*`                        |
 | website pages and copy               | `apps/web/src/app/*.tsx` (routes in `site-routes.tsx`), components `components/paper.tsx`, `site-parts.tsx`      |
 | the app name / origin / bundle id    | `packages/shared/src/brand.ts` (mirrored by hand in `apps/mobile/app.config.ts` and `apps/web/index.html`)        |
@@ -215,6 +219,8 @@ scripts/                   one-off dev scripts (author-intro.ts: intro page draw
 - `StoryRecord` (`story/storage.ts`): `{ id, title, seed, cover, events: ({words}|{cmd}|{end})[] }`. The `end` event marks where the child said "The End"; replay draws the finale there.
 
 ## Gotchas
+
+- **`apps/web/.env`'s `DATABASE_URL` is the production database** (Drydock's Postgres, as of 2026-11-04). Bun loads it automatically, so `bun run dev`, `prisma` and any script in `apps/web` touch production unless you override it with a localhost URL. Server tests refuse any non-local host (`server/test/setup.ts`).
 
 - **World is 160x100, ground at y=80.** Shapes inside an `obj` are relative to its anchor; negative y is up. The prompt and the engine must agree.
 - **`page` wipes objects.** Characters from the previous page are kept in `Scene.carried`; a verb that references one recreates it on the new page (so `mv dragon` after `page` works even if the model forgot to redraw).
