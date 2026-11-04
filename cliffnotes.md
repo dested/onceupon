@@ -220,6 +220,7 @@ scripts/                   one-off dev scripts (author-intro.ts: intro page draw
 
 ## Gotchas
 
+- **Removing a Drydock env var needs `apply` right away.** `drydock-apply.ts unset` deletes the SSM key, but the live ECS task definition still names it, so every new task (the deploy's migration step, a restart) fails to start with no exit code until `drydock-apply.ts apply` re-registers the definition. 2026-11-04: the phase-3 deploy's migration failed this way; `apply` then a workflow rerun fixed it.
 - **`apps/web/.env`'s `DATABASE_URL` is the production database** (Drydock's Postgres, as of 2026-11-04). Bun loads it automatically, so `bun run dev`, `prisma` and any script in `apps/web` touch production unless you override it with a localhost URL. Server tests refuse any non-local host (`server/test/setup.ts`).
 
 - **World is 160x100, ground at y=80.** Shapes inside an `obj` are relative to its anchor; negative y is up. The prompt and the engine must agree.

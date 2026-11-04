@@ -3,7 +3,9 @@
 //
 //   bun scripts/drydock-apply.ts list                 env names + value lengths in SSM
 //   bun scripts/drydock-apply.ts env                  set the managed vars below (stored; live on the next deploy)
-//   bun scripts/drydock-apply.ts unset KEY [KEY...]   delete vars from SSM (stored; live on the next deploy)
+//   bun scripts/drydock-apply.ts unset KEY [KEY...]   delete vars from SSM, then run `apply` at once: the live task
+//                                                     definition still names the deleted keys, so until `apply`
+//                                                     re-registers it no new task (deploy migration, restart) can start
 //   bun scripts/drydock-apply.ts apply                Apply + redeploy now (restarts production)
 //   bun scripts/drydock-apply.ts config               write the ssr + Postgres config below and apply it
 //   bun scripts/drydock-apply.ts rotate-auth-secret   new BETTER_AUTH_SECRET (logs every admin out; device
@@ -82,6 +84,7 @@ if (mode === 'config') {
     await call('projects.env.delete', { name: project, key })
     console.log(`unset ${key}`)
   }
+  console.log('next: `bun scripts/drydock-apply.ts apply` now, before any push (new tasks cannot start until it runs)')
 } else if (mode === 'rotate-auth-secret') {
   const secret = [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, '0')).join('')
   await call('projects.env.set', { name: project, key: 'BETTER_AUTH_SECRET', value: secret })
