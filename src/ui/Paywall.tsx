@@ -15,7 +15,7 @@ import { gate, openParentArea, startFreshStory } from './hosted'
  * minutes (the smarter one). Real renders, sized for the tile; never name a model or vendor here.
  */
 const PAIR = {
-  words: 'a bear sits in a boat on the lake',
+  words: 'owl',
   free: pairFree,
   minutes: pairMinutes,
 } as const
