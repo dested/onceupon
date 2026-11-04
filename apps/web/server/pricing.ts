@@ -23,6 +23,7 @@ const PRICING: Array<{ match: RegExp; input: number; output: number; cacheRead: 
   { match: /claude-opus-4/, input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 },
   { match: /claude-sonnet-5/, input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
   { match: /claude-sonnet-4/, input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+  { match: /claude-haiku-5-5/, input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125 },
   { match: /claude-haiku-4-5/, input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
   { match: /claude-haiku-3-5/, input: 0.8, output: 4, cacheRead: 0.08, cacheWrite: 1 },
 ]

@@ -3,9 +3,12 @@
  * Director sends it (cached system prompt, earlier beats as cached story chunks, the page described
  * back by the dialect), each line parsed and applied to a Scene as it lands.
  *
- *   bun scripts/proto-bench.ts <dialect> [set=quick|full|id,id] [run=<name>] [model=claude-sonnet-5-5] [conc=4]
+ *   bun scripts/proto-bench.ts <dialect> [set=quick|full|tail|id,id|@stories.json] [run=<name>] [model=claude-sonnet-5-5]
+ *     [conc=4] [thinking=fast|between|adaptive-low|disabled]
  *
- * Writes lab/proto/<run>/<dialect>/<story>.json (BenchFile) and prints a summary. Render the
+ * thinking=fast (default) is fastThinking(model), what the relay sends. set=@file reads a BenchStory[] JSON.
+ * Writes lab/proto/<run>/<dialect>/<story>.json (BenchFile), results.jsonl (one row per beat, with stop
+ * reason and skip) and prints a summary. Render the
  * pictures with scripts/proto-render.mjs, compare with scripts/proto-sheet.ts.
  * Key: VITE_ANTHROPIC_API_KEY from .env.local (Bun loads it).
  */
@@ -16,8 +19,10 @@ import { Scene } from '~/engine/scene'
 import type { Command } from '~/engine/types'
 import { VirtualClock } from '~/engine/clock'
 import { estimateCost } from '~/llm/models'
+import { fastThinking } from '~/llm/anthropic-thinking'
 import { protoFactory } from '~/proto/registry'
 import { benchSet, type BenchStory } from '~/proto/stories'
+import { z } from 'zod'
 import type { BenchBeat, BenchFile } from '~/proto/bench-types'
 
 const args = Object.fromEntries(
@@ -34,14 +39,32 @@ if (!dialectId) {
 const model = args['model'] ?? 'claude-sonnet-5-5'
 const run = args['run'] ?? `${new Date().toISOString().slice(0, 10)}-${dialectId}`
 const conc = Number(args['conc'] ?? 4)
-/** between = thinking between_tools (Sonnet 5.5's lowest); adaptive-low = adaptive + effort low. */
-const thinkingMode = args['thinking'] ?? 'between'
-const stories = benchSet(args['set'] ?? 'quick')
+/**
+ * fast = fastThinking(model) (the relay's setting); between = thinking between_tools (Sonnet 5.5's
+ * lowest); adaptive-low = adaptive + effort low; disabled = thinking off.
+ */
+const thinkingMode = args['thinking'] ?? 'fast'
+const thinkingParams = (): ReturnType<typeof fastThinking> => {
+  if (thinkingMode === 'adaptive-low') {
+    return { thinking: { type: 'adaptive', display: 'omitted' }, output_config: { effort: 'low' } }
+  }
+  if (thinkingMode === 'between') return { thinking: { type: 'between_tools' } }
+  if (thinkingMode === 'disabled') return { thinking: { type: 'disabled' } }
+  if (thinkingMode === 'fast') return fastThinking(model)
+  throw new Error(`unknown thinking=${thinkingMode} (fast|between|adaptive-low|disabled)`)
+}
+const storyFileSchema = z.array(z.object({ id: z.string(), beats: z.array(z.string()).min(1) }))
+const setArg = args['set'] ?? 'quick'
+const stories: BenchStory[] = setArg.startsWith('@')
+  ? storyFileSchema.parse(JSON.parse(await fs.readFile(setArg.slice(1), 'utf8')))
+  : benchSet(setArg)
 const key = process.env['VITE_ANTHROPIC_API_KEY']
 if (!key) throw new Error('VITE_ANTHROPIC_API_KEY missing (.env.local)')
 const client = new Anthropic({ apiKey: key })
 const outDir = path.join('lab', 'proto', run, dialectId)
 await fs.mkdir(outDir, { recursive: true })
+const resultsPath = path.join(outDir, 'results.jsonl')
+await fs.writeFile(resultsPath, '')
 
 const INK = new Set(['shapesAdded', 'shapesReset', 'bg', 'fx'])
 
@@ -77,6 +100,7 @@ async function benchStory(story: BenchStory): Promise<BenchFile> {
     let usage = { input: 0, cacheRead: 0, cacheWrite: 0, output: 0, costUsd: null as number | null }
     let error: string | null = null
     let skipped = false
+    let stopReason: string | null = null
     const t0 = performance.now()
     const handle = (line: string): void => {
       if (!line.trim()) return
@@ -108,9 +132,7 @@ async function benchStory(story: BenchStory): Promise<BenchFile> {
             ),
           },
         ],
-        ...(thinkingMode === 'adaptive-low'
-          ? { thinking: { type: 'adaptive' as const, display: 'omitted' as const }, output_config: { effort: 'low' as const } }
-          : { thinking: { type: 'between_tools' as const } }),
+        ...thinkingParams(),
       })
       let buf = ''
       for await (const ev of stream) {
@@ -120,6 +142,7 @@ async function benchStory(story: BenchStory): Promise<BenchFile> {
           usage.cacheWrite = ev.message.usage.cache_creation_input_tokens ?? 0
         } else if (ev.type === 'message_delta') {
           usage.output = ev.usage.output_tokens
+          stopReason = ev.delta.stop_reason ?? stopReason
         } else if (ev.type === 'content_block_delta' && ev.delta.type === 'text_delta') {
           if (firstTokenMs === null) firstTokenMs = performance.now() - t0
           buf += ev.delta.text
@@ -137,6 +160,27 @@ async function benchStory(story: BenchStory): Promise<BenchFile> {
     }
     const doneMs = performance.now() - t0
     clock.advanceTo(clock.now() + 20000)
+    const costUsd = estimateCost(model, usage)
+    const row = {
+      story: story.id,
+      beat: beats.length + 1,
+      model,
+      thinking: thinkingMode,
+      words,
+      firstTokenMs,
+      firstInkMs,
+      doneMs,
+      input: usage.input,
+      cacheRead: usage.cacheRead,
+      cacheWrite: usage.cacheWrite,
+      output: usage.output,
+      costUsd,
+      parseErrors: parseErrors.length,
+      skipped,
+      stopReason,
+      error,
+    }
+    await fs.appendFile(resultsPath, JSON.stringify(row) + '\n')
     beats.push({
       words,
       lines,
@@ -147,7 +191,7 @@ async function benchStory(story: BenchStory): Promise<BenchFile> {
       cacheRead: usage.cacheRead,
       cacheWrite: usage.cacheWrite,
       output: usage.output,
-      costUsd: estimateCost(model, usage),
+      costUsd,
       parseErrors,
       error,
     })
