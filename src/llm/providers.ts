@@ -16,6 +16,8 @@ export interface LlmRequest {
   /** In order; the static prefix first (cached), the per-call tail last. */
   user: PromptBlock[]
   maxTokens: number
+  /** This call replaces one thrown away because more words arrived (the relay passes it on as DrawRequest.restart). */
+  restart?: boolean
   signal: AbortSignal
 }
 
