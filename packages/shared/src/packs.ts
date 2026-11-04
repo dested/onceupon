@@ -74,9 +74,9 @@ export function formatUsd(cents: number): string {
 /** Server flag defaults for the free allowance; the admin portal can change them without a deploy. */
 export const FREE_DEFAULTS = {
   /** The first story is free, once: mic seconds granted at device registration. */
-  firstStorySec: 120,
+  firstStorySec: 300,
   /** Refilled once a week (top-up to this many seconds, never accumulating). */
-  weeklySec: 60,
+  weeklySec: 180,
   /** 0 = Sunday ... 6 = Saturday: the "Saturday story". */
   weeklyRefillDay: 6,
 } as const

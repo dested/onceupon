@@ -43,6 +43,11 @@ export interface DeviceState {
   comped: boolean
   /** Parent turned on "share with voice" after the consent notice. */
   shareVoice: boolean
+  /**
+   * A grown-up agreed, on the gated consent card, to send story words to Claude. Until it is true the
+   * server answers `session.start`, `session.typed` and `/api/app/draw` with `consent_required`.
+   */
+  aiConsent: boolean
   freeStoryUsed: boolean
   blocked: boolean
   /** ISO time of the next weekly free top-up, null if the device is not eligible yet. */
@@ -131,7 +136,8 @@ export interface AppApi {
     output: DeviceState & { deviceToken: string }
   }
   'device.state': { input: Record<string, never>; output: DeviceState }
-  'device.consent': { input: { shareVoice: boolean }; output: DeviceState }
+  /** Each field present is set; an absent field is left as it is. `aiConsent: false` withdraws (drawing stops). */
+  'device.consent': { input: { shareVoice?: boolean; aiConsent?: boolean }; output: DeviceState }
   'device.attribution': { input: { token: string }; output: { ok: true } }
   config: { input: Record<string, never>; output: ClientConfig }
   'mask.list': { input: Record<string, never>; output: { words: string[] } }
@@ -163,6 +169,7 @@ export interface AppApi {
   'share.create': {
     input: {
       record: SharedRecord
+      /** Ignored since 1.0 (no child's name on a public page); the studio sends null. */
       childName: string | null
       /** Only accepted when the device has `shareVoice` consent and is paying. One file: the clips concatenated by the studio. */
       voice: { mime: string; base64: string } | null

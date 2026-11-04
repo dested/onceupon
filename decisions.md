@@ -1,5 +1,20 @@
 # Decisions
 
+## 2026-11-04 — Squiggletale 1.0: Kids Category, consent before Claude, lean scope
+
+**Why:** Sal is shipping 1.0 while App Review is fast. Made for Kids, so the strictest data rules
+apply (1.3, 5.1.4): ears are on-device only (SpeechAnalyzer first, SFSpeechRecognizer fallback; no
+child audio leaves the device unless a parent shares a story), and a one-time parent consent behind
+the parental gate comes before any story words reach our server and Claude (5.1.2(i)); the server
+refuses to draw without it. Lean scope: fixes, polish, the mp4, static legal pages. Free first story
+5 min plus a 3-min Saturday story (2 min ended mid-story), quiet time ends a story at 60 s (was 210 s),
+the three consumable packs stay, gift codes and the child's name on shared pages are cut from the app,
+support@squiggletale.com. Haiku 5.5 replaces Sonnet 5.5 only if Sal finds the pictures equal blind.
+Domain moves to squiggletale.com. Full record: `plans/2026-11-04-launch-1-0.md`.
+**Rejected:** cloud ears in the iOS app (child audio to a third party); a subscription in 1.0 (no real
+usage data yet, and consumables are the easiest first Kids review); colored pencils / markers and the
+site rebuild in 1.0 (1.1); Whistle in the binary without a bake-off win.
+
 ## 2026-09-22 — MP4 export: the live engine on a virtual clock, hardware H.264, CPU canvases
 
 **Why:** the video must match replay and be reproducible, so it is the real Stage/Director/dialect stepped on a `VirtualClock` (no second renderer, no screen recording). Measured: GPU canvases vary by a few pixels between runs, so export canvases are CPU; Chrome's software H.264 (OpenH264) varies byte-wise for identical frames while the hardware encoder does not, so hardware is preferred; Mediabunny's `AudioBufferSource` varied the chunk layout, so audio is encoded with `AudioEncoder` up front and both tracks are muxed in a fixed order. Result: two exports differ only in the container creation times.

@@ -55,6 +55,8 @@ export interface BridgeApi {
   }
   /** Opens in the system browser (web checkout, privacy policy). */
   'open.url': { input: { url: string }; output: Record<string, never> }
+  /** Opens this app's page in iOS Settings (microphone and speech switches). Behind the parental gate. */
+  'settings.open': { input: Record<string, never>; output: Record<string, never> }
   haptic: { input: { kind: 'light' | 'success' | 'warning' }; output: Record<string, never> }
   /** Apple AdServices attribution token, null off-iOS or when unavailable. */
   'attribution.token': { input: Record<string, never>; output: { token: string | null } }
@@ -101,6 +103,13 @@ export interface BridgeApi {
     input: { locale: string; onDevice: boolean; record?: boolean; engine?: SpeechEngine }
     output: { available: boolean; engine?: SpeechEngine }
   }
+  /**
+   * Gets the on-device recognizer ready without prompting or listening: starts the analyzer's language
+   * model download if it is missing (the studio calls it right after the AI consent). Resolves when the
+   * model is installed or nothing needs downloading (`ready: true`), or with `ready: false` when it
+   * cannot (offline, unsupported locale); never rejects for those.
+   */
+  'speech.prepare': { input: { locale: string }; output: { ready: boolean } }
   /** Stops listening; `clip` is the recorded audio of this span when `record` was set. */
   'speech.stop': {
     input: Record<string, never>
@@ -118,12 +127,27 @@ export interface BridgeEventMap {
   /** Same shape as the studio's RecResult list: every segment so far, the last may be interim. */
   'speech.result': { results: Array<{ transcript: string; isFinal: boolean }>; isFinal: boolean }
   'speech.end': Record<string, never>
-  'speech.error': { code: string; message: string }
+  'speech.error': { code: SpeechErrorCode; message: string }
   /** Mic loudness 0..1, about 10x a second while listening. */
   'speech.level': { level: number }
   /** The recognizer is capturing and understanding audio (after any model download). */
   'speech.ready': Record<string, never>
 }
+
+/**
+ * Why listening stopped or could not start. `not-allowed`: mic or speech permission denied (the studio
+ * shows the grown-up message and a gated Open Settings). `interrupted`: a call, Siri, an alarm, a route
+ * change or an engine reset stopped the engine (the shell also sends `speech.end`; the studio restarts
+ * once). `model`: the language model could not download or install. `unsupported-locale`. `transcriber`:
+ * the recognizer failed after it was ready. `failed`: anything else.
+ */
+export type SpeechErrorCode =
+  | 'not-allowed'
+  | 'interrupted'
+  | 'model'
+  | 'unsupported-locale'
+  | 'transcriber'
+  | 'failed'
 
 export const SPEECH_ENGINES = ['analyzer', 'sfspeech', 'whistle'] as const
 export type SpeechEngine = (typeof SPEECH_ENGINES)[number]
@@ -189,4 +213,6 @@ export const KV_KEYS = {
   deviceToken: 'deviceToken',
   settings: 'settings',
   tutorialDone: 'tutorialDone',
+  /** `{"v":1,"at":"<iso>"}` once a grown-up said "I agree" on the consent card; replaces `micGateDone`. */
+  aiConsent: 'aiConsent',
 } as const
