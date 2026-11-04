@@ -41,5 +41,6 @@ Re-read this file and the Standing answers + Phase 3 decisions in /w/code/onceup
 **Added 2026-11-04 (Phase 3 decision 4b): free tier on Haiku.**
 - Flag `freeModel` in FLAG_DEFAULTS, default `'claude-sonnet-5-5'` until the haiku lane passes (the lead flips it to `'claude-haiku-5-5'`), validated like `model`. `model` stays the paid model.
 - Relay picks the model per draw: a device with any ledger credit that isn't a free grant (Apple or Stripe pack, gift code, comp) → `flags.model`, else `flags.freeModel`. The chosen model drives the reserve estimate, the stream, `estimateCost` and the CallLog row. No schema change unless you must (ask first).
-- CallLog `skip`: a relayed line counts as a skip when the trimmed line matches `/^(skip\b|#\s*nothing\b)/i`.
+- CallLog `skip`: a relayed line counts as a skip when the trimmed line matches the kit dialect's `KIT_SKIP_RE` = `/^(skip\b|#\s*nothing[\s.!]*$)/i` (whole line; haiku lane a3703b4, exported from `src/llm/kit/dialect.ts`). `wait` is the prompt's no-op, not a skip.
+- Prompt allow-list keeps shipped prompts: also accept the hashes in `apps/web/server/prompt-hashes.json` (`[{dialect, sha256, note}]`, the lead appends each release's hashes), merged with the boot-computed ones. Otherwise every prompt edit after 1.0 refuses installed apps until they update. Ship the file with an empty array.
 - Tests: free device → freeModel; pack credit → model; comp → model; a `# nothing` reply logs skip.
