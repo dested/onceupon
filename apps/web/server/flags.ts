@@ -12,8 +12,8 @@ export const FLAG_DEFAULTS = {
   onDeviceEars: true,
   /** The paid model: devices that bought minutes (pack, gift) or are comped draw with it. */
   model: 'claude-sonnet-5-5',
-  /** Every other device (free minutes) draws with this one. Decision 4b: becomes Haiku 5.5 once it passes safety. */
-  freeModel: 'claude-sonnet-5-5',
+  /** Every other device (free minutes, the first story included) draws with this one (decision 4b; Haiku 5.5 passed the kit safety bench 2026-11-04). */
+  freeModel: 'claude-haiku-5-5',
   dialect: 'kit' as 'kit' | 'sketch' | 'ops' | 'json' | 'lines',
   purchasesPaused: false,
   relayPaused: false,

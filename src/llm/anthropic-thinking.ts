@@ -15,7 +15,7 @@ interface Params {
  *   adaptive + effort low p50 0.80 s too but 2.7-4.4 s spikes on story beats and 4-5x the output.
  *   Then the kit prompt bench (haiku2, 2026-11-04): with `disabled` Haiku still answers 0-2 hard beats per 38 with
  *   nothing drawn; adaptive + effort low drew every beat, first ink p50 ~0.8 s, max 5.0 s on the final prompt
- *   (the relay cuts a call with no first delta at 6 s). A short wait beats a blank page, so adaptive low.
+ *   (the relay cuts a call with no first delta at 8 s). A short wait beats a blank page, so adaptive low.
  * Mirrored in apps/web/server/anthropic-thinking.ts (the relay); change both together.
  */
 export function fastThinking(model: string): Params {

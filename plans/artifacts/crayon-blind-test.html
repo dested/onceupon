@@ -1,0 +1,350 @@
+<title>Crayon Blind Test</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&family=Patrick+Hand&display=swap">
+<style>
+  :root {
+    --paper: #fbf6ea;
+    --paper-deep: #efe6d2;
+    --table: #e9dfcb;
+    --ink: #3b2f2f;
+    --ink-soft: #7a6a5a;
+    --purple: #7b5c91;
+    --lilac: #e6ddec;
+    --sage: #dce7d5;
+    --coral: #d9937e;
+    --yellow: #f6c945;
+    --white: #fffdf7;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--table);
+    color: var(--ink);
+    font-family: "Patrick Hand", "Comic Sans MS", "Chalkboard SE", system-ui, sans-serif;
+    font-size: 19px;
+    line-height: 1.4;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 20px 120px;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  h1, h2, h3 { font-family: "Gloria Hallelujah", "Patrick Hand", cursive; font-weight: 400; margin: 0; text-wrap: balance; }
+  h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.2; }
+  h2 { font-size: 26px; }
+  h3 { font-size: 21px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; }
+  .tabs { display: flex; gap: 10px; }
+  .btn {
+    font: inherit; color: var(--ink); background: var(--paper);
+    border: 3px solid var(--ink); border-radius: 16px;
+    padding: 8px 18px; min-height: 48px; cursor: pointer;
+    box-shadow: 3px 4px 0 var(--ink);
+    transition: transform .08s ease, box-shadow .08s ease;
+  }
+  .btn:active { transform: translate(2px, 3px); box-shadow: 1px 1px 0 var(--ink); }
+  .btn[aria-pressed="true"], .btn.on { background: var(--lilac); }
+  .btn.yellow { background: var(--yellow); }
+  .btn.sage { background: var(--sage); }
+  .btn.small { min-height: 40px; padding: 4px 14px; font-size: 17px; box-shadow: 2px 3px 0 var(--ink); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .card {
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 24px;
+    box-shadow: 5px 7px 0 rgba(59, 47, 47, .85);
+    padding: clamp(14px, 2.4vw, 26px);
+    display: flex; flex-direction: column; gap: 16px; min-width: 0;
+  }
+  .meta { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; color: var(--ink-soft); }
+  .words { font-size: clamp(22px, 2.6vw, 30px); line-height: 1.3; color: var(--ink); margin: 0; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .side { position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .side img {
+    display: block; width: 100%; max-width: 100%; aspect-ratio: 16 / 10; object-fit: cover;
+    border: 3px solid var(--ink); border-radius: 14px; background: var(--paper-deep); cursor: zoom-in;
+  }
+  .side.picked img { outline: 6px solid var(--purple); outline-offset: 3px; }
+  .tag {
+    position: absolute; top: 10px; left: 10px;
+    font-family: "Gloria Hallelujah", cursive; font-size: 22px; line-height: 1;
+    background: var(--white); border: 3px solid var(--ink); border-radius: 12px; padding: 6px 12px 2px;
+    transform: rotate(-3deg); box-shadow: 2px 3px 0 var(--ink);
+  }
+  .actions {
+    position: sticky; bottom: 0; z-index: 5;
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center;
+    background: var(--table);
+    padding-block: 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  .actions .btn { width: 100%; font-size: 21px; }
+  .nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+  .dots { display: flex; flex-wrap: wrap; gap: 6px; }
+  .dot {
+    width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink); background: var(--white);
+    padding: 0; cursor: pointer; font-size: 0;
+  }
+  .dot.done { background: var(--purple); }
+  .dot.here { outline: 3px solid var(--coral); outline-offset: 2px; }
+  .count { font-size: 22px; }
+  .note { color: var(--ink-soft); }
+  .error { color: #9c3d2a; }
+  .tally { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .tally .card { align-items: center; text-align: center; gap: 4px; }
+  .big { font-family: "Gloria Hallelujah", cursive; font-size: clamp(40px, 7vw, 64px); line-height: 1.1; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 18px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--paper-deep); vertical-align: top; }
+  th { font-weight: 400; color: var(--ink-soft); }
+  td.num { font-variant-numeric: tabular-nums; }
+  .pw { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .pw .card.chosen { background: var(--sage); }
+  .mini { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mini figure { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .mini img { width: 100%; max-width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border: 2px solid var(--ink); border-radius: 10px; cursor: zoom-in; }
+  .mini figcaption { font-size: 16px; color: var(--ink-soft); }
+  .mini figure.win figcaption { color: var(--purple); }
+  .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+  .voices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .voices .card.chosen { background: var(--sage); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .zoom {
+    position: fixed; inset: 0; z-index: 20; background: rgba(40, 32, 32, .88);
+    display: flex; align-items: center; justify-content: center; cursor: zoom-out;
+    padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  }
+  .zoom[hidden], [hidden] { display: none !important; }
+  a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+  .zoom img { max-width: 100%; max-height: 100%; border-radius: 12px; border: 3px solid var(--paper); }
+  @media (max-width: 760px) {
+    .pair { grid-template-columns: 1fr; }
+    .pw, .voices { grid-template-columns: 1fr; }
+    .tally { gap: 8px; }
+    .actions .btn { font-size: 18px; padding-inline: 8px; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Crayon Blind Test</h1>
+    <nav class="tabs" aria-label="Sections">
+      <a class="btn small" id="tab-pictures" href="#pictures">Pictures</a>
+      <a class="btn small" id="tab-narrator" href="#narrator">Narrator</a>
+    </nav>
+  </header>
+  <p class="error" id="save-error" hidden></p>
+  <main id="view"></main>
+</div>
+<div class="zoom" id="zoom" hidden><img id="zoom-img" alt=""></div>
+
+<script>
+const DATA = {"pairs": [{"id": "bear-in-boat-b1", "words": "a bear sits in a boat on the lake", "story": null, "a": "img/bear-in-boat-b1-a.jpg", "b": "img/bear-in-boat-b1-b.jpg", "aIs": "sonnet"}, {"id": "girl-flies-kite-b1", "words": "a girl flies a kite", "story": null, "a": "img/girl-flies-kite-b1-a.jpg", "b": "img/girl-flies-kite-b1-b.jpg", "aIs": "sonnet"}, {"id": "dog-jumps-fence-b1", "words": "the dog jumps over the fence", "story": null, "a": "img/dog-jumps-fence-b1-a.jpg", "b": "img/dog-jumps-fence-b1-b.jpg", "aIs": "sonnet"}, {"id": "cat-sleeps-bed-b1", "words": "the cat is sleeping in a bed", "story": null, "a": "img/cat-sleeps-bed-b1-a.jpg", "b": "img/cat-sleeps-bed-b1-b.jpg", "aIs": "sonnet"}, {"id": "tail-toaster-b1", "words": "a toaster with legs that can talk", "story": null, "a": "img/tail-toaster-b1-a.jpg", "b": "img/tail-toaster-b1-b.jpg", "aIs": "sonnet"}, {"id": "pig-rocket-car-b1", "words": "a pig wearing sunglasses drove a rocket car to the candy store", "story": null, "a": "img/pig-rocket-car-b1-a.jpg", "b": "img/pig-rocket-car-b1-b.jpg", "aIs": "sonnet"}, {"id": "tail-windmill-b1", "words": "a windmill on a hill", "story": null, "a": "img/tail-windmill-b1-a.jpg", "b": "img/tail-windmill-b1-b.jpg", "aIs": "haiku"}, {"id": "cat-b1", "words": "cat", "story": null, "a": "img/cat-b1-a.jpg", "b": "img/cat-b1-b.jpg", "aIs": "haiku"}, {"id": "tail-snail-b1", "words": "a snail with a rainbow shell", "story": null, "a": "img/tail-snail-b1-a.jpg", "b": "img/tail-snail-b1-b.jpg", "aIs": "haiku"}, {"id": "elephant-b1", "words": "elephant", "story": null, "a": "img/elephant-b1-a.jpg", "b": "img/elephant-b1-b.jpg", "aIs": "sonnet"}, {"id": "unicorn-b1", "words": "unicorn", "story": null, "a": "img/unicorn-b1-a.jpg", "b": "img/unicorn-b1-b.jpg", "aIs": "sonnet"}, {"id": "tail-volcano-b1", "words": "a volcano erupting with lava", "story": null, "a": "img/tail-volcano-b1-a.jpg", "b": "img/tail-volcano-b1-b.jpg", "aIs": "sonnet"}, {"id": "tail-cheese-ship-b1", "words": "a spaceship made of cheese", "story": null, "a": "img/tail-cheese-ship-b1-a.jpg", "b": "img/tail-cheese-ship-b1-b.jpg", "aIs": "sonnet"}, {"id": "story-dragon-b1", "words": "there was a purple dragon who loved to eat pizza", "story": "Dragon story · page 1 of 3", "a": "img/story-dragon-b1-a.jpg", "b": "img/story-dragon-b1-b.jpg", "aIs": "sonnet"}, {"id": "story-dragon-b2", "words": "one night he flew all the way up to the moon", "story": "Dragon story · page 2 of 3", "a": "img/story-dragon-b2-a.jpg", "b": "img/story-dragon-b2-b.jpg", "aIs": "sonnet"}, {"id": "story-dragon-b3", "words": "on the moon he met an alien with three eyes and they became best friends", "story": "Dragon story · page 3 of 3", "a": "img/story-dragon-b3-a.jpg", "b": "img/story-dragon-b3-b.jpg", "aIs": "sonnet"}, {"id": "robot-b1", "words": "robot", "story": null, "a": "img/robot-b1-a.jpg", "b": "img/robot-b1-b.jpg", "aIs": "sonnet"}, {"id": "turtle-b1", "words": "turtle", "story": null, "a": "img/turtle-b1-a.jpg", "b": "img/turtle-b1-b.jpg", "aIs": "sonnet"}, {"id": "pirate-b1", "words": "pirate", "story": null, "a": "img/pirate-b1-a.jpg", "b": "img/pirate-b1-b.jpg", "aIs": "haiku"}, {"id": "castle-b1", "words": "castle", "story": null, "a": "img/castle-b1-a.jpg", "b": "img/castle-b1-b.jpg", "aIs": "haiku"}, {"id": "snowman-b1", "words": "snowman", "story": null, "a": "img/snowman-b1-a.jpg", "b": "img/snowman-b1-b.jpg", "aIs": "haiku"}, {"id": "tail-hat-horse-b1", "words": "a horse wearing a birthday party hat and a long striped scarf", "story": null, "a": "img/tail-hat-horse-b1-a.jpg", "b": "img/tail-hat-horse-b1-b.jpg", "aIs": "sonnet"}, {"id": "owl-b1", "words": "owl", "story": null, "a": "img/owl-b1-a.jpg", "b": "img/owl-b1-b.jpg", "aIs": "haiku"}, {"id": "dragon-fire-castle-b1", "words": "a dragon breathes fire on a castle", "story": null, "a": "img/dragon-fire-castle-b1-a.jpg", "b": "img/dragon-fire-castle-b1-b.jpg", "aIs": "haiku"}, {"id": "airplane-b1", "words": "airplane", "story": null, "a": "img/airplane-b1-a.jpg", "b": "img/airplane-b1-b.jpg", "aIs": "haiku"}, {"id": "story-bunny-b1", "words": "Once upon a time there was a little bunny who lived next to a big red house", "story": "Bunny story · page 1 of 4", "a": "img/story-bunny-b1-a.jpg", "b": "img/story-bunny-b1-b.jpg", "aIs": "sonnet"}, {"id": "story-bunny-b2", "words": "one day a hungry fox came out of the forest", "story": "Bunny story · page 2 of 4", "a": "img/story-bunny-b2-a.jpg", "b": "img/story-bunny-b2-b.jpg", "aIs": "sonnet"}, {"id": "story-bunny-b3", "words": "the bunny was scared and hid behind a tree", "story": "Bunny story · page 3 of 4", "a": "img/story-bunny-b3-a.jpg", "b": "img/story-bunny-b3-b.jpg", "aIs": "sonnet"}, {"id": "story-bunny-b4", "words": "then they went inside the house and ate carrot soup together", "story": "Bunny story · page 4 of 4", "a": "img/story-bunny-b4-a.jpg", "b": "img/story-bunny-b4-b.jpg", "aIs": "sonnet"}, {"id": "princess-b1", "words": "princess", "story": null, "a": "img/princess-b1-a.jpg", "b": "img/princess-b1-b.jpg", "aIs": "sonnet"}, {"id": "monster-b1", "words": "monster", "story": null, "a": "img/monster-b1-a.jpg", "b": "img/monster-b1-b.jpg", "aIs": "sonnet"}, {"id": "horse-b1", "words": "horse", "story": null, "a": "img/horse-b1-a.jpg", "b": "img/horse-b1-b.jpg", "aIs": "sonnet"}, {"id": "dragon-b1", "words": "dragon", "story": null, "a": "img/dragon-b1-a.jpg", "b": "img/dragon-b1-b.jpg", "aIs": "sonnet"}, {"id": "story-princess-b1", "words": "a princess had a pet dinosaur named Sprinkles", "story": "Princess story · page 1 of 4", "a": "img/story-princess-b1-a.jpg", "b": "img/story-princess-b1-b.jpg", "aIs": "haiku"}, {"id": "story-princess-b2", "words": "they went to the beach and built a big sandcastle", "story": "Princess story · page 2 of 4", "a": "img/story-princess-b2-a.jpg", "b": "img/story-princess-b2-b.jpg", "aIs": "haiku"}, {"id": "story-princess-b3", "words": "then a giant wave came and washed it away and the dinosaur cried", "story": "Princess story · page 3 of 4", "a": "img/story-princess-b3-a.jpg", "b": "img/story-princess-b3-b.jpg", "aIs": "haiku"}, {"id": "story-princess-b4", "words": "so the princess gave him an ice cream and he was happy again", "story": "Princess story · page 4 of 4", "a": "img/story-princess-b4-a.jpg", "b": "img/story-princess-b4-b.jpg", "aIs": "haiku"}, {"id": "tail-jellyfish-b1", "words": "a giant jellyfish wearing a crown", "story": null, "a": "img/tail-jellyfish-b1-a.jpg", "b": "img/tail-jellyfish-b1-b.jpg", "aIs": "haiku"}], "paywall": [{"id": "tail-jellyfish-2-b1", "words": "a giant jellyfish wearing a crown", "free": "pw/tail-jellyfish-2-b1-free.jpg", "smart": "pw/tail-jellyfish-2-b1-smart.jpg"}, {"id": "tail-cheese-ship-b1", "words": "a spaceship made of cheese", "free": "pw/tail-cheese-ship-b1-free.jpg", "smart": "pw/tail-cheese-ship-b1-smart.jpg"}, {"id": "owl-b1", "words": "owl", "free": "pw/owl-b1-free.jpg", "smart": "pw/owl-b1-smart.jpg"}, {"id": "story-bunny-b3", "words": "the bunny was scared and hid behind a tree", "free": "pw/story-bunny-b3-free.jpg", "smart": "pw/story-bunny-b3-smart.jpg"}], "voices": [{"id": "veda", "name": "Veda", "intro": "audio/veda-intro.mp3", "coach": "audio/veda-coach.mp3"}, {"id": "emma", "name": "Emma", "intro": "audio/emma-intro.mp3", "coach": "audio/emma-coach.mp3"}, {"id": "nathaniel", "name": "Nathaniel", "intro": "audio/nathaniel-intro.mp3", "coach": "audio/nathaniel-coach.mp3"}], "facts": [["First drawing, median", "0.80 s", "1.29 s"], ["First drawing, slowest 10%", "3.7 s", "1.7 s"], ["First drawing, worst of 90", "5.0 s", "2.7 s"], ["Cost per minute of talking", "$0.0011–0.0015", "$0.016–0.021"], ["An hour of talking", "$0.07–0.09", "$0.97–1.25"], ["Kid-safety lines (5 skip, 5 draw), 2 runs", "10 of 10, both", "10 of 10, both"], ["Blank pages, 2 full runs", "0 (1 before a dialect fix)", "0"]], "lines": {"intro": "Hi! This is your story book. You tell the story, any way you like.", "coach": "All done? Just say: The End!"}};
+
+const state = { picks: {}, narrator: null, paywall: null, revealed: false, index: 0 };
+let db = null;
+const writing = {};
+
+function save(path, body) {
+  try { localStorage.setItem('cbt:' + path, JSON.stringify(body)); } catch (e) {}
+  if (!db) return;
+  const prev = writing[path] || Promise.resolve();
+  writing[path] = prev.then(() => db.doc(path).set(body)).catch((e) => {
+    const el = document.getElementById('save-error');
+    el.textContent = 'Picks aren’t saving right now (' + ((e && e.code) || 'error') + ').';
+    el.hidden = false;
+  });
+}
+
+function loadLocal() {
+  for (const p of DATA.pairs) {
+    try {
+      const v = JSON.parse(localStorage.getItem('cbt:picks/' + p.id) || 'null');
+      if (v && v.choice) state.picks[p.id] = v.choice;
+    } catch (e) {}
+  }
+  try {
+    const n = JSON.parse(localStorage.getItem('cbt:choices/narrator') || 'null'); if (n) state.narrator = n.voice;
+    const w = JSON.parse(localStorage.getItem('cbt:choices/paywall') || 'null'); if (w) state.paywall = w.pair;
+    const r = JSON.parse(localStorage.getItem('cbt:choices/reveal') || 'null'); if (r) state.revealed = true;
+  } catch (e) {}
+}
+
+async function loadDb() {
+  if (!window.claude || !window.claude.use) return;
+  const timer = new Promise((res) => setTimeout(() => res(null), 10000));
+  db = await Promise.race([window.claude.use('db'), timer]);
+  if (!db) return;
+  try {
+    const picks = await db.collection('picks').get();
+    for (const d of picks.docs) { const v = d.data(); if (v && typeof v.choice === 'string') state.picks[d.id] = v.choice; }
+    const choices = await db.collection('choices').get();
+    for (const d of choices.docs) {
+      const v = d.data() || {};
+      if (d.id === 'narrator' && typeof v.voice === 'string') state.narrator = v.voice;
+      if (d.id === 'paywall' && typeof v.pair === 'string') state.paywall = v.pair;
+      if (d.id === 'reveal') state.revealed = true;
+    }
+    state.index = firstOpen();
+    render();
+  } catch (e) {
+    const el = document.getElementById('save-error');
+    el.textContent = 'Couldn’t load earlier picks (' + ((e && e.code) || 'error') + ').';
+    el.hidden = false;
+  }
+}
+
+function firstOpen() {
+  const i = DATA.pairs.findIndex((p) => !state.picks[p.id]);
+  return i === -1 ? DATA.pairs.length - 1 : i;
+}
+const picked = () => DATA.pairs.filter((p) => state.picks[p.id]).length;
+
+function winner(p, choice) {
+  if (choice === 'same') return 'same';
+  const other = p.aIs === 'haiku' ? 'sonnet' : 'haiku';
+  return choice === 'a' ? p.aIs : other;
+}
+
+function pick(choice) {
+  const p = DATA.pairs[state.index];
+  if (!p) return;
+  state.picks[p.id] = choice;
+  save('picks/' + p.id, { choice, winner: winner(p, choice), at: Date.now() });
+  if (state.index < DATA.pairs.length - 1) state.index += 1;
+  else if (picked() === DATA.pairs.length) reveal();
+  render();
+}
+
+function reveal() {
+  if (!state.revealed) save('choices/reveal', { at: Date.now() });
+  state.revealed = true;
+  location.hash = '#results';
+  render();
+  window.scrollTo(0, 0);
+}
+
+function el(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === 'class') n.className = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else if (v === true) n.setAttribute(k, '');
+    else if (v !== false && v != null) n.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k != null) n.append(k.nodeType ? k : document.createTextNode(String(k)));
+  return n;
+}
+
+function zoomable(src, alt, lazy) {
+  return el('img', { src, alt, loading: lazy ? 'lazy' : 'eager', onclick: () => { const z = document.getElementById('zoom'); document.getElementById('zoom-img').src = src; z.hidden = false; } });
+}
+
+function viewPictures() {
+  const p = DATA.pairs[state.index];
+  for (const q of DATA.pairs.slice(state.index + 1, state.index + 3)) { new Image().src = q.a; new Image().src = q.b; }
+  const choice = state.picks[p.id];
+  const dots = el('div', { class: 'dots', role: 'list' }, DATA.pairs.map((q, i) =>
+    el('button', { class: 'dot' + (state.picks[q.id] ? ' done' : '') + (i === state.index ? ' here' : ''), 'aria-label': 'Pair ' + (i + 1), onclick: () => { state.index = i; render(); } }, String(i + 1))));
+  const side = (key, label, src) => el('div', { class: 'side' + (choice === key ? ' picked' : '') },
+    zoomable(src, 'Picture ' + label), el('span', { class: 'tag' }, label));
+  const card = el('section', { class: 'card' },
+    el('div', { class: 'meta' }, el('span', { class: 'count' }, (state.index + 1) + ' / ' + DATA.pairs.length), p.story ? el('span', {}, p.story) : null),
+    el('p', { class: 'words' }, '“' + p.words + '”'),
+    el('div', { class: 'pair' }, side('a', 'A', p.a), side('b', 'B', p.b)));
+  const actions = el('div', { class: 'actions' },
+    el('button', { class: 'btn' + (choice === 'a' ? ' on' : ''), onclick: () => pick('a') }, 'A is better'),
+    el('button', { class: 'btn' + (choice === 'same' ? ' on' : ''), onclick: () => pick('same') }, 'Same'),
+    el('button', { class: 'btn' + (choice === 'b' ? ' on' : ''), onclick: () => pick('b') }, 'B is better'));
+  const nav = el('div', { class: 'nav' },
+    el('button', { class: 'btn small', disabled: state.index === 0, onclick: () => { state.index -= 1; render(); } }, 'Back'),
+    el('span', { class: 'note' }, picked() + ' picked'),
+    el('button', { class: 'btn small yellow', disabled: picked() === 0, onclick: reveal }, 'Reveal'));
+  return el('div', { class: 'wrap' }, card, actions, nav, dots);
+}
+
+function viewResults() {
+  const t = { haiku: 0, same: 0, sonnet: 0 };
+  for (const p of DATA.pairs) { const c = state.picks[p.id]; if (c) t[winner(p, c)] += 1; }
+  const tally = el('div', { class: 'tally' },
+    [['Haiku better', t.haiku], ['Same', t.same], ['Sonnet better', t.sonnet]].map(([label, n]) =>
+      el('div', { class: 'card' }, el('span', { class: 'big' }, n), el('span', {}, label))));
+  const facts = el('section', { class: 'card' }, el('h2', {}, 'Speed and cost'),
+    el('div', { class: 'tablewrap' }, el('table', {},
+      el('thead', {}, el('tr', {}, el('th', {}, ''), el('th', {}, 'Haiku 5.5 (free)'), el('th', {}, 'Sonnet 5.5 (with minutes)'))),
+      el('tbody', {}, DATA.facts.map((r) => el('tr', {}, el('td', {}, r[0]), el('td', { class: 'num' }, r[1]), el('td', { class: 'num' }, r[2])))))));
+  const pw = el('section', { class: 'card' }, el('h2', {}, 'Paywall pair'),
+    el('div', { class: 'pw' }, DATA.paywall.map((c) => el('div', { class: 'card' + (state.paywall === c.id ? ' chosen' : '') },
+      el('p', { class: 'words' }, '“' + c.words + '”'),
+      el('div', { class: 'mini' },
+        el('figure', {}, zoomable(c.free, 'Free'), el('figcaption', {}, 'Free')),
+        el('figure', {}, zoomable(c.smart, 'With minutes'), el('figcaption', {}, 'With minutes'))),
+      el('div', { class: 'row' }, el('button', { class: 'btn small' + (state.paywall === c.id ? ' sage' : ''), onclick: () => { state.paywall = c.id; save('choices/paywall', { pair: c.id, at: Date.now() }); render(); } }, state.paywall === c.id ? 'Chosen' : 'Use this pair'))))));
+  const all = el('section', { class: 'card' }, el('h2', {}, 'Every pair'),
+    el('div', { class: 'list' }, DATA.pairs.map((p) => {
+      const c = state.picks[p.id];
+      const w = c ? winner(p, c) : null;
+      const fig = (src, model) => el('figure', { class: w === model ? 'win' : '' }, zoomable(src, model, true), el('figcaption', {}, model === 'haiku' ? 'Haiku' : 'Sonnet'));
+      const h = p.aIs === 'haiku' ? p.a : p.b, s = p.aIs === 'haiku' ? p.b : p.a;
+      return el('div', { class: 'side' },
+        el('span', {}, '“' + p.words + '”'),
+        el('div', { class: 'mini' }, fig(h, 'haiku'), fig(s, 'sonnet')),
+        el('span', { class: 'note' }, c ? (w === 'same' ? 'You: same' : 'You: ' + (w === 'haiku' ? 'Haiku' : 'Sonnet')) : 'Not picked'));
+    })));
+  const back = el('div', { class: 'nav' }, el('a', { class: 'btn small', href: '#pictures' }, 'Back to the pictures'));
+  return el('div', { class: 'wrap' }, el('h2', {}, picked() + ' of ' + DATA.pairs.length + ' picked'), tally, facts, pw, all, back);
+}
+
+function viewNarrator() {
+  const cards = DATA.voices.map((v) => {
+    const chosen = state.narrator === v.id;
+    return el('section', { class: 'card' + (chosen ? ' chosen' : '') },
+      el('h2', {}, v.name),
+      el('div', { class: 'row' },
+        el('button', { class: 'btn small', onclick: () => play(v.intro) }, 'Intro line'),
+        el('button', { class: 'btn small', onclick: () => play(v.coach) }, 'Coach line')),
+      el('div', { class: 'row' }, el('button', { class: 'btn' + (chosen ? ' sage' : ' yellow'), onclick: () => { state.narrator = v.id; save('choices/narrator', { voice: v.id, at: Date.now() }); render(); } }, chosen ? 'Picked' : 'Pick ' + v.name)));
+  });
+  return el('div', { class: 'wrap' },
+    el('section', { class: 'card' },
+      el('p', { class: 'words' }, '“' + DATA.lines.intro + '”'),
+      el('p', { class: 'words' }, '“' + DATA.lines.coach + '”')),
+    el('div', { class: 'voices' }, cards));
+}
+
+let audio = null;
+function play(src) {
+  try { if (audio) audio.pause(); audio = new Audio(src); audio.play().catch(() => {}); } catch (e) {}
+}
+
+function route() {
+  const h = location.hash.replace('#', '');
+  if (h === 'narrator') return 'narrator';
+  if (h === 'results' && state.revealed) return 'results';
+  return 'pictures';
+}
+
+function render() {
+  const r = route();
+  document.getElementById('tab-pictures').classList.toggle('on', r !== 'narrator');
+  document.getElementById('tab-narrator').classList.toggle('on', r === 'narrator');
+  const v = document.getElementById('view');
+  v.replaceChildren(r === 'narrator' ? viewNarrator() : r === 'results' ? viewResults() : viewPictures());
+}
+
+document.getElementById('zoom').addEventListener('click', () => { document.getElementById('zoom').hidden = true; });
+document.addEventListener('keydown', (e) => {
+  if (!document.getElementById('zoom').hidden) { if (e.key === 'Escape') document.getElementById('zoom').hidden = true; return; }
+  if (route() !== 'pictures') return;
+  if (e.key === 'ArrowLeft') pick('a');
+  else if (e.key === 'ArrowRight') pick('b');
+  else if (e.key === 'ArrowDown' || e.key === 's') pick('same');
+  else if ((e.key === 'ArrowUp' || e.key === 'Backspace') && state.index > 0) { state.index -= 1; render(); }
+  else return;
+  e.preventDefault();
+});
+window.addEventListener('hashchange', render);
+
+loadLocal();
+state.index = firstOpen();
+render();
+loadDb();
+</script>
