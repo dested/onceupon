@@ -10,6 +10,8 @@ const rawSchema = z.object({
   BETTER_AUTH_URL: z.string().url().default('http://localhost:7720'),
   PUBLIC_ORIGIN: z.string().url().optional(),
   ADMIN_EMAILS: z.string().default(''),
+  /** `open` lets the allow-listed admin emails create an account; anything else keeps sign-up closed (V-28). */
+  ADMIN_SIGNUP: z.string().optional(),
   DEVICE_TOKEN_SECRET: z
     .string()
     .min(32, 'DEVICE_TOKEN_SECRET must be at least 32 chars')

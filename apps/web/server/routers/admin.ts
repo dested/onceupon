@@ -55,6 +55,9 @@ export const adminRouter = router({
     resetFreeStory: adminProcedure
       .input(z.object({ deviceId: z.string().min(1) }))
       .mutation(({ input, ctx }) => q.resetFreeStory(input.deviceId, ctx.session.user.email)),
+    delete: adminProcedure
+      .input(z.object({ deviceId: z.string().min(1) }))
+      .mutation(({ input, ctx }) => q.deleteDevice(input.deviceId, ctx.session.user.email)),
   }),
 
   gift: router({

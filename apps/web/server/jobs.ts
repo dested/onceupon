@@ -2,15 +2,18 @@ import { prisma } from './prisma'
 import { expireShares } from './shares'
 import { runAlertChecks } from './alerts'
 import { log } from './logger'
+import { runRetention } from './retention'
 
 const TICK_MS = 60 * 1000
 const SHARES_EVERY_MS = 10 * 60 * 1000
 const ALERT_EVERY_MS = 10 * 60 * 1000
 const STALE_SESSION_MS = 2 * 60 * 1000
+const RETENTION_EVERY_MS = 24 * 60 * 60 * 1000
 
 let started = false
 let lastShares = 0
 let lastAlertCheck = 0
+let lastRetention = 0
 
 function msg(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -50,11 +53,18 @@ async function tick(): Promise<void> {
     lastAlertCheck = Date.now()
     await step('runAlertChecks', runAlertChecks)
   }
+  if (Date.now() - lastRetention >= RETENTION_EVERY_MS) {
+    lastRetention = Date.now()
+    await step('retention', async () => {
+      const r = await runRetention()
+      log.info(`[jobs] retention ${JSON.stringify(r)}`)
+    })
+  }
 }
 
 /**
  * Start the maintenance loop once: stale sessions every minute (the relay grace hangs off them),
- * shares and alert checks every 10 minutes.
+ * shares and alert checks every 10 minutes, retention (V-22) once a day.
  */
 export function startJobs(): void {
   if (started) return

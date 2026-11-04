@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
-import { router, publicProcedure } from '../trpc'
+import { router, publicProcedure, limitedProcedure } from '../trpc'
 import { env } from '../env'
 import { prisma } from '../prisma'
 import { ApiError } from '../app-api-types'
@@ -31,7 +31,7 @@ function toTrpc(err: unknown): TRPCError {
 }
 
 const shopRouter = router({
-  checkout: publicProcedure
+  checkout: limitedProcedure('checkout')
     .input(z.object({ packId: packIdSchema, deviceCode: z.string().min(1) }))
     .mutation(async ({ input }) => {
       try {
@@ -66,7 +66,7 @@ const shopRouter = router({
 })
 
 const giftRouter = router({
-  checkout: publicProcedure
+  checkout: limitedProcedure('checkout')
     .input(
       z.object({
         packId: packIdSchema,
@@ -97,7 +97,7 @@ const giftRouter = router({
         throw toTrpc(err)
       }
     }),
-  redeemOnWeb: publicProcedure
+  redeemOnWeb: limitedProcedure('checkout')
     .input(z.object({ code: z.string().min(1), deviceCode: z.string().min(1) }))
     .mutation(async ({ input }) => {
       try {

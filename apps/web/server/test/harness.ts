@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { appApiRouter } from '../app-api'
 import { prisma } from '../prisma'
 import { invalidateFlags } from '../flags'
+import { resetRateLimitsForTests } from '../rate-limit'
 import type { ApiName, ApiInput, DrawChunk } from '../../../../packages/shared/src/api'
 
 /** The studio's real kit system prompt (the relay's allow-list accepts it). */
@@ -43,12 +44,13 @@ export async function stopApp(): Promise<void> {
   if (s) await new Promise<void>((resolve) => s.close(() => resolve()))
 }
 
-/** Empty every product table (the admin auth tables are left alone). */
+/** Empty every product table (the admin auth tables are left alone) and the rate-limit counters. */
 export async function resetDb(): Promise<void> {
   await prisma.$executeRawUnsafe(
     'TRUNCATE call_log, story_session, ledger_entry, purchase, share, gift_code, alert, audit_log, apple_notification, stripe_event, flag, device CASCADE'
   )
   invalidateFlags()
+  resetRateLimitsForTests()
 }
 
 export interface Res {

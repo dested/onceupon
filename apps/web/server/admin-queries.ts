@@ -424,6 +424,30 @@ export async function resetFreeStory(deviceId: string, actor: string) {
   return { ok: true }
 }
 
+/**
+ * "Delete my data" (V-21): remove a device and everything that hangs off it (the schema cascades:
+ * ledger, sessions, purchases, shares, call logs). The audit row keeps the device code and the counts,
+ * nothing else.
+ */
+export async function deleteDevice(deviceId: string, actor: string) {
+  return prisma.$transaction(async (tx) => {
+    const device = await tx.device.findUnique({ where: { id: deviceId }, select: { id: true, code: true } })
+    if (!device) return { ok: false as const, code: null, counts: null }
+    const where = { deviceId }
+    const [entries, sessions, purchases, shares, calls] = await Promise.all([
+      tx.ledgerEntry.count({ where }),
+      tx.storySession.count({ where }),
+      tx.purchase.count({ where }),
+      tx.share.count({ where }),
+      tx.callLog.count({ where }),
+    ])
+    const counts = { entries, sessions, purchases, shares, calls }
+    await tx.device.delete({ where: { id: deviceId } })
+    await tx.auditLog.create({ data: { actor, action: 'device.delete', target: device.code, detail: counts } })
+    return { ok: true as const, code: device.code, counts }
+  })
+}
+
 /** Re-read the balance after a ledger credit/debit so the drawer can update in place. */
 export async function deviceBalance(deviceId: string) {
   const d = await prisma.device.findUnique({ where: { id: deviceId }, select: { balanceSec: true } })

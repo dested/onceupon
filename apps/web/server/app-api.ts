@@ -7,6 +7,7 @@ import { shareHandlers } from './app-handlers/share'
 import { deviceFromToken } from './device'
 import { drawHandler } from './relay'
 import { log } from './logger'
+import { allow, clientIp, type Bucket } from './rate-limit'
 import type { Device } from '@prisma/client'
 import type { ApiErrorCode, ApiName } from '../../../packages/shared/src/api'
 
@@ -46,11 +47,6 @@ function firstIssue(err: z.ZodError): string {
   return path ? `${path}: ${issue.message}` : issue.message
 }
 
-function ipOf(req: Request): string {
-  const fwd = req.headers['x-forwarded-for']
-  if (typeof fwd === 'string' && fwd.length > 0) return fwd.split(',')[0]?.trim() ?? ''
-  return req.ip ?? ''
-}
 
 function uaOf(req: Request): string {
   const ua = req.headers['user-agent']
@@ -73,7 +69,7 @@ async function runHandler<K extends ApiName>(
   req: Request,
   res: Response
 ): Promise<void> {
-  const base: HandlerCtx = { device: null, ip: ipOf(req), userAgent: uaOf(req) }
+  const base: HandlerCtx = { device: null, ip: clientIp(req), userAgent: uaOf(req) }
 
   if (handler.auth === 'device') {
     const token = headerToken(req)
@@ -109,7 +105,12 @@ async function runHandler<K extends ApiName>(
 function mountFrom<K extends ApiName>(map: Handlers, name: K): void {
   const handler = map[name]
   if (!handler) return
+  const bucket: Bucket = name === 'device.register' ? 'register' : name === 'share.create' ? 'share' : 'app'
   appApiRouter.post(`/${name}`, (req, res) => {
+    if (!allow(bucket, clientIp(req))) {
+      sendError(res, 429, 'cap', 'too many requests, try again soon')
+      return
+    }
     runHandler(handler, req, res).catch((e: unknown) => onError(req, res, e))
   })
 }

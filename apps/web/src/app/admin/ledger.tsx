@@ -211,6 +211,14 @@ function DeviceDetail({ data, onDone, onClose }: { data: DeviceData; onDone: () 
     })
   )
   const reset = useMutation(trpc.admin.ledger.resetFreeStory.mutationOptions({ onSuccess: onDone }))
+  const remove = useMutation(
+    trpc.admin.ledger.delete.mutationOptions({
+      onSuccess: () => {
+        onDone()
+        onClose()
+      },
+    })
+  )
 
   const entryCols: Column<DeviceData['entries'][number]>[] = [
     { header: 'When', cell: (r) => dateTime(r.createdAt) },
@@ -387,6 +395,18 @@ function DeviceDetail({ data, onDone, onClose }: { data: DeviceData; onDone: () 
               onConfirm={() => reset.mutate({ deviceId: dev.id })}>
               Reset free story
             </ConfirmButton>
+          </div>
+
+          <div className="rounded-2xl border-[3px] border-ink bg-paper-deep/40 p-3">
+            <div className="mb-2 font-hand text-base text-ink">Delete device</div>
+            <ConfirmButton
+              tone="red"
+              confirmLabel={`delete ${dev.code}?`}
+              disabled={remove.isPending}
+              onConfirm={() => remove.mutate({ deviceId: dev.id })}>
+              Delete device
+            </ConfirmButton>
+            {remove.isError && <p className="font-hand text-sm text-crayon-red">{errorMessage(remove.error)}</p>}
           </div>
         </div>
       </div>

@@ -89,13 +89,10 @@ async function createServer() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
-      onError({ error, type, path: trpcPath, input }) {
-        log.error(`[trpc] ${type} ${trpcPath ?? '<unknown>'} ${error.code} — ${error.message}`, {
-          input,
-        })
-        if (error.code === 'INTERNAL_SERVER_ERROR' && error.stack) {
-          console.error(error.stack)
-        }
+      // Path and code only (V-24): inputs and messages can carry gift codes, family codes and names.
+      onError({ error, type, path: trpcPath }) {
+        const cause = error.cause instanceof Error ? ` (${error.cause.name})` : ''
+        log.error(`[trpc] ${type} ${trpcPath ?? '<unknown>'} ${error.code}${cause}`)
       },
     })
   )

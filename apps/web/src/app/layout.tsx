@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Outlet, ScrollRestoration } from 'react-router-dom'
+import { Link, Outlet, ScrollRestoration, useLocation, useSearchParams } from 'react-router-dom'
 import { StickerButton, StickerLink } from '~/components/paper'
 import { BRAND } from '../../../../packages/shared/src/brand'
 import { Footer, Wordmark } from './site-parts'
@@ -13,8 +13,31 @@ const NAV: { label: string; to: string; tilt: number }[] = [
 
 const APP_STORE = BRAND.appStoreUrl || '/#get-the-app'
 
+/**
+ * Pages the app opens in its in-app browser with `?app=1` (ClientConfig URLs): rendered with no site
+ * nav and no footer, so nothing is one tap from a web purchase (V-27). The FAQ is reachable from
+ * Support, so it is in the set too.
+ */
+const APP_MODE_PAGES = new Set(['/privacy', '/terms', '/support', '/delete-my-data', '/faq'])
+
 export function Layout() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const { pathname } = useLocation()
+  const [params] = useSearchParams()
+  // Decided on the first render and kept while the Layout lives, so links between the legal pages
+  // (which drop the query) stay in app mode.
+  const [appMode] = useState(() => params.get('app') === '1' && APP_MODE_PAGES.has(pathname))
+
+  if (appMode) {
+    return (
+      <div className="tabletop flex min-h-screen flex-col">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-6 pt-6 pb-16">
+          <Outlet />
+        </main>
+        <ScrollRestoration />
+      </div>
+    )
+  }
 
   return (
     <div className="tabletop flex min-h-screen flex-col">

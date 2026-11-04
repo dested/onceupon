@@ -122,10 +122,11 @@ export const coreHandlers: Handlers = {
       readOnly: flags.readOnly,
       shopUrl: `${origin}/shop`,
       redeemUrl: `${origin}/redeem`,
-      privacyUrl: `${origin}/privacy`,
-      termsUrl: `${origin}/terms`,
-      supportUrl: `${origin}/support`,
-      deleteDataUrl: `${origin}/delete-my-data`,
+      // `?app=1`: the in-app browser shows these with no site nav or footer (V-27).
+      privacyUrl: `${origin}/privacy?app=1`,
+      termsUrl: `${origin}/terms?app=1`,
+      supportUrl: `${origin}/support?app=1`,
+      deleteDataUrl: `${origin}/delete-my-data?app=1`,
       silenceNudgeMs: flags.silenceNudgeMs,
       silenceEndMs: flags.silenceEndMs,
     }

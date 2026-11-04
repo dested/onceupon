@@ -9,7 +9,7 @@ import { ApiError } from './app-api-types'
 import type { AppApi, PublicShare, SharedRecord, ShareSummary } from '../../../packages/shared/src/api'
 
 const MAX_RECORD_CHARS = 500_000
-const MAX_CHILD_NAME = 24
+const MAX_SHARES_PER_DAY = 20
 const MAX_COVER_BYTES = 300 * 1024
 const MAX_VOICE_BYTES = 12 * 1024 * 1024
 // The studio's thumbnails are JPEG (stage.thumbnail()); PNG is accepted too. Served back by sniffing the bytes.
@@ -82,14 +82,17 @@ export async function createShare(
   device: Device,
   input: AppApi['share.create']['input']
 ): Promise<AppApi['share.create']['output']> {
-  const { record, childName, voice, coverPng } = input
+  // `childName` is ignored since 1.0: no child's name on a public page (Sal's decision 6).
+  const { record, voice, coverPng } = input
 
   if (voice && !((device.paying || device.comped) && device.shareVoice)) {
     throw new ApiError(403, 'consent_required', 'Voice sharing needs a paying account with consent')
   }
-  if (childName && childName.length > MAX_CHILD_NAME) {
-    throw new ApiError(400, 'bad_request', 'Child name is too long')
-  }
+  // V-25: at most 20 shares per device per UTC day.
+  const now = new Date()
+  const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  const today = await prisma.share.count({ where: { deviceId: device.id, createdAt: { gte: dayStart } } })
+  if (today >= MAX_SHARES_PER_DAY) throw new ApiError(429, 'cap', 'Too many shares today')
   if (JSON.stringify(record).length > MAX_RECORD_CHARS) {
     throw new ApiError(400, 'bad_request', 'Story record is too large')
   }
@@ -102,7 +105,6 @@ export async function createShare(
   const maskedEvents = await Promise.all(
     record.events.map(async (e) => (e.k === 'words' ? { ...e, text: await maskText(e.text) } : e))
   )
-  const maskedChildName = childName ? await maskText(childName) : null
   const maskedRecord: SharedRecord = {
     ...record,
     title: maskedTitle,
@@ -120,7 +122,7 @@ export async function createShare(
       deviceId: device.id,
       storyId: record.id,
       title: maskedTitle,
-      childName: maskedChildName,
+      childName: null,
       record: JSON.parse(JSON.stringify(maskedRecord)),
       cover: coverBytes,
       voice: voiceBytes,
@@ -143,7 +145,6 @@ export async function getPublicShare(id: string): Promise<PublicShare | null> {
     select: {
       id: true,
       title: true,
-      childName: true,
       record: true,
       voiceMime: true,
       createdAt: true,
@@ -156,7 +157,7 @@ export async function getPublicShare(id: string): Promise<PublicShare | null> {
   return {
     id: row.id,
     title: row.title,
-    childName: row.childName,
+    childName: null, // never shown since 1.0, even on shares made before
     record: toPublicRecord(row.record),
     hasVoice: row.voiceMime !== null,
     voiceUrl: row.voiceMime ? `/api/share/${id}/voice` : null,
@@ -184,13 +185,13 @@ export interface ShareMeta {
 export async function shareMeta(id: string): Promise<ShareMeta | null> {
   const row = await prisma.share.findUnique({
     where: { id },
-    select: { title: true, childName: true, voiceMime: true, expiresAt: true, unpublishedAt: true },
+    select: { title: true, voiceMime: true, expiresAt: true, unpublishedAt: true },
   })
   if (!row || !isLive(row)) return null
   const hasCover = await coverExists(id)
   return {
     title: row.title,
-    childName: row.childName,
+    childName: null, // never shown since 1.0, even on shares made before
     coverUrl: hasCover ? `/api/share/${id}/cover.png` : null,
     expiresAt: row.expiresAt.toISOString(),
     hasVoice: row.voiceMime !== null,

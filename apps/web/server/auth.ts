@@ -13,6 +13,8 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,
+    // Both admin accounts exist; sign-up stays closed unless ADMIN_SIGNUP=open (V-28).
+    disableSignUp: env.ADMIN_SIGNUP !== 'open',
   },
   databaseHooks: {
     user: {
