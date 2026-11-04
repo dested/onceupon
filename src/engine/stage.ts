@@ -12,7 +12,7 @@ import {
   type Stroke,
 } from './geometry'
 import { BG_ID, type SceneEvent } from './scene'
-import { darken } from './colors'
+import { CRAYONS, darken, hexToRgb } from './colors'
 import type { StageAudio } from './audio'
 import { realClock, type Clock } from './clock'
 import { faceExtras, faceInfo, isOutlineOf, luminance, popShapeToStrokes, type FaceInfo } from './pop'
@@ -101,6 +101,32 @@ const REST: Vec = { x: 152, y: 94 }
 const FINALE_ID = '__finale'
 /** "The End" ink; a crayon-box dark, never a UI token. */
 const FINALE_INK = '#2b2626'
+/** "The End" on a dark page: light crayon lettering with a FINALE_INK outline. */
+const FINALE_INK_LIGHT = CRAYONS.white ?? '#fdfcf8'
+
+/** WCAG relative luminance of a #rrggbb colour; null for anything else. */
+function relLuminance(hex: string): number | null {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return null
+  const { r, g, b } = hexToRgb(hex)
+  const lin = (c: number): number => {
+    const v = c / 255
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+  }
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+}
+
+function contrast(a: number, b: number): number {
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+}
+
+/** True when light lettering reads better than FINALE_INK on this sky (a night or deep-coloured page). */
+function darkSky(sky: string | null): boolean {
+  const l = sky === null ? null : relLuminance(sky)
+  const ink = relLuminance(FINALE_INK)
+  const light = relLuminance(FINALE_INK_LIGHT)
+  if (l === null || ink === null || light === null) return false
+  return contrast(light, l) > contrast(ink, l)
+}
 
 function easeInOut(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2
@@ -163,6 +189,10 @@ export class Stage {
   readonly style: StageStyle
   /** Pop: the sky is dark, so the bg gets twinkling stars. */
   private night = false
+  /** The current page's sky colour (from its `bg`), or null on bare paper. */
+  private sky: string | null = null
+  /** The finale title is light lettering with a dark outline (the page is dark). */
+  private finaleOutlined = false
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -412,6 +442,7 @@ export class Stage {
         const v = this.newView(BG_ID, 0, 0)
         v.z = -1e9
         this.night = luminance(ev.sky) < 0.3
+        this.sky = ev.sky
         const shapes: Shape[] = [
           { k: 'rect', x: -2, y: -2, w: WORLD_W + 4, h: GROUND_Y + 2, color: ev.sky, fill: true },
         ]
@@ -438,6 +469,8 @@ export class Stage {
         this.pageTurn = this.calm ? null : { img: snap, t0: now }
         this.pageCount = ev.page.index
         this.views.clear()
+        this.sky = null
+        this.night = false
         this.queue = []
         this.bubbles = []
         this.audio?.pageFlip()
@@ -571,10 +604,46 @@ export class Stage {
   ): void {
     if (!v.lctx) return
     if (st.kind === 'text') {
-      if (charsTo > charsFrom) this.brush.stampTextRange(v.lctx, st, charsFrom, charsTo, v.xform)
+      if (charsTo <= charsFrom) return
+      if (v.id === FINALE_ID && this.finaleOutlined) this.stampOutlinedText(v.lctx, st, charsFrom, charsTo, v.xform)
+      else this.brush.stampTextRange(v.lctx, st, charsFrom, charsTo, v.xform)
       return
     }
     this.brush.stampRange(v.lctx, st, s0, s1, v.xform, v.seeds[idx] ?? 0)
+  }
+
+  /**
+   * The finale's lettering on a dark page: a FINALE_INK outline under the light fill. Each step also
+   * re-fills the previous letter so the new letter's outline never nicks it.
+   */
+  private stampOutlinedText(
+    ctx: CanvasRenderingContext2D,
+    st: Stroke,
+    from: number,
+    to: number,
+    xform: LayerXform
+  ): void {
+    if (!st.text) return
+    const { x, y, size, text } = st.text
+    const a = Math.max(0, from)
+    const b = Math.min(text.length, to)
+    if (b <= a) return
+    const a0 = Math.max(0, a - 1)
+    ctx.save()
+    ctx.font = `${size * xform.s}px "Gloria Hallelujah", "Patrick Hand", cursive`
+    ctx.textBaseline = 'alphabetic'
+    ctx.textAlign = 'left'
+    const px = (x - xform.ox) * xform.s
+    const py = (y - xform.oy) * xform.s
+    const at = (i: number): number => (i > 0 ? ctx.measureText(text.slice(0, i)).width : 0)
+    ctx.globalAlpha = st.alpha
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = size * xform.s * 0.16
+    ctx.strokeStyle = FINALE_INK
+    ctx.strokeText(text.slice(a, b), px + at(a), py)
+    ctx.fillStyle = st.color
+    ctx.fillText(text.slice(a0, b), px + at(a0), py)
+    ctx.restore()
   }
 
   private pendingLength(): number {
@@ -1164,7 +1233,9 @@ export class Stage {
     const v = this.newView(FINALE_ID, 0, 0)
     v.z = 2e9
     v.noLife = true
-    const shape: Shape = { k: 'text', x, y, size, color: FINALE_INK, text }
+    // A dark page gets light lettering with a dark crayon outline; light pages keep the dark ink.
+    this.finaleOutlined = darkSky(this.sky)
+    const shape: Shape = { k: 'text', x, y, size, color: this.finaleOutlined ? FINALE_INK_LIGHT : FINALE_INK, text }
     this.addShapes(v, [shape], {})
     return new Promise<void>((resolve) => {
       this.finaleState = { id: FINALE_ID, seed, resolve, done: false }
@@ -1189,6 +1260,9 @@ export class Stage {
     this.zCounter = 0
     this.finaleState = null
     this.pageCount = 1
+    this.sky = null
+    this.night = false
+    this.finaleOutlined = false
   }
 
   /**

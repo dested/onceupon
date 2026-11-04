@@ -52,7 +52,7 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
     s.seek(0)
   }
   const ended = len > 0 && pos >= len
-  // The finale writes its own "The End" across the page: no caption pill on top of it.
+  // The finale writes its own "The End" across the page: nothing sits on top of it.
   const inFinale = (story.endAt >= 0 && pos > story.endAt) || /^\W*the end\W*$/i.test(caption)
   const remove = (): void => {
     if (!confirmDelete) {
@@ -116,18 +116,12 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
           <div className="replay-filmstrip">
             <Filmstrip embedded />
           </div>
-          {caption && !inFinale && (
-            <div className="replay-caption" data-testid="narration">
-              <p key={caption} className="font-scrawl">
-                {caption}
-              </p>
-              {hasVoice && (
-                <span className="replay-voice" data-testid="voice-indicator">
-                  <Mic size={14} strokeWidth={2.5} /> in their own voice
-                </span>
-              )}
-            </div>
+          {hasVoice && caption && !inFinale && (
+            <span className="replay-voice" data-testid="voice-indicator">
+              <Mic size={14} strokeWidth={2.5} /> in their own voice
+            </span>
           )}
+          {/* Each line shows once, in the subtitles at the bottom, as it does while telling. */}
           <Subtitles className="story-subtitles" />
         </div>
       </main>
