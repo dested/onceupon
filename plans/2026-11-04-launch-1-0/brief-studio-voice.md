@@ -48,3 +48,7 @@ Re-read this file and the Standing answers + Phase 3 decisions in /w/code/onceup
 **Commits.** `bash ~/.claude/sal/bin/commit-paths.sh "<msg> (studio-voice)" <your paths>`, one per item group.
 
 **Report** (≤ 10 lines, per ready): `ready studio-voice <item> <sha>`, what was verified, screenshots (absolute paths), anything left, questions with recs.
+
+**FIX QUEUE: do these before any other item, in this order (lead, 2026-11-04)**
+1. Consent copy (Sal: "can you not say claude anthropic"). P1: "To draw a story, Squiggletale sends the words your child says, as text, to our server, which asks a third-party AI service to turn them into a drawing." P3: "That AI service doesn't use these words to train its models and deletes them within 30 days." No "Claude", "Anthropic", "Haiku" or "Sonnet" in any string a parent or child sees. ParentArea text links (Restore purchases, Copy) use the card's purple link style. Re-shoot 02-consent-card-shell-390x844 and 02-consent-card-1180x820 and send `ready studio-voice consent-copy <sha>` on its own.
+2. Ears notes show once, in the dock: no centre toast while the dock is on screen, and a toast never overlaps the subtitles. Drop second lines that repeat the title ("Just a little moment", "Ask a grown-up to turn on the microphone."). Keep "The crayon can't hear you yet" + "Open Settings"; "Getting ready…" alone for the learning state. Re-shoot 10/11/12.
