@@ -15,7 +15,7 @@ import { isDialectId, makeDialect } from '~/llm/dialect'
 import { recordClockOffset, replaySchedule, voiceLeadMs } from '~/story/replay'
 import type { StoryRecord } from '~/story/storage'
 import { makeVoiceTrack } from '~/story/voice'
-import { BookFrame, CPU, loadVideoFonts, PAPER, VIDEO_H, VIDEO_W } from './frame'
+import { BookFrame, CPU, loadVideoAssets, PAPER, VIDEO_H, VIDEO_W } from './frame'
 
 /**
  * A saved story → an .mp4, in the browser. The record is replayed on a VirtualClock through the
@@ -41,6 +41,8 @@ const VIDEO_BITRATE = 3_000_000
 const CURSOR_REST = { x: 124, y: 94 }
 /** Longest the exporter holds the main thread before yielding. */
 const SLICE_MS = 12
+/** An encoder holding work with no output for this long is stuck (seen: WKWebView in the iOS simulator). */
+const STALL_MS = 10_000
 
 /**
  * The seam for the child's recorded voice (built separately). `videoSecondsOf` maps a time on the
@@ -68,10 +70,15 @@ export interface ExportResult {
   blob: Blob
   seconds: number
   frames: number
+  /** 'aac', or null when the browser has no AAC encoder (the video then has no sound). */
   audioCodec: string | null
+  /** Things worth a line in the debug report (e.g. no AAC encoder). */
+  notes: string[]
 }
 
 export class ExportUnsupportedError extends Error {}
+/** An encoder stopped producing output (no packet for STALL_MS while it held work). */
+export class ExportStalledError extends Error {}
 
 const H264_CODECS = ['avc1.640028', 'avc1.4d0028', 'avc1.42e028']
 
@@ -116,6 +123,79 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError')
 }
 
+/**
+ * Watches one encoder: every wait checks Cancel, and an encoder that holds work but has produced no
+ * output for STALL_MS fails the export instead of hanging it. `fed`/`out` count inputs and outputs.
+ */
+class EncoderWatch {
+  private lastOutputAt = performance.now()
+  private fed = 0
+  private out = 0
+  constructor(
+    private readonly signal: AbortSignal | undefined,
+    private readonly what: string
+  ) {}
+
+  input(): void {
+    if (this.fed === this.out) this.lastOutputAt = performance.now()
+    this.fed++
+  }
+
+  output(): void {
+    this.out++
+    this.lastOutputAt = performance.now()
+  }
+
+  check(): void {
+    throwIfAborted(this.signal)
+    if (this.fed > this.out && performance.now() - this.lastOutputAt > STALL_MS)
+      throw new ExportStalledError(`${this.what} encoder produced nothing for ${STALL_MS / 1000}s`)
+  }
+
+  /** Yield until `ready()`, checking Cancel and the stall clock every turn. */
+  async until(ready: () => boolean): Promise<void> {
+    while (!ready()) {
+      this.check()
+      await yieldToUi()
+    }
+    this.check()
+  }
+
+  /** Await an encoder promise (flush) while still honouring Cancel and the stall clock. */
+  race<T>(p: Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      let settled = false
+      const finish = (): void => {
+        settled = true
+        clearInterval(timer)
+        this.signal?.removeEventListener('abort', onAbort)
+      }
+      const fail = (e: unknown): void => {
+        if (settled) return
+        finish()
+        reject(e)
+      }
+      const onAbort = (): void => fail(new DOMException('Export cancelled', 'AbortError'))
+      const timer = setInterval(() => {
+        try {
+          this.check()
+        } catch (e) {
+          fail(e)
+        }
+      }, 250)
+      this.signal?.addEventListener('abort', onAbort)
+      p.then(
+        (v) => {
+          if (settled) return
+          finish()
+          resolve(v)
+        },
+        (e: unknown) => fail(e)
+      )
+    })
+  }
+}
+
 function makeCanvas(w: number, h: number): { c: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
   const c = document.createElement('canvas')
   c.width = w
@@ -127,39 +207,43 @@ function makeCanvas(w: number, h: number): { c: HTMLCanvasElement; ctx: CanvasRe
 
 type Packet<M> = { packet: EncodedPacket; meta: M | undefined }
 
-const AUDIO_CODECS = [
-  { mux: 'aac', webcodecs: 'mp4a.40.2' },
-  { mux: 'opus', webcodecs: 'opus' },
-] as const
+/** AAC only: Photos and most players refuse Opus-in-mp4, so without AAC the video has no sound. */
+const AAC = 'mp4a.40.2'
 const AUDIO_BITRATE = 128_000
 /** Samples per AudioData handed to the encoder. */
 const AUDIO_BLOCK = 4800
 
 /**
- * Encode the rendered mix to packets up front, like the video. (Mediabunny's AudioBufferSource
- * encodes asynchronously, which made the file's chunk layout vary run to run.)
+ * Encode the rendered mix to AAC packets up front, like the video. (Mediabunny's AudioBufferSource
+ * encodes asynchronously, which made the file's chunk layout vary run to run.) Null when the browser
+ * has no AAC encoder.
  */
 async function encodeAudio(
-  audio: AudioBuffer
-): Promise<{ codec: 'aac' | 'opus'; packets: Packet<EncodedAudioChunkMetadata>[] } | null> {
+  audio: AudioBuffer,
+  signal: AbortSignal | undefined
+): Promise<Packet<EncodedAudioChunkMetadata>[] | null> {
   if (typeof AudioEncoder === 'undefined') return null
-  for (const c of AUDIO_CODECS) {
-    const config: AudioEncoderConfig = {
-      codec: c.webcodecs,
-      sampleRate: audio.sampleRate,
-      numberOfChannels: audio.numberOfChannels,
-      bitrate: AUDIO_BITRATE,
-    }
-    if (!(await AudioEncoder.isConfigSupported(config)).supported) continue
-    const packets: Packet<EncodedAudioChunkMetadata>[] = []
-    let failed: unknown = null
-    const encoder = new AudioEncoder({
-      output: (chunk, meta) =>
-        packets.push({ packet: EncodedPacket.fromEncodedChunk(chunk), meta }),
-      error: (e) => {
-        failed = e
-      },
-    })
+  const config: AudioEncoderConfig = {
+    codec: AAC,
+    sampleRate: audio.sampleRate,
+    numberOfChannels: audio.numberOfChannels,
+    bitrate: AUDIO_BITRATE,
+  }
+  if (!(await AudioEncoder.isConfigSupported(config).catch(() => ({ supported: false }))).supported)
+    return null
+  const watch = new EncoderWatch(signal, 'audio')
+  const packets: Packet<EncodedAudioChunkMetadata>[] = []
+  let failed: unknown = null
+  const encoder = new AudioEncoder({
+    output: (chunk, meta) => {
+      watch.output()
+      packets.push({ packet: EncodedPacket.fromEncodedChunk(chunk), meta })
+    },
+    error: (e) => {
+      failed = e
+    },
+  })
+  try {
     encoder.configure(config)
     const channels = audio.numberOfChannels
     for (let from = 0; from < audio.length; from += AUDIO_BLOCK) {
@@ -175,16 +259,18 @@ async function encodeAudio(
         timestamp: Math.round((from / audio.sampleRate) * 1e6),
         data: planar,
       })
+      watch.input()
       encoder.encode(data)
       data.close()
-      if (encoder.encodeQueueSize > 8) await yieldToUi()
+      if (failed) throw failed
+      await watch.until(() => encoder.encodeQueueSize <= 8)
     }
-    await encoder.flush()
-    encoder.close()
+    await watch.race(encoder.flush())
     if (failed) throw failed
-    return { codec: c.mux, packets }
+    return packets
+  } finally {
+    if (encoder.state !== 'closed') encoder.close()
   }
-  return null
 }
 
 export async function exportStoryVideo(
@@ -200,8 +286,9 @@ export async function exportStoryVideo(
     opts.onProgress?.({ phase, fraction: Math.max(0, Math.min(1, fraction)) })
   }
 
+  const notes: string[] = []
   const videoConfig = await pickVideoConfig()
-  await loadVideoFonts()
+  const assets = await loadVideoAssets()
   throwIfAborted(signal)
 
   // The child's voice. `opts.voice === undefined` means "figure it out"; an explicit null skips it.
@@ -240,7 +327,11 @@ export async function exportStoryVideo(
   events.forEach((ev, i) => {
     clock.at(times[i] ?? 0, () => {
       if (ev.k === 'words') caption = ev.text
-      else if (ev.k === 'end') void stage.finale(record.seed)
+      else if (ev.k === 'end') {
+        // The finale's own "The End" title takes the page; no caption pill over it.
+        caption = ''
+        void stage.finale(record.seed)
+      }
       else director.execute(ev.line)
     })
   })
@@ -248,15 +339,19 @@ export async function exportStoryVideo(
 
   const packets: Packet<EncodedVideoChunkMetadata>[] = []
   let encodeError: unknown = null
+  const watch = new EncoderWatch(signal, 'video')
   const encoder = new VideoEncoder({
-    output: (chunk, meta) => packets.push({ packet: EncodedPacket.fromEncodedChunk(chunk), meta }),
+    output: (chunk, meta) => {
+      watch.output()
+      packets.push({ packet: EncodedPacket.fromEncodedChunk(chunk), meta })
+    },
     error: (e) => {
       encodeError = e
     },
   })
   encoder.configure(videoConfig)
 
-  const frame = new BookFrame()
+  const frame = new BookFrame(assets)
   const out = makeCanvas(VIDEO_W, VIDEO_H)
   let frames = 0
   let slice = performance.now()
@@ -269,15 +364,16 @@ export async function exportStoryVideo(
       timestamp: Math.round(frames * FRAME_US),
       duration: Math.round(FRAME_US),
     })
+    watch.input()
     encoder.encode(vf, { keyFrame: frames % GOP === 0 })
     vf.close()
     frames++
-    while (encoder.encodeQueueSize > 6) await yieldToUi()
+    await watch.until(() => encoder.encodeQueueSize <= 6)
     if (performance.now() - slice > SLICE_MS) {
       await yieldToUi()
       slice = performance.now()
     }
-    throwIfAborted(signal)
+    watch.check()
   }
 
   try {
@@ -286,7 +382,7 @@ export async function exportStoryVideo(
       const t = frames * FRAME_MS
       clock.advanceTo(t)
       stage.renderAt(t)
-      frame.compose(out.ctx, paper, { page: stage.pageNumber, caption })
+      frame.compose(out.ctx, paper, { caption })
       await encode()
       if (t >= lastEventMs && stage.settled) stillSince ??= t
       else stillSince = null
@@ -306,7 +402,7 @@ export async function exportStoryVideo(
         (0.9 * (storyMs + j * FRAME_MS)) / Math.max(estimateMs, storyMs + END_CARD_MS)
       )
     }
-    await encoder.flush()
+    await watch.race(encoder.flush())
     if (encodeError) throw encodeError
     encoder.close()
     throwIfAborted(signal)
@@ -327,28 +423,31 @@ export async function exportStoryVideo(
       const into = Math.max(0, recordMs - ev.t)
       return (next === undefined ? base + into : Math.min(base + into, next)) / 1000
     }
-    const audio = await renderAudioCues(
-      cues.cues,
-      seconds,
-      record.seed,
-      voice ? (ctx) => voice.mix(ctx, videoSecondsOf) : undefined
+    // Offline rendering has no output to watch; the race only keeps Cancel live while it runs.
+    const audio = await new EncoderWatch(signal, 'audio render').race(
+      renderAudioCues(
+        cues.cues,
+        seconds,
+        record.seed,
+        voice ? (ctx) => voice.mix(ctx, videoSecondsOf) : undefined
+      )
     )
     throwIfAborted(signal)
 
-    const encodedAudio = await encodeAudio(audio)
+    const audioPackets = await encodeAudio(audio, signal)
     throwIfAborted(signal)
+    if (!audioPackets) notes.push('video export: no AAC AudioEncoder in this browser; the video has no sound')
 
     report('mux', 0.96, true)
     const target = new BufferTarget()
     const output = new Output({ format: new Mp4OutputFormat({ fastStart: 'in-memory' }), target })
     const video = new EncodedVideoPacketSource('avc')
     output.addVideoTrack(video, { frameRate: FPS })
-    const audioTrack = encodedAudio ? new EncodedAudioPacketSource(encodedAudio.codec) : null
+    const audioTrack = audioPackets ? new EncodedAudioPacketSource('aac') : null
     if (audioTrack) output.addAudioTrack(audioTrack)
     await output.start()
     try {
       // Interleave a second of video with a second of audio, in a fixed order.
-      const audioPackets = encodedAudio?.packets ?? []
       let v = 0
       let a = 0
       const totalSec = Math.ceil(seconds) + 1
@@ -359,8 +458,8 @@ export async function exportStoryVideo(
           await video.add(item.packet, item.meta)
         }
         if (audioTrack)
-          for (; a < audioPackets.length; a++) {
-            const item = audioPackets[a]
+          for (; a < (audioPackets?.length ?? 0); a++) {
+            const item = audioPackets?.[a]
             if (!item || item.packet.timestamp >= s) break
             await audioTrack.add(item.packet, item.meta)
           }
@@ -373,8 +472,8 @@ export async function exportStoryVideo(
         if (item) await video.add(item.packet, item.meta)
       }
       if (audioTrack)
-        for (; a < audioPackets.length; a++) {
-          const item = audioPackets[a]
+        for (; a < (audioPackets?.length ?? 0); a++) {
+          const item = audioPackets?.[a]
           if (item) await audioTrack.add(item.packet, item.meta)
         }
       await output.finalize()
@@ -389,7 +488,8 @@ export async function exportStoryVideo(
       blob: new Blob([buffer], { type: 'video/mp4' }),
       seconds,
       frames,
-      audioCodec: encodedAudio?.codec ?? null,
+      audioCodec: audioPackets ? 'aac' : null,
+      notes,
     }
   } finally {
     if (encoder.state !== 'closed') encoder.close()

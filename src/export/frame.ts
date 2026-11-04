@@ -1,13 +1,14 @@
 import { makePaper } from '~/engine/paper'
 import { mulberry32 } from '~/engine/rng'
 import { BRAND } from '../../packages/shared/src/brand'
+import appIconUrl from '~/assets/brand/app-icon.jpg'
 
 /**
  * The video's picture: the home screen's storybook drawn on a canvas (warm tabletop, coral cloth
  * cover, stitched spine with rings, cream paper), the stage inside the paper, and the replay's
- * overlays burned in. Values mirror `.story-studio` / `.storybook` / `.book-binding` /
- * `.story-paper` / `.made-by-you` / `.paper-bottomline` in src/styles/app.css, scaled up ~1.2x so
- * they read on a phone. If the home screen's book changes, change it here too.
+ * replay's caption burned in, the app icon in the corner. Values mirror `.story-studio` /
+ * `.storybook` / `.book-binding` / `.story-paper` in src/styles/app.css, scaled up ~1.2x so they read
+ * on a phone. If the home screen's book changes, change it here too.
  */
 export const VIDEO_W = 1280
 export const VIDEO_H = 800
@@ -20,7 +21,7 @@ const TABLE = '#eee5d5'
 const CORAL = '#d9937e'
 const CORAL_EDGE = '#876351'
 const INK = '#3b2f2f'
-const MUTED = '#998977'
+const MUTED = '#796d60'
 const PURPLE = '#7b5c91'
 const LILAC = '#e6ddec'
 const HAND = '"Patrick Hand", "Comic Sans MS", cursive'
@@ -39,9 +40,20 @@ function canvas(w: number, h: number): { c: HTMLCanvasElement; ctx: CanvasRender
   return { c, ctx }
 }
 
-/** Fonts the frame and the stage draw with; canvas text silently falls back if they are not loaded. */
-export async function loadVideoFonts(): Promise<void> {
-  await Promise.all([document.fonts.load(`32px ${HAND}`), document.fonts.load(`32px ${SCRAWL}`)])
+/** What the frame draws with: the fonts (canvas text silently falls back without them) and the app icon. */
+export interface VideoAssets {
+  logo: HTMLImageElement
+}
+
+export async function loadVideoAssets(): Promise<VideoAssets> {
+  const logo = new Image()
+  logo.src = appIconUrl
+  await Promise.all([
+    document.fonts.load(`32px ${HAND}`),
+    document.fonts.load(`32px ${SCRAWL}`),
+    logo.decode(),
+  ])
+  return { logo }
 }
 
 function drawTable(ctx: CanvasRenderingContext2D): void {
@@ -113,53 +125,31 @@ function drawBook(ctx: CanvasRenderingContext2D): void {
   }
 }
 
-/**
- * The Squiggletale mark, bottom-right of the paper on every frame (end card included). Placeholder
- * until there is a real logo: the home screen's wordmark (yellow star, "squiggletale", coral ✦) on a
- * paper chip so it reads on dark skies. Swap this one function for an image when the logo exists.
- */
-function drawLogo(ctx: CanvasRenderingContext2D): void {
+/** The app icon as a sticker, bottom-right of the paper on every frame (end card included). */
+const LOGO = 58 * K
+function drawLogo(ctx: CanvasRenderingContext2D, logo: HTMLImageElement): void {
   ctx.save()
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.globalAlpha = 1
-  const word = BRAND.name.toLowerCase()
-  ctx.font = `${20 * K}px ${SCRAWL}`
-  const ww = ctx.measureText(word).width
-  const star = 15 * K
-  const gap = 7 * K
-  const w = 14 * K + star + gap + ww + gap + 10 * K + 12 * K
-  const h = 38 * K
-  const x = PAPER.x + PAPER.w - 16 * K - w
-  const y = PAPER.y + PAPER.h - 12 * K - h
-  ctx.fillStyle = 'rgba(251,246,234,0.88)'
+  const x = PAPER.x + PAPER.w - 18 * K - LOGO
+  const y = PAPER.y + PAPER.h - 16 * K - LOGO
+  const r = LOGO * 0.22
+  // Hard offset shadow, never blurred, then the icon clipped to a rounded square with an ink edge.
+  ctx.fillStyle = 'rgba(59,47,47,0.3)'
   ctx.beginPath()
-  ctx.roundRect(x, y, w, h, 12 * K)
+  ctx.roundRect(x + 3 * K, y + 4 * K, LOGO, LOGO, r)
   ctx.fill()
-  // Five-point star, wax yellow with a darker edge (the header's Star icon).
-  const sx = x + 14 * K + star / 2
-  const sy = y + h / 2
+  ctx.save()
   ctx.beginPath()
-  for (let i = 0; i < 10; i++) {
-    const r = i % 2 === 0 ? star / 2 : star / 4.4
-    const a = -Math.PI / 2 + (i * Math.PI) / 5
-    if (i === 0) ctx.moveTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r)
-    else ctx.lineTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r)
-  }
-  ctx.closePath()
-  ctx.fillStyle = '#efd48f'
-  ctx.fill()
-  ctx.strokeStyle = '#aa8a44'
-  ctx.lineWidth = 1.5 * K
-  ctx.lineJoin = 'round'
+  ctx.roundRect(x, y, LOGO, LOGO, r)
+  ctx.clip()
+  ctx.drawImage(logo, x, y, LOGO, LOGO)
+  ctx.restore()
+  ctx.strokeStyle = INK
+  ctx.lineWidth = 2.5 * K
+  ctx.beginPath()
+  ctx.roundRect(x, y, LOGO, LOGO, r)
   ctx.stroke()
-  ctx.fillStyle = INK
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'middle'
-  const tx = sx + star / 2 + gap
-  ctx.fillText(word, tx, sy + 2 * K)
-  ctx.fillStyle = CORAL
-  ctx.font = `${13 * K}px ${HAND}`
-  ctx.fillText('✦', tx + ww + 3 * K, sy - 8 * K)
   ctx.restore()
 }
 
@@ -184,7 +174,6 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, max: number): string[
 }
 
 export interface FrameOverlay {
-  page: number
   /** The replay's narration caption (latest words chunk); empty for none. */
   caption: string
 }
@@ -194,7 +183,7 @@ export class BookFrame {
   private base: HTMLCanvasElement
   private end: HTMLCanvasElement | null = null
 
-  constructor() {
+  constructor(private readonly assets: VideoAssets) {
     const { c, ctx } = canvas(VIDEO_W, VIDEO_H)
     drawTable(ctx)
     drawBook(ctx)
@@ -203,9 +192,8 @@ export class BookFrame {
 
   compose(ctx: CanvasRenderingContext2D, picture: CanvasImageSource, overlay: FrameOverlay): void {
     this.drawBase(ctx, picture)
-    this.drawTags(ctx, overlay.page)
     if (overlay.caption) this.drawCaption(ctx, overlay.caption)
-    drawLogo(ctx)
+    drawLogo(ctx, this.assets.logo)
   }
 
   /** The closing card, crossfading in over the last story frame (`mix` 0..1). */
@@ -216,7 +204,7 @@ export class BookFrame {
     ctx.globalAlpha = Math.max(0, Math.min(1, mix))
     this.drawBase(ctx, this.endCard())
     ctx.globalAlpha = 1
-    drawLogo(ctx)
+    drawLogo(ctx, this.assets.logo)
   }
 
   private drawBase(ctx: CanvasRenderingContext2D, picture: CanvasImageSource): void {
@@ -237,37 +225,6 @@ export class BookFrame {
     ctx.lineWidth = 1
     paperPath(ctx)
     ctx.stroke()
-  }
-
-  private drawTags(ctx: CanvasRenderingContext2D, page: number): void {
-    // "Made by you" sticker, top-right, tilted 3deg.
-    ctx.save()
-    ctx.font = `${16 * K}px ${HAND}`
-    const label = '✦ Made by you'
-    const tw = ctx.measureText(label).width
-    const w = tw + 24 * K
-    const h = 30 * K
-    const x = PAPER.x + PAPER.w - 24 * K - w
-    const y = PAPER.y + 17 * K
-    ctx.translate(x + w / 2, y + h / 2)
-    ctx.rotate((3 * Math.PI) / 180)
-    ctx.fillStyle = '#f4e7c9'
-    ctx.beginPath()
-    ctx.roundRect(-w / 2, -h / 2, w, h, [3, 5, 3, 6])
-    ctx.fill()
-    ctx.fillStyle = '#886c45'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(label, 0, 1)
-    ctx.restore()
-    // Page number, bottom-left (the logo holds the bottom-right).
-    ctx.save()
-    ctx.font = `${14 * K}px ${HAND}`
-    ctx.fillStyle = MUTED
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'alphabetic'
-    ctx.fillText(String(page).padStart(2, '0'), PAPER.x + 26 * K, PAPER.y + PAPER.h - 13 * K)
-    ctx.restore()
   }
 
   /** The replay's caption pill: paper at 90%, scrawl hand, hard offset shadow, near the top of the page. */
@@ -300,14 +257,14 @@ export class BookFrame {
     ctx.restore()
   }
 
-  /** "Made with Squiggletale" on fresh paper, paper-sized. */
+  /** "Made with Squiggletale" and the public domain on fresh paper, paper-sized. */
   private endCard(): HTMLCanvasElement {
     if (this.end) return this.end
     const paper = makePaper(PAPER.w, PAPER.h, CPU)
     const ctx = paper.getContext('2d', CPU)
     if (!ctx) return paper
     const cx = PAPER.w / 2
-    const cy = PAPER.h / 2
+    const cy = PAPER.h / 2 - 22 * K
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillStyle = INK
@@ -323,7 +280,7 @@ export class BookFrame {
     ctx.lineCap = 'round'
     ctx.lineWidth = 9 * K
     ctx.beginPath()
-    const y0 = cy + 72 * K
+    const y0 = cy + 86 * K
     for (let i = 0; i <= 24; i++) {
       const px = cx - nameW / 2 + (nameW * i) / 24
       const py = y0 + Math.sin(i / 3.2) * 3 * K + (rng() - 0.5) * 2 * K
@@ -335,6 +292,9 @@ export class BookFrame {
     ctx.font = `${30 * K}px ${HAND}`
     ctx.fillText('✦', cx + nameW / 2 + 26 * K, cy - 18 * K)
     ctx.fillText('✦', cx - nameW / 2 - 30 * K, cy + 40 * K)
+    ctx.fillStyle = MUTED
+    ctx.font = `${30 * K}px ${HAND}`
+    ctx.fillText(BRAND.publicDomain, cx, cy + 134 * K)
     this.end = paper
     return paper
   }

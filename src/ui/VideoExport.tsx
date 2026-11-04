@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download } from 'lucide-react'
 import { exportStoryVideo, ExportUnsupportedError, videoFileName } from '~/export/mp4'
-import { NATIVE } from '~/backend/config'
+import { APP_SHELL, NATIVE } from '~/backend/config'
 import { saveVideo, shareVideo } from '~/backend/share'
 import type { StoryRecord } from '~/story/storage'
 import { appStore } from '~/story/store'
 import { IconButton, PaperCard, StickerButton } from './bits'
+import { gate } from './hosted'
+
+/** Any failure that isn't "this browser can't": a stuck encoder, a muxer error, Photos throwing. */
+const FAILED = "Couldn't make the video. Try again later."
 
 type ExportState =
   | { k: 'idle' }
@@ -25,7 +29,8 @@ const PHASE_WORDS = {
  * "Download video": renders the saved story to an .mp4 in the browser, then saves it to Photos on the
  * iPad app (with a Share button for AirDrop/Messages, also the fallback when Photos is off) or hands
  * it to the browser's downloads on the web. `icon` sits in the replay toolbar; `studio` is the closing
- * card's button; `player` is the share page's sticker.
+ * card's button; `player` is the share page's sticker. In the app a grown-up passes the gate before
+ * the export (it can raise the Photos prompt) and again before Share (the share sheet leaves the app).
  */
 export function VideoExportButton({
   getRecord,
@@ -57,6 +62,7 @@ export function VideoExportButton({
       setState({ k: 'error', message: 'There is no story to make a video of yet' })
       return
     }
+    if (APP_SHELL && !(await gate())) return
     const abort = new AbortController()
     abortRef.current = abort
     setState({ k: 'running', fraction: 0, phase: 'frames' })
@@ -64,8 +70,11 @@ export function VideoExportButton({
       const res = await exportStoryVideo(record, {
         signal: abort.signal,
         moderation: appStore.get().settings.moderation,
-        onProgress: (p) => setState({ k: 'running', fraction: p.fraction, phase: p.phase }),
+        onProgress: (p) => {
+          if (!abort.signal.aborted) setState({ k: 'running', fraction: p.fraction, phase: p.phase })
+        },
       })
+      if (res.notes.length > 0) appStore.set((s) => ({ warnings: [...s.warnings.slice(-9), ...res.notes] }))
       const filename = videoFileName(record.title)
       const mb = res.blob.size / 1e6
       if (NATIVE) {
@@ -89,7 +98,9 @@ export function VideoExportButton({
       else if (e instanceof ExportUnsupportedError) setState({ k: 'error', message: e.message })
       else {
         console.error('video export failed', e)
-        setState({ k: 'error', message: 'The video got stuck. Try again?' })
+        const why = e instanceof Error ? e.message : String(e)
+        appStore.set((s) => ({ warnings: [...s.warnings.slice(-9), `video export failed: ${why}`] }))
+        setState({ k: 'error', message: FAILED })
       }
     } finally {
       if (abortRef.current === abort) abortRef.current = null
@@ -99,6 +110,7 @@ export function VideoExportButton({
   const share = async (): Promise<void> => {
     const video = videoRef.current
     if (!video || state.k !== 'kept' || state.sharing) return
+    if (APP_SHELL && !(await gate())) return
     setState({ ...state, sharing: true })
     try {
       await shareVideo(video.blob, video.filename)
@@ -173,7 +185,10 @@ export function VideoExportButton({
                     tone="paper"
                     tilt={2}
                     className="!text-lg"
-                    onClick={() => abortRef.current?.abort()}
+                    onClick={() => {
+                      abortRef.current?.abort()
+                      setState({ k: 'idle' })
+                    }}
                     data-testid="export-cancel">
                     cancel
                   </StickerButton>
@@ -220,13 +235,16 @@ export function VideoExportButton({
             )}
             {state.k === 'error' && (
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xl leading-tight">{state.message}</span>
+                <span className="text-xl leading-tight" data-testid="export-error">
+                  {state.message}
+                </span>
                 <StickerButton
                   tone="yellow"
                   tilt={2}
                   className="!text-lg"
-                  onClick={() => setState({ k: 'idle' })}>
-                  ok
+                  onClick={() => setState({ k: 'idle' })}
+                  data-testid="export-close">
+                  Close
                 </StickerButton>
               </div>
             )}
