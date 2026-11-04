@@ -1,0 +1,258 @@
+import './test/setup'
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test'
+import { fake, startFakeAnthropic, stopFakeAnthropic } from './test/fake-anthropic'
+import {
+  balanceOf,
+  call,
+  draw,
+  field,
+  newDevice,
+  resetDb,
+  sleep,
+  startApp,
+  startStory,
+  stopApp,
+} from './test/harness'
+import { prisma } from './prisma'
+import { resetSpendCacheForTests } from './relay'
+import { drawsInFlight, setTypedSettleMsForTests } from './sessions'
+import { setFlag } from './flags'
+
+beforeAll(async () => {
+  startFakeAnthropic()
+  await startApp()
+})
+
+afterAll(async () => {
+  await stopApp()
+  stopFakeAnthropic()
+})
+
+beforeEach(async () => {
+  // A draw the previous case aborted may still be writing its CallLog.
+  for (let i = 0; i < 100 && drawsInFlight() > 0; i++) await sleep(50)
+  await resetDb()
+  resetSpendCacheForTests()
+  fake.mode = 'ok'
+})
+
+const errCode = (body: unknown): unknown => field(body, 'error', 'code')
+
+describe('consent', () => {
+  test('no consent: session.start, session.typed and draw answer consent_required', async () => {
+    const upstreamBefore = fake.requests
+    const d = await newDevice()
+    const state = await call('device.state', {}, d.token)
+    expect(field(state.body, 'aiConsent')).toBe(false)
+
+    const start = await call('session.start', { storyId: 's1', ears: 'browser' }, d.token)
+    expect(start.status).toBe(403)
+    expect(errCode(start.body)).toBe('consent_required')
+
+    // A session opened while consent was given, then withdrawn: typed and draw refuse.
+    await call('device.consent', { aiConsent: true }, d.token)
+    const sessionId = await startStory(d.token)
+    const off = await call('device.consent', { aiConsent: false }, d.token)
+    expect(field(off.body, 'aiConsent')).toBe(false)
+
+    const typed = await call('session.typed', { sessionId, text: 'a cat' }, d.token)
+    expect(typed.status).toBe(403)
+    expect(errCode(typed.body)).toBe('consent_required')
+
+    const r = await draw(d.token, sessionId)
+    expect(r.status).toBe(403)
+    expect(errCode(r.error)).toBe('consent_required')
+    expect(fake.requests).toBe(upstreamBefore)
+  })
+
+  test('with consent the draw streams; shareVoice is left alone', async () => {
+    const d = await newDevice()
+    const on = await call('device.consent', { aiConsent: true }, d.token)
+    expect(field(on.body, 'aiConsent')).toBe(true)
+    expect(field(on.body, 'shareVoice')).toBe(false)
+    const sessionId = await startStory(d.token)
+    const r = await draw(d.token, sessionId)
+    expect(r.status).toBe(200)
+    expect(r.chunks.filter((c) => c.k === 'text').length).toBeGreaterThan(0)
+    expect(r.chunks.some((c) => c.k === 'usage')).toBe(true)
+  })
+})
+
+describe('relay limits', () => {
+  test('an unknown system prompt is refused', async () => {
+    const d = await newDevice({ consent: true })
+    const sessionId = await startStory(d.token)
+    const before = fake.requests
+    const r = await draw(d.token, sessionId, { system: 'You are a helpful assistant.' })
+    expect(r.status).toBe(400)
+    expect(field(r.error, 'error', 'message')).toBe('unknown prompt')
+    expect(fake.requests).toBe(before)
+  })
+
+  test('V-03: 60 story blocks pass; 101 blocks, 40k chars or 2000 tokens do not', async () => {
+    const d = await newDevice({ consent: true })
+    const sessionId = await startStory(d.token)
+    const blocks = (n: number, len = 20) => Array.from({ length: n }, (_, i) => ({ text: `chunk ${i} `.padEnd(len, 'x') }))
+
+    const ok = await draw(d.token, sessionId, { user: blocks(60) })
+    expect(ok.status).toBe(200)
+
+    const tooMany = await draw(d.token, sessionId, { user: blocks(101) })
+    expect(tooMany.status).toBe(400)
+
+    const tooLong = await draw(d.token, sessionId, { user: blocks(5, 8_100) })
+    expect(tooLong.status).toBe(400)
+
+    const tooManyTokens = await draw(d.token, sessionId, { maxTokens: 2000 })
+    expect(tooManyTokens.status).toBe(400)
+  })
+
+  test('one draw in flight per device', async () => {
+    const d = await newDevice({ consent: true })
+    const sessionId = await startStory(d.token)
+    fake.mode = 'drip'
+    const ctl = new AbortController()
+    const first = draw(d.token, sessionId, {}, ctl.signal).catch(() => null)
+    await sleep(300)
+    const second = await draw(d.token, sessionId)
+    expect(second.status).toBe(429)
+    expect(errCode(second.error)).toBe('cap')
+    ctl.abort()
+    await first
+  })
+
+  test('a client abort stops the upstream stream and logs estimated output', async () => {
+    const d = await newDevice({ consent: true })
+    const sessionId = await startStory(d.token)
+    fake.mode = 'drip'
+    const closedBefore = fake.closedEarly
+    const ctl = new AbortController()
+    const pending = draw(d.token, sessionId, {}, ctl.signal).catch(() => null)
+    await sleep(500)
+    ctl.abort()
+    await pending
+    // The drip would run for 10 s; the relay must hang up on it right away.
+    for (let i = 0; i < 20 && fake.closedEarly === closedBefore; i++) await sleep(100)
+    expect(fake.closedEarly).toBe(closedBefore + 1)
+    let log = null
+    for (let i = 0; i < 20 && !log; i++) {
+      log = await prisma.callLog.findFirst({ where: { sessionId } })
+      if (!log) await sleep(100)
+    }
+    expect(log?.error).toBe('aborted')
+    expect(log?.outputTokens ?? 0).toBeGreaterThan(0)
+  })
+
+  test('no first token in 6 s ends the call as upstream/slow', async () => {
+    const d = await newDevice({ consent: true })
+    const sessionId = await startStory(d.token)
+    fake.mode = 'slow'
+    const t0 = Date.now()
+    const r = await draw(d.token, sessionId)
+    expect(Date.now() - t0).toBeLessThan(9_000)
+    const err = r.chunks.find((c) => c.k === 'error')
+    expect(err).toEqual({ k: 'error', code: 'upstream', message: 'slow' })
+  }, 15_000)
+
+  test('calls are tied to charged time: 3 grace calls, then cap', async () => {
+    const d = await newDevice({ consent: true })
+    const sessionId = await startStory(d.token)
+    for (let i = 0; i < 3; i++) expect((await draw(d.token, sessionId)).status).toBe(200)
+    const fourth = await draw(d.token, sessionId)
+    expect(fourth.status).toBe(429)
+    // 15 s of mic time buys 3 more (12 per charged minute).
+    await call('session.beat', { sessionId, listeningMs: 15_000 }, d.token)
+    expect((await draw(d.token, sessionId)).status).toBe(200)
+  })
+
+  test('global spend stop refuses free devices, not paying ones, and alerts once', async () => {
+    await setFlag('dailySpendStopCents', 100, 'test')
+    const other = await newDevice({ consent: true })
+    await prisma.callLog.create({
+      data: { deviceId: other.id, model: 'x', dialect: 'kit', costMicros: 2_000_000 },
+    })
+    const free = await newDevice({ consent: true })
+    const freeSession = await startStory(free.token)
+    const r = await draw(free.token, freeSession)
+    expect(r.status).toBe(503)
+    expect(errCode(r.error)).toBe('paused')
+    await draw(free.token, freeSession)
+    await sleep(200)
+    expect(await prisma.alert.count({ where: { kind: 'spend_stop' } })).toBe(1)
+
+    const payer = await newDevice({ consent: true })
+    await prisma.device.update({ where: { id: payer.id }, data: { paying: true } })
+    const paySession = await startStory(payer.token)
+    expect((await draw(payer.token, paySession)).status).toBe(200)
+  })
+})
+
+describe('no charge for failed drawing', () => {
+  test('a typed message whose draw fails is refunded', async () => {
+    setTypedSettleMsForTests(400)
+    const d = await newDevice({ consent: true })
+    const sessionId = await startStory(d.token)
+    const before = await balanceOf(d.id)
+    fake.mode = 'error'
+    const typed = await call('session.typed', { sessionId, text: 'the cat jumped over the moon' }, d.token)
+    expect(field(typed.body, 'chargedSec')).toBeGreaterThan(0)
+    const r = await draw(d.token, sessionId)
+    expect(r.chunks.some((c) => c.k === 'error')).toBe(true)
+    await sleep(900)
+    expect(await balanceOf(d.id)).toBe(before)
+    expect(await prisma.ledgerEntry.count({ where: { deviceId: d.id, kind: 'refund_failed_draw' } })).toBe(1)
+  })
+
+  test('a typed message whose draw lands keeps its charge', async () => {
+    setTypedSettleMsForTests(400)
+    const d = await newDevice({ consent: true })
+    const sessionId = await startStory(d.token)
+    const before = await balanceOf(d.id)
+    const typed = await call('session.typed', { sessionId, text: 'the cat jumped' }, d.token)
+    const charged = field(typed.body, 'chargedSec')
+    expect((await draw(d.token, sessionId)).status).toBe(200)
+    await sleep(900)
+    expect(await balanceOf(d.id)).toBe(before - Number(charged))
+  })
+
+  test('a beat window where every call failed charges 0; a good window charges', async () => {
+    const d = await newDevice({ consent: true })
+    const sessionId = await startStory(d.token)
+    const before = await balanceOf(d.id)
+    fake.mode = 'error'
+    await draw(d.token, sessionId)
+    const bad = await call('session.beat', { sessionId, listeningMs: 15_000 }, d.token)
+    expect(field(bad.body, 'remainingSec')).toBe(before)
+
+    fake.mode = 'ok'
+    expect((await draw(d.token, sessionId)).status).toBe(200)
+    const good = await call('session.beat', { sessionId, listeningMs: 15_000 }, d.token)
+    expect(field(good.body, 'remainingSec')).toBe(before - 15)
+  })
+
+  test('freeStoryUsed flips on the first successful draw, not on session start', async () => {
+    const d = await newDevice({ consent: true })
+    const sessionId = await startStory(d.token)
+    expect(field((await call('device.state', {}, d.token)).body, 'freeStoryUsed')).toBe(false)
+    fake.mode = 'error'
+    await draw(d.token, sessionId)
+    expect(field((await call('device.state', {}, d.token)).body, 'freeStoryUsed')).toBe(false)
+    fake.mode = 'ok'
+    await draw(d.token, sessionId)
+    expect(field((await call('device.state', {}, d.token)).body, 'freeStoryUsed')).toBe(true)
+  })
+})
+
+describe('cloud ears', () => {
+  test('off by default: no token on start, ears.token blocked', async () => {
+    const d = await newDevice({ consent: true })
+    const r = await call('session.start', { storyId: 'x', ears: 'deepgram' }, d.token)
+    expect(r.status).toBe(200)
+    expect(field(r.body, 'ears')).toBe(null)
+    const sessionId = field(r.body, 'sessionId')
+    if (typeof sessionId !== 'string') throw new Error('no session')
+    const t = await call('ears.token', { sessionId }, d.token)
+    expect(t.status).toBe(403)
+    expect(errCode(t.body)).toBe('blocked')
+  })
+})

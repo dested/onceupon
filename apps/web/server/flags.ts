@@ -4,8 +4,8 @@ import { log } from './logger'
 
 /** Runtime feature flags. Defaults live here; the admin portal overrides individual keys in the DB. */
 export const FLAG_DEFAULTS = {
-  freeFirstStorySec: 120,
-  weeklyFreeSec: 60,
+  freeFirstStorySec: 300,
+  weeklyFreeSec: 180,
   weeklyRefillDay: 6,
   earsVendor: 'deepgram' as 'deepgram' | 'openai',
   /** iPad shells use the on-device recognizer (free) instead of minting cloud ears. */
@@ -19,8 +19,12 @@ export const FLAG_DEFAULTS = {
   attributionOn: true,
   dailyDeviceCostCapCents: 300,
   dailySpendAlertCents: 10000,
-  silenceNudgeMs: 90000,
-  silenceEndMs: 210000,
+  /** Above today's (UTC) model spend the relay refuses non-paying, non-comped devices (503 paused). 0 = off. */
+  dailySpendStopCents: 7500,
+  /** Mint Deepgram/OpenAI ears tokens (never for iOS). Off for 1.0: ears are on the device. */
+  cloudEars: false,
+  silenceNudgeMs: 30000,
+  silenceEndMs: 60000,
   maxSessionsPerDeviceDay: 40,
 }
 
@@ -44,6 +48,8 @@ const flagsObject = z.object({
   attributionOn: z.boolean(),
   dailyDeviceCostCapCents: int0,
   dailySpendAlertCents: int0,
+  dailySpendStopCents: int0,
+  cloudEars: z.boolean(),
   silenceNudgeMs: int0,
   silenceEndMs: int0,
   maxSessionsPerDeviceDay: int0,

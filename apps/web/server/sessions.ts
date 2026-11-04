@@ -2,7 +2,8 @@ import type { Device, StorySession } from '@prisma/client'
 import { prisma } from './prisma'
 import { ApiError } from './app-api-types'
 import * as ledger from './ledger'
-import { getFlags } from './flags'
+import { getFlags, type Flags } from './flags'
+import { log } from './logger'
 import { mintEarsWithFallback } from './ears'
 import { requireAiConsent } from './device'
 import type { AppApi, EarsToken, EndReason, SessionStart } from '../../../packages/shared/src/api'
@@ -59,14 +60,12 @@ export async function startSession(
   })
 
   let ears: EarsToken | null = null
-  // On-device (apple) and browser ears need no cloud credential.
-  if (input.ears === 'deepgram' || input.ears === 'openai') {
+  // On-device (apple) and browser ears need no cloud credential. Cloud ears are off unless the
+  // `cloudEars` flag is on, and never for iOS (child audio stays on the device).
+  if ((input.ears === 'deepgram' || input.ears === 'openai') && cloudEarsAllowed(fresh, flags)) {
     ears = await mintEarsWithFallback(flags, earsTtl(remainingSec))
   }
-
-  if (!fresh.freeStoryUsed) {
-    await prisma.device.update({ where: { id: fresh.id }, data: { freeStoryUsed: true } })
-  }
+  // freeStoryUsed flips on the first successful draw (markDrawSucceeded), not here.
 
   return {
     sessionId: session.id,
@@ -75,6 +74,126 @@ export async function startSession(
     model: flags.model,
     dialect: flags.dialect,
   }
+}
+
+/** Cloud ears (Deepgram / OpenAI tokens) only when the flag is on, and never on iOS. */
+function cloudEarsAllowed(device: Device, flags: Flags): boolean {
+  return flags.cloudEars && device.platform !== 'ios'
+}
+
+// ---------------------------------------------------------------- draw outcomes (no charge for failed drawing)
+
+/** One relay call in flight per device (the studio never has two). */
+const inFlight = new Map<string, { sessionId: string; startedAt: number }>()
+
+/** Claim the device's draw slot; false when a call is already in flight. */
+export function beginDraw(deviceId: string, sessionId: string): boolean {
+  if (inFlight.has(deviceId)) return false
+  inFlight.set(deviceId, { sessionId, startedAt: Date.now() })
+  return true
+}
+
+export function endDraw(deviceId: string): void {
+  inFlight.delete(deviceId)
+}
+
+/** Draws in flight across every device (tests wait for 0 between cases). */
+export function drawsInFlight(): number {
+  return inFlight.size
+}
+
+/**
+ * Draw requests the relay refused before streaming (cap, paused, unknown prompt...), per device+session,
+ * in memory. They never reach CallLog but they are drawing that failed, so the beat window counts them.
+ */
+const refusals = new Map<string, number[]>()
+const REFUSAL_KEEP_MS = 10 * 60_000
+
+const refusalKey = (deviceId: string, sessionId: string): string => `${deviceId}:${sessionId}`
+
+export function recordRefusal(deviceId: string, sessionId: string): void {
+  const key = refusalKey(deviceId, sessionId)
+  const now = Date.now()
+  const kept = (refusals.get(key) ?? []).filter((t) => now - t < REFUSAL_KEEP_MS)
+  kept.push(now)
+  refusals.set(key, kept)
+  if (refusals.size > 5000) {
+    for (const [k, ts] of refusals) if (ts.every((t) => now - t >= REFUSAL_KEEP_MS)) refusals.delete(k)
+  }
+}
+
+function refusalsSince(deviceId: string, sessionId: string, since: Date): number {
+  return (refusals.get(refusalKey(deviceId, sessionId)) ?? []).filter((t) => t >= since.getTime()).length
+}
+
+/**
+ * Did drawing fail for the whole window? True when the session tried to draw in it (a finished call
+ * or a refused request) and nothing was drawn. A client abort (the studio restarting with more words)
+ * is neutral. A window with no attempt at all (the child was quiet or thinking) is metered as usual.
+ */
+async function drawingFailedSince(deviceId: string, sessionId: string, since: Date): Promise<boolean> {
+  const calls = await prisma.callLog.findMany({
+    where: { sessionId, createdAt: { gte: since } },
+    select: { error: true },
+  })
+  const counted = calls.filter((c) => c.error !== 'aborted')
+  const refused = refusalsSince(deviceId, sessionId, since)
+  if (counted.length + refused === 0) return false
+  return counted.every((c) => c.error !== null)
+}
+
+/** The first successful draw uses up the free first story (not the session start). */
+export async function markDrawSucceeded(deviceId: string): Promise<void> {
+  await prisma.device.updateMany({ where: { id: deviceId, freeStoryUsed: false }, data: { freeStoryUsed: true } })
+}
+
+/** How long after a typed charge its drawing has to land. */
+export const TYPED_SETTLE_MS = 20_000
+let typedSettleMs = TYPED_SETTLE_MS
+/** Tests shorten the settle delay. */
+export function setTypedSettleMsForTests(ms: number): void {
+  typedSettleMs = ms
+}
+
+/**
+ * Settle one typed charge: if no call for the session finished cleanly within the settle window after
+ * the charge, credit the seconds back (`refund_failed_draw`). A call still in flight gets one more
+ * window. Returns the seconds refunded.
+ */
+export async function settleTypedCharge(
+  deviceId: string,
+  sessionId: string,
+  seconds: number,
+  chargedAt: Date,
+  retried = false
+): Promise<number> {
+  if (seconds <= 0) return 0
+  const until = new Date(chargedAt.getTime() + typedSettleMs * (retried ? 2 : 1))
+  const ok = await prisma.callLog.count({
+    where: { sessionId, createdAt: { gte: chargedAt, lte: until }, error: null },
+  })
+  if (ok > 0) return 0
+  if (!retried && inFlight.get(deviceId)?.sessionId === sessionId) {
+    await new Promise((r) => setTimeout(r, typedSettleMs))
+    return settleTypedCharge(deviceId, sessionId, seconds, chargedAt, true)
+  }
+  await prisma.$transaction(async (tx) => {
+    await ledger.credit(deviceId, 'refund_failed_draw', seconds, sessionId, 'typed message, drawing failed', undefined, tx)
+    await tx.storySession.update({
+      where: { id: sessionId },
+      data: { chargedSec: { decrement: seconds }, typedSec: { decrement: seconds } },
+    })
+  })
+  return seconds
+}
+
+function scheduleTypedSettle(deviceId: string, sessionId: string, seconds: number, chargedAt: Date): void {
+  if (seconds <= 0) return
+  setTimeout(() => {
+    settleTypedCharge(deviceId, sessionId, seconds, chargedAt).catch((e: unknown) =>
+      log.error(`[sessions] typed refund failed: ${e instanceof Error ? e.message : String(e)}`)
+    )
+  }, typedSettleMs)
 }
 
 async function ownedOpenSession(device: Device, sessionId: string): Promise<StorySession> {
@@ -106,9 +225,12 @@ export async function beat(
   sessionId: string,
   listeningMs: number
 ): Promise<{ remainingSec: number; exhausted: boolean }> {
-  await ownedOpenSession(device, sessionId)
+  const session = await ownedOpenSession(device, sessionId)
   const ms = clamp(listeningMs, 0, 90_000)
-  const { charged, balanceSec } = await charge(device, sessionId, Math.ceil(ms / 1000), null)
+  // No charge for a window in which every drawing attempt failed.
+  const failed = await drawingFailedSince(device.id, sessionId, session.lastBeatAt)
+  const seconds = failed ? 0 : Math.ceil(ms / 1000)
+  const { charged, balanceSec } = await charge(device, sessionId, seconds, null)
   const exhausted = !device.comped && balanceSec <= 0
   await prisma.storySession.update({
     where: { id: sessionId },
@@ -134,7 +256,10 @@ export async function typed(
 ): Promise<{ remainingSec: number; exhausted: boolean; chargedSec: number }> {
   requireAiConsent(device)
   await ownedOpenSession(device, sessionId)
+  const chargedAt = new Date()
   const { charged, balanceSec } = await charge(device, sessionId, typedChargeSec(text), 'typed')
+  // Refunded if its drawing never lands (settleTypedCharge).
+  scheduleTypedSettle(device.id, sessionId, charged, chargedAt)
   const exhausted = !device.comped && balanceSec <= 0
   await prisma.storySession.update({
     where: { id: sessionId },
@@ -164,7 +289,8 @@ export async function stopSession(
     return { remainingSec: remainingFor(device, d.balanceSec) }
   }
   const ms = clamp(listeningMs, 0, 90_000)
-  const { charged, balanceSec } = await charge(device, sessionId, Math.ceil(ms / 1000), null)
+  const failed = await drawingFailedSince(device.id, sessionId, session.lastBeatAt)
+  const { charged, balanceSec } = await charge(device, sessionId, failed ? 0 : Math.ceil(ms / 1000), null)
   await prisma.storySession.update({
     where: { id: sessionId },
     data: {
@@ -181,6 +307,7 @@ export async function stopSession(
 /** A fresh ears token mid-session (the previous one expired). */
 export async function earsTokenFor(device: Device, sessionId: string): Promise<EarsToken> {
   const flags = await getFlags()
+  if (!cloudEarsAllowed(device, flags)) throw new ApiError(403, 'blocked', 'cloud ears are off')
   await ownedOpenSession(device, sessionId)
   const d = await prisma.device.findUniqueOrThrow({ where: { id: device.id } })
   if (!d.comped && d.balanceSec <= 0) throw new ApiError(402, 'exhausted', 'out of minutes')

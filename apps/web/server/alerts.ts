@@ -39,10 +39,10 @@ export async function raiseAlert(
   }
 }
 
+/** 00:00 UTC today: the relay's caps, the spend stop and the alerts share one day (V-32). */
 function startOfToday(): Date {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d
+  const now = new Date()
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
 }
 
 /** Cost thresholds are stored in cents; CallLog.costMicros is USD*1e6, so cents*10_000 = micros. */

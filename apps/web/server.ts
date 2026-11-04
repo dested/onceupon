@@ -11,6 +11,7 @@ import { corsOrigins, env } from './server/env'
 import { startJobs } from './server/jobs'
 import { formatError, log, requestLogger, startupBanner } from './server/logger'
 import { prisma } from './server/prisma'
+import { promptAllowList } from './server/prompt-allowlist'
 import { appRouter } from './server/router'
 import { shareRouter } from './server/share-routes'
 import { createContext } from './server/trpc'
@@ -202,6 +203,8 @@ async function createServer() {
       routes: ['/', '/app', '/healthz', '/api/app', '/api/share', '/api/trpc', '/api/auth'],
     })
     startJobs()
+    // Load the relay's prompt allow-list now so a broken import shows at boot, not on the first draw.
+    promptAllowList().catch(() => {})
   })
 }
 

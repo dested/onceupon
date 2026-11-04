@@ -11,10 +11,11 @@ export const LEDGER_KINDS = [
   'redeem',
   'debit',
   'refund',
+  'refund_failed_draw',
   'admin',
 ] as const
 
-type CreditKind = 'grant_first' | 'grant_weekly' | 'purchase' | 'redeem' | 'refund' | 'admin'
+type CreditKind = 'grant_first' | 'grant_weekly' | 'purchase' | 'redeem' | 'refund' | 'refund_failed_draw' | 'admin'
 type DebitKind = 'debit' | 'refund' | 'admin'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
