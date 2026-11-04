@@ -38,13 +38,14 @@ by relative path and watched by Metro.
 
 ## The offline studio copy
 
-`assets/studio.html` ships as the offline fallback. Refresh it from the latest hosted build:
+`assets/studio.html` ships as the offline fallback. Refresh it before every native build:
 
 ```sh
-# from the repo root: build the single-file hosted studio, then sync it in
-bun run build:hosted
-cd apps/mobile && bun run sync-studio
+cd apps/mobile && bun run sync-studio   # builds dist-hosted with VITE_API_ORIGIN = BRAND.origin, then copies it
 ```
+
+It ignores `.env.hosted.local` for the API origin and exits 1 (copying nothing) if the build still holds a
+`localhost` / `127.0.0.1` URL. `--no-build` checks and copies an existing `dist-hosted/index.html`.
 
 Until you sync a real build, the placeholder page just shows a crayon and "Loading the storybook".
 

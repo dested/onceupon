@@ -224,7 +224,7 @@ final class WhistleRunner {
     let session = AVAudioSession.sharedInstance()
     // Bluetooth keeps AirPods as the route while listening instead of moving output to the speaker.
     try session.setCategory(
-      .playAndRecord, mode: .default, options: [.defaultToSpeaker, .mixWithOthers, .allowBluetoothA2DP, .allowBluetooth])
+      .playAndRecord, mode: .default, options: [.defaultToSpeaker, .mixWithOthers, .allowBluetoothA2DP, .allowBluetoothHFP])
     try session.setActive(true)
 
     if let recordPath, let url = recordPath.hasPrefix("file:") ? URL(string: recordPath) : Optional(URL(fileURLWithPath: recordPath)) {
@@ -408,15 +408,12 @@ final class WhistleRunner {
 
   /** Stops capture, finishes the transcript, closes the clip. Returns the clip, if any. Safe to call twice: an interruption stops first, the studio's `speech.stop` gets the same clip. */
   func stop() async -> [String: Any]? {
-    lock.lock()
-    let task: Task<[String: Any]?, Never>
-    if let existing = stopTask {
-      task = existing
-    } else {
-      task = Task { await self.teardown() }
-      stopTask = task
+    let task: Task<[String: Any]?, Never> = lock.withLock {
+      if let existing = stopTask { return existing }
+      let fresh = Task { await self.teardown() }
+      stopTask = fresh
+      return fresh
     }
-    lock.unlock()
     return await task.value
   }
 
