@@ -4,9 +4,10 @@
  * back by the dialect), each line parsed and applied to a Scene as it lands.
  *
  *   bun scripts/proto-bench.ts <dialect> [set=quick|full|tail|id,id|@stories.json] [run=<name>] [model=claude-sonnet-5-5]
- *     [conc=4] [thinking=fast|between|adaptive-low|disabled]
+ *     [conc=4] [thinking=fast|between|adaptive-low|disabled] [system=@prompt.txt]
  *
  * thinking=fast (default) is fastThinking(model), what the relay sends. set=@file reads a BenchStory[] JSON.
+ * system=@file replaces the dialect's system prompt (A/B a prompt edit against a saved older prompt).
  * Writes lab/proto/<run>/<dialect>/<story>.json (BenchFile), results.jsonl (one row per beat, with stop
  * reason and skip) and prints a summary. Render the
  * pictures with scripts/proto-render.mjs, compare with scripts/proto-sheet.ts.
@@ -58,6 +59,8 @@ const setArg = args['set'] ?? 'quick'
 const stories: BenchStory[] = setArg.startsWith('@')
   ? storyFileSchema.parse(JSON.parse(await fs.readFile(setArg.slice(1), 'utf8')))
   : benchSet(setArg)
+const systemArg = args['system']
+const systemOverride = systemArg?.startsWith('@') ? await fs.readFile(systemArg.slice(1), 'utf8') : null
 const key = process.env['VITE_ANTHROPIC_API_KEY']
 if (!key) throw new Error('VITE_ANTHROPIC_API_KEY missing (.env.local)')
 const client = new Anthropic({ apiKey: key })
@@ -80,9 +83,10 @@ async function benchStory(story: BenchStory): Promise<BenchFile> {
     return ink
   }
   dialect.later = (cmds) => cmds.forEach(apply)
+  const system = systemOverride ?? dialect.system
   let systemTokens: number | null = null
   try {
-    const c = await client.messages.countTokens({ model, system: dialect.system, messages: [{ role: 'user', content: 'x' }] })
+    const c = await client.messages.countTokens({ model, system, messages: [{ role: 'user', content: 'x' }] })
     systemTokens = c.input_tokens
   } catch {
     systemTokens = null
@@ -123,7 +127,7 @@ async function benchStory(story: BenchStory): Promise<BenchFile> {
       const stream = client.messages.stream({
         model,
         max_tokens: dialect.maxTokens,
-        system: [{ type: 'text', text: dialect.system, cache_control: { type: 'ephemeral' } }],
+        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
         messages: [
           {
             role: 'user',
