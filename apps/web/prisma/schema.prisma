@@ -94,6 +94,8 @@ model Device {
   comped        Boolean   @default(false)
   compedReason  String?   @map("comped_reason")
   shareVoice    Boolean   @default(false) @map("share_voice")
+  /// When a grown-up agreed (gated consent card) to send story words to Claude; null = no consent, no drawing.
+  aiConsentAt   DateTime? @map("ai_consent_at")
   blocked       Boolean   @default(false)
   blockedReason String?   @map("blocked_reason")
   lastPack      String?   @map("last_pack")

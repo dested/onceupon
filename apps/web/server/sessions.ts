@@ -4,6 +4,7 @@ import { ApiError } from './app-api-types'
 import * as ledger from './ledger'
 import { getFlags } from './flags'
 import { mintEarsWithFallback } from './ears'
+import { requireAiConsent } from './device'
 import type { AppApi, EarsToken, EndReason, SessionStart } from '../../../packages/shared/src/api'
 import { typedChargeSec } from '../../../packages/shared/src/typed'
 
@@ -40,6 +41,7 @@ export async function startSession(
   const flags = await getFlags()
   if (flags.readOnly) throw new ApiError(503, 'read_only', 'the app is read-only right now')
   if (flags.relayPaused) throw new ApiError(503, 'paused', 'stories are paused right now')
+  requireAiConsent(device)
 
   const todayCount = await prisma.storySession.count({
     where: { deviceId: device.id, startedAt: { gte: utcMidnight() } },
@@ -130,6 +132,7 @@ export async function typed(
   sessionId: string,
   text: string
 ): Promise<{ remainingSec: number; exhausted: boolean; chargedSec: number }> {
+  requireAiConsent(device)
   await ownedOpenSession(device, sessionId)
   const { charged, balanceSec } = await charge(device, sessionId, typedChargeSec(text), 'typed')
   const exhausted = !device.comped && balanceSec <= 0

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import type { Device } from '@prisma/client'
 import { prisma } from './prisma'
 import { env } from './env'
+import { ApiError } from './app-api-types'
 import * as ledger from './ledger'
 import { nextWeeklyAt } from './ledger'
 import type { Flags } from './flags'
@@ -125,10 +126,18 @@ export function deviceState(d: Device, flags: Flags): DeviceState {
     paying: d.paying || d.comped,
     comped: d.comped,
     shareVoice: d.shareVoice,
+    aiConsent: d.aiConsentAt !== null,
     freeStoryUsed: d.freeStoryUsed,
     blocked: d.blocked,
     nextWeeklyAt: nextWeeklyAt(d, flags),
     lastPack,
+  }
+}
+
+/** The server refuses to send a device's story words to Claude until a grown-up has agreed. */
+export function requireAiConsent(d: Device): void {
+  if (d.aiConsentAt === null) {
+    throw new ApiError(403, 'consent_required', 'a grown-up has not agreed to drawing with AI yet')
   }
 }
 

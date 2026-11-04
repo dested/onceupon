@@ -38,7 +38,8 @@ const registerInput: z.ZodType<AppApi['device.register']['input']> = z.object({
 })
 
 const consentInput: z.ZodType<AppApi['device.consent']['input']> = z.object({
-  shareVoice: z.boolean(),
+  shareVoice: z.boolean().optional(),
+  aiConsent: z.boolean().optional(),
 })
 
 const attributionInput: z.ZodType<AppApi['device.attribution']['input']> = z.object({
@@ -85,13 +86,19 @@ export const coreHandlers: Handlers = {
 
   'device.consent': deviceHandler<'device.consent'>(consentInput, async (input, ctx) => {
     const flags = await getFlags()
-    // Turning it on requires a paying (or comped) device; turning it off is always allowed.
-    if (input.shareVoice && !ctx.device.paying && !ctx.device.comped) {
+    // Share with voice: turning it on requires a paying (or comped) device; turning it off is always allowed.
+    if (input.shareVoice === true && !ctx.device.paying && !ctx.device.comped) {
       throw new ApiError(403, 'consent_required', 'buy a pack to share with voice')
     }
+    // Drawing with AI: each yes stamps the time it was given; a no withdraws (drawing stops).
+    const aiConsentAt =
+      input.aiConsent === undefined ? undefined : input.aiConsent ? new Date() : null
     const updated = await prisma.device.update({
       where: { id: ctx.device.id },
-      data: { shareVoice: input.shareVoice },
+      data: {
+        ...(input.shareVoice === undefined ? {} : { shareVoice: input.shareVoice }),
+        ...(aiConsentAt === undefined ? {} : { aiConsentAt }),
+      },
     })
     return deviceState(updated, flags)
   }),

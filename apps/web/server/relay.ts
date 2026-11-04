@@ -8,6 +8,7 @@ import { getFlags } from './flags'
 import { ApiError } from './app-api-types'
 import { deviceOf } from './app-api'
 import * as sessions from './sessions'
+import { requireAiConsent } from './device'
 import { prisma } from './prisma'
 import { estimateCost, usdToMicros } from './pricing'
 import { maskText } from './mask'
@@ -40,6 +41,8 @@ export async function drawHandler(req: Request, res: Response): Promise<void> {
   const flags = await getFlags()
   if (flags.relayPaused) throw new ApiError(503, 'paused', 'drawing is paused right now')
   if (flags.readOnly) throw new ApiError(503, 'read_only', 'the app is read-only right now')
+
+  requireAiConsent(device)
 
   const parsed = drawSchema.safeParse(req.body)
   if (!parsed.success) {
