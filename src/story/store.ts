@@ -138,10 +138,15 @@ export interface AppState {
   native: boolean
   /** Network reachable (navigator.onLine + bridge net events). */
   online: boolean
+  /** Device registration failed for a reason other than the network; it keeps retrying. */
+  deviceTrouble: boolean
   /** Seconds of mic time on the device account. */
   balanceSec: number
   /** Seconds left in the current story session; null until a session starts. */
   remainingSec: number | null
+  /** When balanceSec / remainingSec last came from the server (Date.now ms): the chip shows the fresher. */
+  balanceAt: number
+  remainingAt: number
   /** Has ever bought a pack or redeemed a gift, or is comped (unlocks share-with-voice). */
   paying: boolean
   /** Comped by an admin: unlimited free stories, no minutes shown. */
@@ -360,8 +365,11 @@ export const appStore = new Store<AppState>({
   hosted: HOSTED,
   native: NATIVE,
   online: typeof navigator !== 'undefined' ? navigator.onLine : true,
+  deviceTrouble: false,
   balanceSec: 0,
   remainingSec: null,
+  balanceAt: 0,
+  remainingAt: 0,
   paying: false,
   comped: false,
   shareVoice: false,

@@ -26,7 +26,7 @@ export class RelayProvider implements LlmProvider {
         user: req.user.map((b) => ({ text: b.text, cache: b.cache })),
         maxTokens: req.maxTokens,
         dialect: appStore.get().settings.dialect,
-        restart: false,
+        restart: req.restart ?? false,
       },
       req.signal
     )) {

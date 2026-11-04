@@ -57,6 +57,8 @@ const KEEP_GOING_NOTE = 'Tap the mic to keep going.'
 /** No `speech.ready` 15 s after the tap: the first-use language model is downloading. */
 const LEARNING_NOTE = 'The crayon is learning to listen. This needs the internet the first time.'
 const TRY_AGAIN_NOTE = 'Try again in a moment.'
+/** A beat whose drawing failed for good (after the relay's one retry). */
+const SLIPPED_NOTE = 'Oops, the crayon slipped. Say that part again?'
 const LEARNING_AFTER_MS = 15_000
 const GIVE_UP_AFTER_MS = 60_000
 /** Words heard from the coach's own clip (it plays through the speaker into the mic) are dropped until this long after it ends. */
@@ -218,8 +220,10 @@ export class LiveSession {
       stage: this.stage,
       dialect: makeDialect(dialect, this.scene, { moderation: appStore.get().settings.moderation }),
       getProvider: currentProvider,
+      canRetry: (err) => err instanceof ApiError && err.code === 'upstream',
       onEvent: (e) => {
         pushDirectorEvent(e)
+        if (e.k === 'failed') this.drawFailed(e.error)
         if (e.k === 'status') {
           this.directorIdle = e.status === 'idle'
           if (this.pendingFinale && this.directorIdle) this.playFinale()
@@ -392,7 +396,7 @@ export class LiveSession {
       onRemaining: (sec) => {
         const wasSleepy = appStore.get().sleepy
         const sleepy = sec <= SLEEPY_AT_SEC
-        appStore.set({ remainingSec: sec, sleepy })
+        appStore.set({ remainingSec: sec, remainingAt: Date.now(), sleepy })
         if (sleepy && !wasSleepy) this.showNote('the crayon is getting sleepy…', 5000)
       },
       onExhausted: () => this.endStory('sleepy'),
@@ -631,6 +635,14 @@ export class LiveSession {
     }
     this.stopListening()
     this.showNote(HOSTED ? 'the crayon cannot hear right now' : `ears did not start: ${why}`, 7000)
+  }
+
+  /** The relay could not draw a beat. Consent and minutes have their own states; anything else gets a kind note. */
+  private drawFailed(err: unknown): void {
+    if (this.ended) return
+    if (err instanceof ApiError && err.code === 'consent_required') this.consentLost()
+    else if (err instanceof ApiError && err.code === 'exhausted') this.endStory('sleepy')
+    else this.showNote(SLIPPED_NOTE, 7000)
   }
 
   /** The server has no grown-up yes for this device: stop and show the "Not now" state. */

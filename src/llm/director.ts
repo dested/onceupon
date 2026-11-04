@@ -31,6 +31,8 @@ export type DirectorEvent =
   | { k: 'skip'; words: string }
   /** More words arrived early in a call: it was thrown away and re-sent with the whole text. */
   | { k: 'restart'; words: string }
+  /** A call failed for good (after its one retry, if the error allowed one): these words were not drawn. */
+  | { k: 'failed'; words: string; error: unknown }
 
 /** A call is cheap to throw away until it has drawn this many lines, at most this many times per beat. */
 const RESTART_MAX_LINES = 3
@@ -42,6 +44,8 @@ export interface DirectorDeps {
   dialect: Dialect
   getProvider: () => LlmProvider | null
   onEvent: (e: DirectorEvent) => void
+  /** A failed call is worth one more try with the same words (the relay's `upstream` errors). */
+  canRetry?: (error: unknown) => boolean
 }
 
 /**
@@ -56,6 +60,8 @@ export class Director {
   private linesThisCall = 0
   private restarts = 0
   private restarting = false
+  /** The next call re-sends words whose call failed once already: it gets no second retry. */
+  private retrying = false
   /** Every chunk sent so far, in order; the prompt caches them as a prefix. */
   private storyChunks: string[] = []
   private callId = 0
@@ -145,6 +151,7 @@ export class Director {
     this.inFlight = false
     this.restarts = 0
     this.restarting = false
+    this.retrying = false
     this.stopped = false
     this.deps.dialect.reset()
     this.emitStatus('idle')
@@ -169,6 +176,8 @@ export class Director {
     this.linesThisCall = 0
     const wasRestart = this.restarting
     this.restarting = false
+    const isRetry = this.retrying
+    this.retrying = false
     const stat: CallStat = {
       id: ++this.callId,
       model: provider.label,
@@ -189,8 +198,16 @@ export class Director {
     this.storyChunks.push(words)
     this.abort = new AbortController()
     let buf = ''
+    let failure: unknown = null
     try {
-      for await (const chunk of provider.stream({ system: dialect.system, user, maxTokens: dialect.maxTokens, signal: this.abort.signal })) {
+      const req = {
+        system: dialect.system,
+        user,
+        maxTokens: dialect.maxTokens,
+        signal: this.abort.signal,
+        restart: wasRestart,
+      }
+      for await (const chunk of provider.stream(req)) {
         if (chunk.k === 'usage') {
           stat.usage = chunk.usage
           stat.costUsd = estimateCost(provider.model, chunk.usage)
@@ -227,6 +244,7 @@ export class Director {
       } else {
         stat.error = e instanceof Error ? e.message : String(e)
         this.deps.onEvent({ k: 'warn', message: stat.error })
+        failure = e
       }
     } finally {
       stat.doneMs = performance.now() - stat.sentAt
@@ -236,6 +254,16 @@ export class Director {
       this.inFlight = false
       this.current = ''
       this.abort = null
+      if (failure !== null && !this.stopped) {
+        // Nothing (or only part) was drawn from these words. Retry once when the error allows it,
+        // with any words that arrived meanwhile; otherwise tell the session.
+        // Words nothing was drawn for leave the prompt's story so far.
+        if (stat.lines === 0) this.dropLastChunk(words)
+        if (!isRetry && stat.lines === 0 && this.deps.canRetry?.(failure)) {
+          this.retrying = true
+          this.pending = this.pending ? `${words} ${this.pending}` : words
+        } else this.deps.onEvent({ k: 'failed', words, error: failure })
+      }
       this.emitStatus(this.pending ? 'thinking' : 'idle')
       if (this.pending && !this.stopped) void this.kick()
     }

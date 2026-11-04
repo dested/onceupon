@@ -1,21 +1,25 @@
 import { bridgeCall } from './bridge'
 import { NATIVE } from './config'
-import { api } from './api'
+import { api, ApiError } from './api'
 import { getKv, setKv } from '~/story/storage'
 import { addMaskWords } from '~/story/clean'
 import { appStore } from '~/story/store'
 import { reconcileConsent } from './consent'
+import { finishPendingPurchases } from './purchases'
 import type { DeviceState, Platform } from '../../packages/shared/src/api'
 
 /**
  * The device account: an opaque token minted once at first launch and stored in kv (native storage
  * on the shell, localStorage on the web). Hosted mode only. Boot starts initDevice() without waiting
  * for it (first paint never waits on the network); api() waits on deviceTokenSettled() so no call
- * goes out tokenless while registration is in flight. A failure just leaves the app offline.
+ * goes out tokenless while registration is in flight. A failure retries with backoff (1 s, 3 s, 10 s,
+ * then every 30 s): a network failure reads as offline, anything else as "can't reach the crayon".
  */
 
 const INSTALL_ID_KEY = 'onceupon.installId'
 const INIT_TIMEOUT_MS = 8000
+const RETRY_DELAYS_MS = [1000, 3000, 10_000]
+const RETRY_EVERY_MS = 30_000
 
 let deviceToken: string | null = null
 let tokenStep: Promise<void> = Promise.resolve()
@@ -79,6 +83,7 @@ async function ensureToken(): Promise<void> {
 function applyDeviceState(state: DeviceState): void {
   appStore.set({
     balanceSec: state.balanceSec,
+    balanceAt: Date.now(),
     paying: state.paying,
     comped: state.comped,
     shareVoice: state.shareVoice,
@@ -88,8 +93,8 @@ function applyDeviceState(state: DeviceState): void {
   void reconcileConsent(state.aiConsent)
 }
 
-async function run(): Promise<void> {
-  await tokenStep
+/** Pull state, config and the mask list once the token is known. */
+async function pull(): Promise<void> {
   if (deviceToken === null) throw new Error('no device token')
   const [state, config, masks] = await Promise.all([
     api('device.state', {}),
@@ -101,24 +106,58 @@ async function run(): Promise<void> {
   addMaskWords(masks.words)
 }
 
+let retryTimer = 0
+let pendingChecked = false
+
+function connected(): void {
+  window.clearTimeout(retryTimer)
+  appStore.set({ online: true, deviceTrouble: false })
+  // Once per launch, with a device token: credit and finish any purchase a crash left open.
+  if (!pendingChecked) {
+    pendingChecked = true
+    void finishPendingPurchases()
+  }
+}
+
 /**
- * Register or restore the device, then pull state/config/masks. Any failure leaves the app offline
- * (the bookshelf and replay still work). Capped at 8 s so boot never hangs on a slow network.
+ * The device is offline → the usual offline note. Online but the server (or the shell) failed, the
+ * server unreachable included → "can't reach the crayon".
+ */
+function failed(e: unknown): void {
+  const offline = !navigator.onLine || (e instanceof ApiError && e.status === 0 && !appStore.get().online)
+  appStore.set(offline ? { online: false } : { deviceTrouble: true })
+}
+
+function scheduleRetry(attempt: number): void {
+  window.clearTimeout(retryTimer)
+  retryTimer = window.setTimeout(
+    () => {
+      ensureToken()
+        .then(pull)
+        .then(connected, (e: unknown) => {
+          failed(e)
+          scheduleRetry(attempt + 1)
+        })
+    },
+    RETRY_DELAYS_MS[attempt] ?? RETRY_EVERY_MS
+  )
+}
+
+/**
+ * Register or restore the device, then pull state/config/masks. A failure keeps retrying in the
+ * background (the bookshelf and replay still work meanwhile). Capped at 8 s so boot never hangs on a
+ * slow network.
  */
 export async function initDevice(): Promise<void> {
   const timeout = new Promise<void>((resolve) => window.setTimeout(resolve, INIT_TIMEOUT_MS))
-  tokenStep = Promise.race([
-    ensureToken().catch(() => {
-      appStore.set({ online: false })
-    }),
-    timeout,
-  ])
-  await Promise.race([
-    run().catch(() => {
-      appStore.set({ online: false })
-    }),
-    timeout,
-  ])
+  const token = ensureToken()
+  tokenStep = Promise.race([token.catch(() => undefined), timeout])
+  const full = token.then(pull)
+  full.then(connected, (e: unknown) => {
+    failed(e)
+    scheduleRetry(0)
+  })
+  await Promise.race([full.catch(() => undefined), timeout])
 }
 
 export async function refreshDevice(): Promise<DeviceState | null> {

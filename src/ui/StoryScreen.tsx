@@ -33,7 +33,14 @@ import { SpendChip } from './SpendChip'
 import { StoryWelcome } from './StoryWelcome'
 import { VideoExportButton } from './VideoExport'
 import { MinutesChip } from './MinutesChip'
-import { formatMinutes, gate, openAppSettings, openParentArea, startFreshStory } from './hosted'
+import {
+  formatMinutes,
+  gate,
+  openAppSettings,
+  openParentArea,
+  shownSeconds,
+  startFreshStory,
+} from './hosted'
 import { openShareCard } from './ShareCard'
 
 export function StoryScreen() {
@@ -61,11 +68,13 @@ export function StoryScreen() {
   const online = useApp((s) => s.online)
   const endReason = useApp((s) => s.endReason)
   const sleepy = useApp((s) => s.sleepy)
-  const remainingSec = useApp((s) => s.remainingSec)
+  const shownSec = useApp(shownSeconds)
   const balanceSec = useApp((s) => s.balanceSec)
   const consentBlocked = useApp((s) => s.hosted && s.consentBlocked)
   const micProblem = useApp((s) => s.micProblem)
-  const offline = hosted && !online
+  const deviceTrouble = useApp((s) => s.hosted && s.deviceTrouble)
+  // Offline, or registered with no server answer yet: no new stories (saved ones still play).
+  const offline = hosted && (!online || deviceTrouble)
   const [typed, setTyped] = useState('')
   const [typing, setTyping] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -471,7 +480,7 @@ export function StoryScreen() {
                 <span>
                   The crayon is getting sleepy…
                   <br />
-                  <strong>{formatMinutes(remainingSec ?? balanceSec)} left</strong>
+                  <strong>{formatMinutes(shownSec)} left</strong>
                   <span className="sleepy-z" aria-hidden="true">
                     z
                   </span>
@@ -522,8 +531,9 @@ export function StoryScreen() {
                 </button>
                 {offline ? (
                   <div className="offline-note" role="status" data-testid="offline-note">
-                    The crayon needs the internet to draw new stories. Your saved stories still
-                    play.
+                    {online
+                      ? "Can't reach the crayon right now. Trying again…"
+                      : 'The crayon needs the internet to draw new stories. Your saved stories still play.'}
                   </div>
                 ) : (
                   <div className="mic-copy">

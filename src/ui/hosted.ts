@@ -14,6 +14,14 @@ export function formatMinutes(sec: number): string {
   return `${m}:${r.toString().padStart(2, '0')}`
 }
 
+/**
+ * The minutes to show: the story session's remaining time or the device balance, whichever the
+ * server reported last (a purchase or a Grown-ups refresh must not be hidden by an older story value).
+ */
+export function shownSeconds(s: { remainingSec: number | null; remainingAt: number; balanceSec: number; balanceAt: number }): number {
+  return s.remainingSec !== null && s.remainingAt >= s.balanceAt ? s.remainingSec : s.balanceSec
+}
+
 // --- The grown-up gate (Apple Kids rule: a math challenge before purchases, link-outs, or the mic) ---
 
 let gateResolver: ((ok: boolean) => void) | null = null

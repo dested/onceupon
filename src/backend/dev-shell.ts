@@ -177,6 +177,12 @@ function install(w: FakeShellWindow): void {
     }
   }
 
+  // Settings that must hold from boot (e.g. `pending`) can be stored first: localStorage `fakeshell.cfg`.
+  try {
+    Object.assign(shell.cfg, JSON.parse(localStorage.getItem('fakeshell.cfg') ?? '{}'))
+  } catch {
+    // ignore a bad stored cfg
+  }
   w.__onceuponShell = { fake: true }
   w.ReactNativeWebView = {
     postMessage: (raw: string) => {

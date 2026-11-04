@@ -6,6 +6,7 @@ import { appStore } from '~/story/store'
 import { BRAND } from '../../packages/shared/src/brand'
 import { formatUsd, PACKS, packById, type PackId } from '../../packages/shared/src/packs'
 import type { AppApi } from '../../packages/shared/src/api'
+import type { BridgeOutput } from '../../packages/shared/src/bridge'
 
 /**
  * Minute packs. Native devices buy through StoreKit and the server verifies the signed transaction;
@@ -68,6 +69,41 @@ export async function buyPack(id: PackId): Promise<BuyResult> {
     if (e instanceof ApiError && e.code === 'paused') return { ok: false, reason: 'paused' }
     return { ok: false, reason: 'failed' }
   }
+}
+
+/**
+ * StoreKit transactions that were paid but never finished (the verify failed on a bad network, or the
+ * app died mid-purchase): verify each with the server, then finish it once the server has it (credited
+ * now, credited before, or `already_used`). Failures are logged and left for the next launch; this
+ * never blocks boot. App only.
+ */
+export async function finishPendingPurchases(): Promise<void> {
+  if (!NATIVE) return
+  let pending: BridgeOutput<'iap.pending'>['transactions']
+  try {
+    pending = (await bridgeCall('iap.pending', {})).transactions
+  } catch (e) {
+    console.warn('iap.pending failed', e)
+    return
+  }
+  let credited = false
+  for (const t of pending) {
+    try {
+      const res = await api('iap.verify', { jws: t.jws })
+      credited ||= res.credited
+    } catch (e) {
+      if (!(e instanceof ApiError && e.code === 'already_used')) {
+        console.warn(`iap.verify failed for ${t.transactionId}`, e)
+        continue
+      }
+    }
+    try {
+      await bridgeCall('iap.finish', { transactionId: t.transactionId })
+    } catch (e) {
+      console.warn(`iap.finish failed for ${t.transactionId}`, e)
+    }
+  }
+  if (credited) await refreshDevice()
 }
 
 export async function restorePurchases(): Promise<{ credited: number; balanceSec: number }> {
