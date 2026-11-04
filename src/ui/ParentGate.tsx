@@ -33,6 +33,11 @@ export function ParentGate() {
   const gateRequest = useApp((s) => s.gateRequest)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const goRef = useRef<HTMLButtonElement>(null)
+  // The number pad has no return key: once it is up, keep Go on screen (small phones scroll the card).
+  const keepGoVisible = (): void => {
+    window.setTimeout(() => goRef.current?.scrollIntoView({ block: 'nearest' }), 400)
+  }
   const [q, setQ] = useState<Question>(makeQuestion)
   const [answer, setAnswer] = useState('')
   const [wrong, setWrong] = useState(0)
@@ -103,6 +108,7 @@ export function ParentGate() {
             className={field}
             placeholder="?"
             data-testid="gate-answer"
+            onFocus={keepGoVisible}
             onChange={(e) => setAnswer(e.target.value.replace(/[^0-9]/g, ''))}
           />
           {wrong > 0 && (
@@ -119,6 +125,7 @@ export function ParentGate() {
               Not now
             </button>
             <button
+              ref={goRef}
               type="submit"
               className="studio-button replay-button"
               disabled={answer.trim().length === 0}

@@ -25,6 +25,22 @@ export function shownSeconds(s: { remainingSec: number | null; remainingAt: numb
 // --- The grown-up gate (Apple Kids rule: a math challenge before purchases, link-outs, or the mic) ---
 
 let gateResolver: ((ok: boolean) => void) | null = null
+let paywallPrePassed = false
+
+// Closing the paywall ends the pass, however it was opened.
+appStore.subscribe(() => {
+  if (paywallPrePassed && !appStore.get().paywallOpen) paywallPrePassed = false
+})
+
+/**
+ * Open the paywall. `gated`: the caller has just passed the parental gate (or is inside the Grown-ups
+ * area, which is behind it), so the paywall's own buttons skip it. A paywall the app opens by itself
+ * (minutes ran out mid-story) passes false and its Buy asks the grown-up.
+ */
+export function openPaywall(gated: boolean): void {
+  paywallPrePassed = gated
+  appStore.set({ paywallOpen: true })
+}
 
 /**
  * Open the parental gate and resolve when the grown-up solves it (true) or gives up / cancels (false).
@@ -32,7 +48,11 @@ let gateResolver: ((ok: boolean) => void) | null = null
  * nothing to gate, so this resolves true right away.
  */
 export function gate(): Promise<boolean> {
-  if (!appStore.get().hosted) return Promise.resolve(true)
+  const s = appStore.get()
+  if (!s.hosted) return Promise.resolve(true)
+  // The paywall was opened by a grown-up who just passed the gate (Grown-ups → Buy minutes): its Buy,
+  // Restore and gift-code buttons don't ask again while it stays open.
+  if (paywallPrePassed && s.paywallOpen) return Promise.resolve(true)
   // A gate already waiting is superseded: resolve the old one as cancelled before starting a new one.
   gateResolver?.(false)
   gateResolver = null

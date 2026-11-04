@@ -7,7 +7,8 @@ import { listShares, unpublishShare } from '~/backend/share'
 import { refreshDevice, setShareVoice } from '~/backend/device'
 import { ApiError } from '~/backend/api'
 import { askConsent, withdrawConsent } from '~/backend/consent'
-import { formatMinutes, takeParentFocus } from './hosted'
+import { formatMinutes, openPaywall, takeParentFocus } from './hosted'
+import { getStory } from '~/story/storage'
 import { PaperCard, StickerButton } from './bits'
 import type { ShareSummary } from '../../packages/shared/src/api'
 
@@ -218,7 +219,11 @@ export function ParentArea() {
             <p className="mt-1 font-hand text-base text-ink-soft">next free minute top-up: {formatNextWeekly(nextWeekly)}</p>
           )}
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <StickerButton tone="yellow" tilt={-1} onClick={() => appStore.set({ paywallOpen: true })} data-testid="parent-buy">
+            <StickerButton tone="yellow" tilt={-1} onClick={() => {
+                appStore.set({ parentOpen: false })
+                openPaywall(true)
+              }}
+              data-testid="parent-buy">
               Buy minutes
             </StickerButton>
             <button type="button" className={linkBtn} onClick={restore} disabled={restoreBusy}>
@@ -246,49 +251,50 @@ export function ParentArea() {
             {aiError && <p className={errorLine}>{aiError}</p>}
           </div>
 
-          {/* Gift code */}
-          <div className={sectionDivide} ref={giftRef}>
-            <h3 className={heading}>Gift code</h3>
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <input
-                value={gift}
-                placeholder="XXXX-XXXX-XXXX"
-                autoComplete="off"
-                className="w-56 rounded-xl border-[3px] border-ink bg-white px-3 py-2 text-center font-hand text-lg tracking-[0.15em] text-ink outline-none"
-                onChange={(e) => setGift(formatGiftInput(e.target.value))}
-                data-testid="gift-input"
-              />
-              <StickerButton
-                tone="green"
-                tilt={-1}
-                onClick={addGift}
-                disabled={giftBusy || gift.trim().length === 0}
-                data-testid="gift-add">
-                {giftBusy ? 'Adding…' : 'Add minutes'}
-              </StickerButton>
+          {/* Gift code (web only: in the app, minutes come from the App Store alone) */}
+          {!APP_SHELL && (
+            <div className={sectionDivide} ref={giftRef}>
+              <h3 className={heading}>Gift code</h3>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <input
+                  value={gift}
+                  placeholder="XXXX-XXXX-XXXX"
+                  autoComplete="off"
+                  className="w-56 rounded-xl border-[3px] border-ink bg-white px-3 py-2 text-center font-hand text-lg tracking-[0.15em] text-ink outline-none"
+                  onChange={(e) => setGift(formatGiftInput(e.target.value))}
+                  data-testid="gift-input"
+                />
+                <StickerButton
+                  tone="green"
+                  tilt={-1}
+                  onClick={addGift}
+                  disabled={giftBusy || gift.trim().length === 0}
+                  data-testid="gift-add">
+                  {giftBusy ? 'Adding…' : 'Add minutes'}
+                </StickerButton>
+              </div>
+              {giftMsg && <p className={okLine}>{giftMsg}</p>}
+              {giftError && <p className={errorLine}>{giftError}</p>}
             </div>
-            {giftMsg && <p className={okLine}>{giftMsg}</p>}
-            {giftError && <p className={errorLine}>{giftError}</p>}
-          </div>
+          )}
 
-          {/* Family code */}
-          <div className={sectionDivide}>
-            <h3 className={heading}>Family code</h3>
-            <div className="mt-2 flex flex-wrap items-center gap-4">
-              <span className="font-scrawl text-[28px] tracking-[0.3em] text-ink" data-testid="family-code">
-                {deviceCode || '········'}
-              </span>
-              <button type="button" className={linkBtn} onClick={copyCode}>
-                {copied ? 'Copied' : 'Copy'}
-              </button>
-            </div>
-            {/* In the app purchases are StoreKit only: no pointer to the web shop (App Store rules). */}
-            {!APP_SHELL && (
+          {/* Family code (web only, same reason) */}
+          {!APP_SHELL && (
+            <div className={sectionDivide}>
+              <h3 className={heading}>Family code</h3>
+              <div className="mt-2 flex flex-wrap items-center gap-4">
+                <span className="font-scrawl text-[28px] tracking-[0.3em] text-ink" data-testid="family-code">
+                  {deviceCode || '········'}
+                </span>
+                <button type="button" className={linkBtn} onClick={copyCode}>
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
               <p className="mt-2 font-hand text-base text-ink-soft">
                 Use it to buy minutes on the web{config?.shopUrl ? ` at ${config.shopUrl}` : ''}
               </p>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Sharing */}
           <div className={sectionDivide}>
@@ -337,7 +343,7 @@ export function ParentArea() {
                     key={s.id}
                     className="flex flex-wrap items-center gap-2 rounded-xl border-2 border-ink/15 px-3 py-2">
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-hand text-lg text-ink">{s.storyId}</div>
+                      <div className="truncate font-hand text-lg text-ink">{getStory(s.storyId)?.title ?? 'Untitled story'}</div>
                       <div className="font-hand text-sm text-ink-soft">
                         {new Date(s.createdAt).toLocaleDateString()} · {s.views} {s.views === 1 ? 'view' : 'views'}
                       </div>
@@ -409,7 +415,7 @@ export function ParentArea() {
               ))}
             </div>
             <p className="mt-2 font-hand text-base text-ink-soft">
-              Deleting the app removes every story stored on this iPad
+              Deleting the app removes every story stored on this device
             </p>
           </div>
         </div>

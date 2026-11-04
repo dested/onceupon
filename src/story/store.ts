@@ -147,6 +147,10 @@ export interface AppState {
   /** When balanceSec / remainingSec last came from the server (Date.now ms): the chip shows the fresher. */
   balanceAt: number
   remainingAt: number
+  /** What the canvas shows, for VoiceOver ("Page 1: girl, kite, tree"); '' on a blank page. */
+  sceneLabel: string
+  /** The crayon has drawn at least one stroke of this story ("Made by you" waits for it). */
+  drawn: boolean
   /** Has ever bought a pack or redeemed a gift, or is comped (unlocks share-with-voice). */
   paying: boolean
   /** Comped by an admin: unlimited free stories, no minutes shown. */
@@ -370,6 +374,8 @@ export const appStore = new Store<AppState>({
   remainingSec: null,
   balanceAt: 0,
   remainingAt: 0,
+  sceneLabel: '',
+  drawn: false,
   paying: false,
   comped: false,
   shareVoice: false,

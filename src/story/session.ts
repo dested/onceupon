@@ -1,5 +1,5 @@
 import { CrayonAudio } from '~/engine/audio'
-import { Scene } from '~/engine/scene'
+import { BG_ID, Scene } from '~/engine/scene'
 import { Stage } from '~/engine/stage'
 import { Director, type DirectorEvent } from '~/llm/director'
 import { makeHostedProvider, makeProvider, type LlmProvider } from '~/llm/providers'
@@ -41,6 +41,7 @@ import { splitTheEnd } from './the-end'
 import { APP_SHELL, HOSTED } from '~/backend/config'
 import { ApiError } from '~/backend/api'
 import { consentRequired } from '~/backend/consent'
+import { openPaywall } from '~/ui/hosted'
 import { StoryMeter, type MeterHandlers } from '~/backend/meter'
 import { VoicePlayer, VoiceRecorder } from '~/story/voice'
 import { playCoachLine } from '~/tutorial/coach'
@@ -66,6 +67,26 @@ const COACH_ECHO_MS = 500
 
 /** Stands in for words the model skipped, so a replay is honest about the gap. */
 export const SKIPPED_MARK = '(the crayon skipped a part)'
+
+/**
+ * The canvas's VoiceOver label after a beat: the page and the things on it, by the names the model
+ * gave them ("Page 2, flying a kite: girl, kite, tree"). Generated ids ("c1", "thing2") are left out.
+ */
+function sceneLabel(scene: Scene): string {
+  const names = new Set<string>()
+  for (const o of scene.objects.values()) {
+    if (o.id === BG_ID) continue
+    const name = o.id
+      .replace(/[\d_-]+/g, ' ')
+      .trim()
+      .toLowerCase()
+    if (name.length >= 3 && name !== 'thing') names.add(name)
+  }
+  const page = scene.pages[scene.pages.length - 1]
+  if (!page) return ''
+  const where = page.title ? `Page ${page.index}, ${page.title}` : `Page ${page.index}`
+  return names.size ? `${where}: ${[...names].join(', ')}` : where
+}
 
 function pushDirectorEvent(e: DirectorEvent): void {
   switch (e.k) {
@@ -226,10 +247,13 @@ export class LiveSession {
         if (e.k === 'failed') this.drawFailed(e.error)
         if (e.k === 'status') {
           this.directorIdle = e.status === 'idle'
+          if (e.status === 'idle') appStore.set({ sceneLabel: sceneLabel(this.scene) })
           if (this.pendingFinale && this.directorIdle) this.playFinale()
         }
-        if (e.k === 'line' && e.ok && e.line !== 'skip')
+        if (e.k === 'line' && e.ok && e.line !== 'skip') {
           this.record({ k: 'cmd', t: this.now(), line: e.line })
+          if (!appStore.get().drawn) appStore.set({ drawn: true })
+        }
         if (e.k === 'skip') this.skip(e.words)
       },
     })
@@ -258,6 +282,8 @@ export class LiveSession {
       endReason: null,
       remainingSec: null,
       sleepy: false,
+      sceneLabel: '',
+      drawn: false,
     })
     this.stage.start()
     this.audio.setEnabled(appStore.get().settings.sound)
@@ -492,7 +518,11 @@ export class LiveSession {
    * Typed words draw exactly like spoken ones. They never count as listening time; in hosted mode each
    * message is charged as talking time by the server from its words (a lone "The End" is free).
    */
-  typeWords(text: string): void {
+  typeWords(raw: string): void {
+    // Typed sentences end with punctuation, so the next one doesn't run into it ("in the park The balloon").
+    const trimmed = raw.trim()
+    if (!trimmed) return
+    const text = /[.!?…]["'”’)]*$/.test(trimmed) ? trimmed : `${trimmed}.`
     void this.audio.start()
     const meter = HOSTED ? this.meter : null
     if (meter) {
@@ -655,7 +685,7 @@ export class LiveSession {
     if (e instanceof ApiError && e.code === 'consent_required') {
       this.consentLost()
     } else if (e instanceof ApiError && e.code === 'exhausted') {
-      appStore.set({ paywallOpen: true })
+      openPaywall(false)
     } else if (e instanceof ApiError && (e.code === 'paused' || e.code === 'read_only')) {
       this.showNote('the crayon is taking a nap, try again soon', 5000)
     } else {

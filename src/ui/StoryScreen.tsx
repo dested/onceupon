@@ -38,6 +38,7 @@ import {
   gate,
   openAppSettings,
   openParentArea,
+  openPaywall,
   shownSeconds,
   startFreshStory,
 } from './hosted'
@@ -60,6 +61,8 @@ export function StoryScreen() {
   const debug = useApp((s) => s.debug)
   const warnings = useApp((s) => s.warnings)
   const note = useApp((s) => s.note)
+  const sceneLabel = useApp((s) => s.sceneLabel)
+  const drawn = useApp((s) => s.drawn)
   const micLevel = useApp((s) => s.micLevel)
   const words = useApp((s) => s.transcriptFinal)
   const interim = useApp((s) => s.transcriptInterim)
@@ -208,7 +211,7 @@ export function StoryScreen() {
         ? 'I’m listening · tap to pause'
         : hasStory
           ? 'Tap the mic to keep going'
-          : 'A little voice. A whole lot of magic.'
+          : ''
   const pageStatus = ended
     ? 'A story only you could tell'
     : ending
@@ -221,7 +224,7 @@ export function StoryScreen() {
             ? 'Listening to your imagination'
             : hasStory
               ? 'There’s more to your story…'
-              : 'A blank page. Endless possibilities.'
+              : ''
 
   return (
     <div
@@ -329,7 +332,7 @@ export function StoryScreen() {
             ref={canvasRef}
             className="story-canvas"
             data-testid="stage"
-            aria-label="Your words become a crayon drawing"
+            aria-label={sceneLabel || 'Your words become a crayon drawing'}
           />
           <div className="paper-topline">
             <button
@@ -342,14 +345,22 @@ export function StoryScreen() {
               Page {pages.length + 1}
               {pages.length > 0 && <ChevronDown size={15} />}
             </button>
-            <span className={`paper-state ${listening || status !== 'idle' ? 'is-active' : ''}`}>
+            {pageStatus ? (
+              <span className={`paper-state ${listening || status !== 'idle' ? 'is-active' : ''}`}>
+                <span />
+                {pageStatus}
+              </span>
+            ) : (
               <span />
-              {pageStatus}
-            </span>
-            <span className="made-by-you">
-              <Sparkles size={16} />
-              Made by you
-            </span>
+            )}
+            {drawn ? (
+              <span className="made-by-you">
+                <Sparkles size={16} />
+                Made by you
+              </span>
+            ) : (
+              <span />
+            )}
           </div>
           {pagesOpen && pages.length > 0 && (
             <div className="story-pages">
@@ -369,7 +380,7 @@ export function StoryScreen() {
           {!hasStory && (
             <>
               <span className="paper-doodle doodle-flower" aria-hidden="true">
-                ✳
+                {'\u2733\uFE0E'}
               </span>
               <span className="paper-doodle doodle-star" aria-hidden="true">
                 ✧
@@ -381,7 +392,7 @@ export function StoryScreen() {
           )}
           <Subtitles className="story-subtitles" />
           <div className="paper-bottomline" aria-hidden="true">
-            <span>every story is a little adventure</span>
+            <span />
             <span>{String(pages.length + 1).padStart(2, '0')}</span>
           </div>
           {note && (
@@ -426,7 +437,7 @@ export function StoryScreen() {
                   <button
                     className="studio-button sleepy-more"
                     onClick={() =>
-                      void gate().then((ok) => ok && appStore.set({ paywallOpen: true }))
+                      void gate().then((ok) => ok && openPaywall(true))
                     }
                     data-testid="more-minutes">
                     <Plus size={21} />
@@ -555,7 +566,7 @@ export function StoryScreen() {
                     ) : (
                       <>
                         <strong data-testid="status">{micTitle}</strong>
-                        <span>{micHint}</span>
+                        {micHint && <span>{micHint}</span>}
                       </>
                     )}
                     {listening && (
