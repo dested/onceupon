@@ -9,8 +9,8 @@ export const BRAND = {
   /** The website and API origin; the studio is served at `${origin}/app/`. */
   origin: 'https://onceupon.dested.com',
   domain: 'onceupon.dested.com',
-  /** The public domain once registered (squiggletale.com redirects here). */
-  publicDomain: 'squiggletale.app',
+  /** The public domain (Sal's, registered 2026-09-23); `origin`/`domain` flip to it with the domain move. */
+  publicDomain: 'squiggletale.com',
   company: 'QuickGame',
   supportEmail: 'sal@quickga.me',
   bundleId: 'com.quickgame.squiggletale',

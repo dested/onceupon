@@ -48,6 +48,14 @@ export interface BridgeApi {
   'iap.purchase': { input: { productId: string }; output: { jws: string; transactionId: string } }
   'iap.restore': { input: Record<string, never>; output: { jws: string[] } }
   'iap.finish': { input: { transactionId: string }; output: Record<string, never> }
+  /**
+   * StoreKit transactions that were paid but never finished (verify failed on a bad network, the app was
+   * killed mid-purchase). The studio calls it at boot, runs `iap.verify` on each, then `iap.finish`.
+   */
+  'iap.pending': {
+    input: Record<string, never>
+    output: { transactions: Array<{ jws: string; transactionId: string; productId: string }> }
+  }
   'share.url': { input: { url: string; title: string }; output: { completed: boolean } }
   'share.file': {
     input: { base64: string; mime: string; filename: string }
