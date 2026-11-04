@@ -58,6 +58,8 @@ let traceCounter = 0
  */
 /** On-device ears stopped and the quiet restart did not bring them back: the dock's own hint says it. */
 const KEEP_GOING_NOTE = ''
+/** Minutes are talking time: after this much quiet the meter stops counting until the child is heard again. */
+const METER_QUIET_MS = 8_000
 const TRY_AGAIN_NOTE = 'Try again in a moment.'
 /** A beat whose drawing failed for good (after the relay's one retry). */
 const SLIPPED_NOTE = 'Oops, the crayon slipped. Say that part again?'
@@ -212,6 +214,9 @@ export class LiveSession {
   private voiceClipIndex = 0
   /** When words last arrived; drives the silence nudge and auto-end. */
   private lastWordsAt = performance.now()
+  /** When the interim transcript last changed (the child is mid-sentence); keeps the meter counting. */
+  private lastHeardAt = 0
+  private lastInterim = ''
   private nudged = false
   private endReason: EndReason = 'the-end'
 
@@ -492,8 +497,9 @@ export class LiveSession {
   }
 
   save(): void {
-    // A story nobody told (debug-driven lines, no words) is not worth a shelf slot.
+    // A story nobody told (no words), or one with nothing drawn yet (minutes ran out first), is not worth a shelf slot.
     if (!this.story.events.some((e) => e.k === 'words')) return
+    if (!this.story.events.some((e) => e.k === 'cmd')) return
     const words = this.story.events
       .filter((e) => e.k === 'words')
       .map((e) => (e.k === 'words' ? e.text : ''))
@@ -942,6 +948,13 @@ export class LiveSession {
     const nudgeMs = cfg?.silenceNudgeMs ?? 30_000
     const endMs = cfg?.silenceEndMs ?? 60_000
     const silent = now - this.lastWordsAt
+    const interim = this.tracker.interim
+    if (interim !== this.lastInterim) {
+      this.lastInterim = interim
+      if (interim) this.lastHeardAt = now
+    }
+    const heard = Math.max(this.lastWordsAt, this.lastHeardAt, this.lastLoudAt)
+    this.meter?.setListening(now - heard < METER_QUIET_MS)
     if (!this.nudged && silent > nudgeMs) {
       this.nudged = true
       this.showNote('all done? just say "The End"', 8000)

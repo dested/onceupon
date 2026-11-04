@@ -419,19 +419,21 @@ export function StoryScreen() {
                     ? 'A lovely ending…'
                     : endReason === 'sleepy'
                       ? 'The crayon fell asleep'
-                      : endReason === 'silence'
+                      : endReason === 'silence' || !drawn
                         ? 'All quiet…'
                         : 'Look what you imagined!'}
                 </strong>
-                <span>
-                  {!ended
-                    ? 'The crayon is finishing your story'
-                    : endReason === 'sleepy'
-                      ? 'Ask a grown-up for more minutes'
-                      : endReason === 'silence'
-                        ? 'The crayon finished your story'
-                        : 'Your story is tucked away in My stories'}
-                </span>
+                {(endReason === 'sleepy' || !ended || drawn) && (
+                  <span>
+                    {!ended
+                      ? 'The crayon is finishing your story'
+                      : endReason === 'sleepy'
+                        ? 'Ask a grown-up for more minutes'
+                        : endReason === 'silence'
+                          ? 'The crayon finished your story'
+                          : 'Your story is tucked away in My stories'}
+                  </span>
+                )}
               </div>
             </div>
             {ended && (
@@ -447,11 +449,13 @@ export function StoryScreen() {
                     More minutes
                   </button>
                 )}
-                <button className="studio-button replay-button" onClick={playAgain}>
-                  <Play size={21} fill="currentColor" />
-                  Play it again
-                </button>
-                {hosted && endReason === 'the-end' && (
+                {drawn && (
+                  <button className="studio-button replay-button" onClick={playAgain}>
+                    <Play size={21} fill="currentColor" />
+                    Play it again
+                  </button>
+                )}
+                {hosted && drawn && endReason === 'the-end' && (
                   <button
                     className="studio-button"
                     onClick={shareStory}
@@ -460,15 +464,17 @@ export function StoryScreen() {
                     Send to grandma
                   </button>
                 )}
-                <VideoExportButton
-                  variant="studio"
-                  getRecord={() => {
-                    const s = sessionRef.current
-                    if (!s) return null
-                    s.save()
-                    return getStory(s.storyId)
-                  }}
-                />
+                {drawn && (
+                  <VideoExportButton
+                    variant="studio"
+                    getRecord={() => {
+                      const s = sessionRef.current
+                      if (!s) return null
+                      s.save()
+                      return getStory(s.storyId)
+                    }}
+                  />
+                )}
                 <button
                   className="studio-button"
                   onClick={newStory}
