@@ -9,7 +9,7 @@ import { VideoExportButton } from './VideoExport'
 
 /**
  * "Send this story": turns a finished, saved story into a public link (and optionally includes the
- * child's recorded voice, when a grown-up has consented). Opened through the grown-up gate from the
+ * child's recorded voice, when a grown-up has consented). No child's name goes on the public page. Opened through the grown-up gate from the
  * closing card and the replay toolbar via `openShareCard(storyId)`. Hosted mode only.
  */
 
@@ -31,14 +31,12 @@ export function ShareCard() {
   const open = useApp((s) => s.shareOpen)
   const hosted = useApp((s) => s.hosted)
   const shareVoice = useApp((s) => s.shareVoice)
-  const [name, setName] = useState('')
   const [includeVoice, setIncludeVoice] = useState(true)
   const [phase, setPhase] = useState<Phase>({ k: 'form' })
   const [shareLabel, setShareLabel] = useState('Share')
 
   useEffect(() => {
     if (!open) return
-    setName('')
     setIncludeVoice(true)
     setPhase({ k: 'form' })
     setShareLabel('Share')
@@ -53,7 +51,7 @@ export function ShareCard() {
   const makeLink = (): void => {
     if (!record) return
     setPhase({ k: 'busy' })
-    void createShare(record, { childName: name.trim() || null, includeVoice: includeVoice && shareVoice })
+    void createShare(record, { childName: null, includeVoice: includeVoice && shareVoice })
       .then((res) => setPhase({ k: 'done', url: res.url }))
       .catch((e: unknown) => {
         let text = "That didn't work; try again"
@@ -100,18 +98,6 @@ export function ShareCard() {
         ) : (
           <>
             <h2 className="font-scrawl share-card-heading">Send this story</h2>
-            <label className="share-card-label" htmlFor="share-name">
-              Who made it? (first name, optional)
-            </label>
-            <input
-              id="share-name"
-              value={name}
-              maxLength={24}
-              autoComplete="off"
-              className="w-full rounded-xl border-[3px] border-ink bg-white px-3 py-2 font-hand text-lg text-ink outline-none"
-              onChange={(e) => setName(e.target.value)}
-              data-testid="share-name"
-            />
             {shareVoice && (
               <label className="share-card-check font-hand">
                 <input

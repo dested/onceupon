@@ -19,10 +19,16 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
   const pos = useApp((s) => s.replayPos)
   const len = useApp((s) => s.replayLen)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const hasVoice = useMemo(() => {
+  const story = useMemo(() => {
     const r = getStory(storyId)
-    return r?.voice !== undefined && r.voice.clips.length > 0
+    return {
+      title: r?.title ?? '',
+      hasVoice: r?.voice !== undefined && r.voice.clips.length > 0,
+      // Index of the end event: once it has played, the finale owns the page.
+      endAt: r ? r.events.findIndex((ev) => ev.k === 'end') : -1,
+    }
   }, [storyId])
+  const { title, hasVoice } = story
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -46,6 +52,8 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
     s.seek(0)
   }
   const ended = len > 0 && pos >= len
+  // The finale writes its own "The End" across the page: no caption pill on top of it.
+  const inFinale = (story.endAt >= 0 && pos > story.endAt) || /^\W*the end\W*$/i.test(caption)
   const remove = (): void => {
     if (!confirmDelete) {
       setConfirmDelete(true)
@@ -57,53 +65,77 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
   }
 
   return (
-    <div className="relative h-full w-full select-none" data-testid="replay">
-      <canvas ref={canvasRef} className="block h-full w-full" />
-      <Filmstrip />
-      <div className="absolute top-[calc(1rem+var(--sat))] right-[calc(1rem+var(--sar))] flex items-center gap-3">
-        {confirmDelete ? (
-          <StickerButton tilt={0} tone="red" className="!text-base" onClick={remove} onBlur={() => setConfirmDelete(false)} data-testid="delete-story">
-            <Trash2 size={18} strokeWidth={2.5} /> delete this story?
-          </StickerButton>
-        ) : (
-          <IconButton label="Delete this story" onClick={remove} data-testid="delete-story">
-            <Trash2 size={22} strokeWidth={2.5} />
-          </IconButton>
-        )}
-        {hosted && (
-          <IconButton
-            label="Share this story"
-            data-testid="share-story"
-            onClick={() => void gate().then((ok) => ok && openShareCard(storyId))}>
-            <Share2 size={22} strokeWidth={2.5} />
-          </IconButton>
-        )}
-        <VideoExportButton variant="icon" getRecord={() => getStory(storyId)} />
-        <IconButton label="Back to bookshelf" onClick={() => appStore.set({ screen: 'shelf', replayId: null })}>
-          <ArrowLeft size={24} strokeWidth={3} />
-        </IconButton>
-      </div>
-      {caption && (
-        <div className="pointer-events-none absolute top-[calc(8.5rem+var(--sat))] right-[var(--sar)] left-[var(--sal)] flex flex-col items-center gap-2 px-10" data-testid="narration">
-          <p
-            key={caption}
-            className="max-w-3xl rounded-2xl bg-paper/90 px-6 py-2 text-center font-scrawl text-2xl leading-snug text-ink shadow-[3px_4px_0_0_rgba(59,47,47,0.25)]">
-            {caption}
-          </p>
-          {hasVoice && (
-            <span
-              className="inline-flex items-center gap-1 rounded-full bg-paper/90 px-3 py-1 font-hand text-[16px] text-ink-soft shadow-[2px_3px_0_0_rgba(59,47,47,0.2)]"
-              data-testid="voice-indicator">
-              <Mic size={14} strokeWidth={2.5} /> in their own voice
-            </span>
-          )}
+    <div className="story-studio replay-studio" data-testid="replay">
+      <header className="studio-header replay-header">
+        <div>
+          <button
+            type="button"
+            className="studio-button shelf-button"
+            aria-label="Back to my stories"
+            onClick={() => appStore.set({ screen: 'shelf', replayId: null })}
+            data-testid="replay-back">
+            <ArrowLeft size={22} strokeWidth={2.5} />
+            <span>My stories</span>
+          </button>
         </div>
-      )}
-      <Subtitles className="bottom-[calc(6rem+var(--sab))] left-[calc(1.5rem+var(--sal))] right-[calc(1.5rem+var(--sar))]" />
-      <div className="absolute right-[calc(1.5rem+var(--sar))] bottom-[calc(1.5rem+var(--sab))] left-[calc(1.5rem+var(--sal))] flex items-center gap-4" data-testid="scrubber">
+        <h1 className="replay-title font-scrawl" data-testid="replay-title">
+          {title}
+        </h1>
+        <div className="replay-actions">
+          {confirmDelete ? (
+            <StickerButton tilt={0} tone="red" className="!text-base" onClick={remove} onBlur={() => setConfirmDelete(false)} data-testid="delete-story">
+              <Trash2 size={18} strokeWidth={2.5} /> delete this story?
+            </StickerButton>
+          ) : (
+            <IconButton label="Delete this story" onClick={remove} data-testid="delete-story">
+              <Trash2 size={22} strokeWidth={2.5} />
+            </IconButton>
+          )}
+          {hosted && (
+            <IconButton
+              label="Share this story"
+              data-testid="share-story"
+              onClick={() => void gate().then((ok) => ok && openShareCard(storyId))}>
+              <Share2 size={22} strokeWidth={2.5} />
+            </IconButton>
+          )}
+          <VideoExportButton variant="icon" getRecord={() => getStory(storyId)} />
+        </div>
+      </header>
+
+      <main className="storybook" aria-label="Your storybook">
+        <div className="book-binding" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="story-paper">
+          <canvas ref={canvasRef} className="story-canvas" data-testid="stage" aria-label={title} />
+          <div className="replay-filmstrip">
+            <Filmstrip embedded />
+          </div>
+          {caption && !inFinale && (
+            <div className="replay-caption" data-testid="narration">
+              <p key={caption} className="font-scrawl">
+                {caption}
+              </p>
+              {hasVoice && (
+                <span className="replay-voice" data-testid="voice-indicator">
+                  <Mic size={14} strokeWidth={2.5} /> in their own voice
+                </span>
+              )}
+            </div>
+          )}
+          <Subtitles className="story-subtitles" />
+        </div>
+      </main>
+
+      <footer className="replay-controls" data-testid="scrubber">
         {ended ? (
-          <StickerButton tone="yellow" tilt={0} onClick={again} className="shrink-0">
-            <RotateCcw size={22} strokeWidth={3} /> again
+          <StickerButton tone="yellow" tilt={0} onClick={again} className="shrink-0" data-testid="replay-again">
+            <RotateCcw size={22} strokeWidth={3} /> Play again
           </StickerButton>
         ) : (
           <IconButton
@@ -122,12 +154,9 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
           step={1}
           value={Math.min(pos, len)}
           onChange={(e) => sessionRef.current?.seek(Number(e.target.value))}
-          className="h-3 w-full cursor-pointer accent-crayon-red"
+          className="replay-range accent-crayon-red"
         />
-        <span className="w-16 shrink-0 text-right font-hand text-base text-ink-soft">
-          {Math.min(pos, len)}/{len}
-        </span>
-      </div>
+      </footer>
     </div>
   )
 }

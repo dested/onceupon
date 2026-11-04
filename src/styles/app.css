@@ -1114,6 +1114,124 @@ button {
   }
 }
 
+/* Replay: the studio's book with a header toolbar and a scrubber row instead of the mic dock. */
+.story-studio.replay-studio {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.replay-header {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 78px;
+}
+.replay-title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  font-size: 26px;
+  font-weight: 400;
+}
+.replay-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+.replay-filmstrip {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  left: 8px;
+  max-width: 45%;
+}
+.replay-caption {
+  position: absolute;
+  z-index: 2;
+  top: 9%;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 24px;
+  pointer-events: none;
+}
+.replay-caption p {
+  max-width: min(48rem, 80%);
+  padding: 8px 24px;
+  border-radius: 16px;
+  background: rgb(251 246 234 / 0.9);
+  box-shadow: 3px 4px 0 #3b2f2f40;
+  text-align: center;
+  font-size: 24px;
+  line-height: 1.375;
+}
+.replay-voice {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgb(251 246 234 / 0.9);
+  box-shadow: 2px 3px 0 #3b2f2f33;
+  font-size: 16px;
+  color: var(--color-ink-soft);
+}
+.replay-controls {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 6px 14px;
+}
+.replay-range {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  cursor: pointer;
+}
+@media (max-width: 1050px) {
+  .replay-title {
+    font-size: 22px;
+  }
+}
+@media (max-width: 599px) {
+  .replay-header {
+    min-height: 62px;
+  }
+  .replay-title {
+    font-size: 18px;
+  }
+  .replay-actions {
+    gap: 6px;
+  }
+  .replay-filmstrip {
+    display: none;
+  }
+  .replay-caption {
+    top: 6%;
+    padding: 0 10px;
+  }
+  .replay-caption p {
+    max-width: 92%;
+    padding: 4px 14px;
+    font-size: 17px;
+  }
+  .replay-controls {
+    gap: 12px;
+    padding: 10px 2px 8px;
+  }
+}
+@media (max-height: 480px) {
+  .replay-header {
+    min-height: 56px;
+  }
+  .replay-controls {
+    padding: 6px 2px 4px;
+  }
+}
+
 /* ============================================================================
    Hosted-mode surfaces: the grown-up gate, minutes chip, paywall / rebuy,
    share card, parent area helpers, sleepy + offline states. Appended for the
@@ -1397,8 +1515,10 @@ button {
 .share-card-check {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
-  margin-top: 12px;
+  min-height: 44px;
+  margin-top: 4px;
   font-size: 18px;
   color: var(--color-ink);
 }
