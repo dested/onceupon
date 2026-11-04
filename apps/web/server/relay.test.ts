@@ -17,13 +17,15 @@ import {
 import { prisma } from './prisma'
 import { resetSpendCacheForTests } from './relay'
 import { drawsInFlight, setTypedSettleMsForTests } from './sessions'
-import { setFlag } from './flags'
+import { getFlags, setFlag } from './flags'
 import { fulfillCheckout } from './stripe'
 import { SKIP_LINE } from './relay'
-import { dialectOfSystem, setShippedHashesFileForTests } from './prompt-allowlist'
-import { createHash } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import {
+  dialectOfSystem,
+  KNOWN_PROMPTS_KEY,
+  reloadPromptAllowListForTests,
+  setStudioPromptsForTests,
+} from './prompt-allowlist'
 import * as path from 'node:path'
 
 beforeAll(async () => {
@@ -331,28 +333,34 @@ describe('free tier model (decision 4b)', () => {
   })
 })
 
-describe('shipped prompt hashes', () => {
-  test('a prompt listed in prompt-hashes.json is accepted after the module prompt changed', async () => {
-    const oldPrompt = 'an earlier release of the kit prompt'
-    const dir = mkdtempSync(path.join(tmpdir(), 'prompt-hashes-'))
-    const file = path.join(dir, 'prompt-hashes.json')
-    const sha = createHash('sha256').update(oldPrompt).digest('hex')
-    writeFileSync(file, JSON.stringify([{ dialect: 'kit', sha256: sha, note: 'test release' }]))
+describe('known prompt hashes', () => {
+  test('a prompt that ran before an edit and a reboot is still accepted', async () => {
     try {
-      setShippedHashesFileForTests(file)
-      expect(await dialectOfSystem(oldPrompt)).toBe('kit')
+      // Boot 1 ships the old prompt; boot 2 (after the edit) ships the new one.
+      setStudioPromptsForTests([{ dialect: 'kit', text: 'kit prompt, release 1' }])
+      expect(await dialectOfSystem('kit prompt, release 1')).toBe('kit')
+      setStudioPromptsForTests([{ dialect: 'kit', text: 'kit prompt, release 2' }])
+      expect(await dialectOfSystem('kit prompt, release 2')).toBe('kit')
+      expect(await dialectOfSystem('kit prompt, release 1')).toBe('kit')
       expect(await dialectOfSystem('a prompt nobody shipped')).toBe(null)
+      const row = await prisma.flag.findUniqueOrThrow({ where: { key: KNOWN_PROMPTS_KEY } })
+      expect(Array.isArray(row.value) ? row.value.length : 0).toBe(2)
+
+      // The relay takes the old prompt end to end.
       const d = await newDevice({ consent: true })
       const sessionId = await startStory(d.token)
-      expect((await draw(d.token, sessionId, { system: oldPrompt })).status).toBe(200)
+      expect((await draw(d.token, sessionId, { system: 'kit prompt, release 1' })).status).toBe(200)
+
+      // The hidden row never shows on the admin flags page.
+      reloadPromptAllowListForTests()
+      expect(Object.keys(await getFlags())).not.toContain(KNOWN_PROMPTS_KEY)
     } finally {
-      setShippedHashesFileForTests(null)
-      rmSync(dir, { recursive: true, force: true })
+      setStudioPromptsForTests(null)
     }
   })
 
-  test('the committed prompt-hashes.json parses', async () => {
-    setShippedHashesFileForTests(null)
+  test("this build's studio prompts are accepted", async () => {
+    reloadPromptAllowListForTests()
     expect(await dialectOfSystem(await kitSystemPrompt())).toBe('kit')
   })
 })

@@ -235,7 +235,10 @@ export async function handleNotification(signedPayload: string): Promise<string>
             where: { id: purchase.id },
             data: { refundedAt: new Date() },
           })
-          await debit(purchase.deviceId, 'refund', purchase.seconds, purchase.id, 'apple refund')
+          // A deleted device keeps its purchase row (deviceId null): nothing left to debit.
+          if (purchase.deviceId) {
+            await debit(purchase.deviceId, 'refund', purchase.seconds, purchase.id, 'apple refund')
+          }
           await raiseAlert(
             'refund',
             `Apple ${String(notificationType)} for purchase ${purchase.id} (${purchase.seconds}s)`,

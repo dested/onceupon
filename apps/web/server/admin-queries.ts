@@ -426,8 +426,8 @@ export async function resetFreeStory(deviceId: string, actor: string) {
 
 /**
  * "Delete my data" (V-21): remove a device and everything that hangs off it (the schema cascades:
- * ledger, sessions, purchases, shares, call logs). The audit row keeps the device code and the counts,
- * nothing else.
+ * ledger, sessions, shares, call logs). Purchase rows stay for accounting with deviceId null. The
+ * audit row keeps the device code and the counts, nothing else.
  */
 export async function deleteDevice(deviceId: string, actor: string) {
   return prisma.$transaction(async (tx) => {
@@ -441,9 +441,17 @@ export async function deleteDevice(deviceId: string, actor: string) {
       tx.share.count({ where }),
       tx.callLog.count({ where }),
     ])
-    const counts = { entries, sessions, purchases, shares, calls }
+    // Purchases outlive the device for accounting (deviceId → null); everything else cascades.
+    const counts = { entries, sessions, shares, calls, purchasesKept: purchases }
     await tx.device.delete({ where: { id: deviceId } })
-    await tx.auditLog.create({ data: { actor, action: 'device.delete', target: device.code, detail: counts } })
+    await tx.auditLog.create({
+      data: {
+        actor,
+        action: 'device.delete',
+        target: device.code,
+        detail: { ...counts, note: `${purchases} purchases kept` },
+      },
+    })
     return { ok: true as const, code: device.code, counts }
   })
 }
@@ -506,7 +514,7 @@ export async function revenue(days: number) {
       grossCents: p.grossCents,
       feeCents: p.feeCents,
       netCents: p.netCents,
-      deviceCode: p.device.code,
+      deviceCode: p.device?.code ?? 'deleted',
       refundedAt: p.refundedAt?.toISOString() ?? null,
     })),
     daily,

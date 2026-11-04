@@ -5,6 +5,7 @@ import { prisma } from './prisma'
 import { allow, resetRateLimitsForTests } from './rate-limit'
 import { runRetention } from './retention'
 import { deleteDevice } from './admin-queries'
+import { fulfillCheckout } from './stripe'
 
 beforeAll(async () => {
   await startApp()
@@ -92,7 +93,53 @@ describe('admin delete device (V-21)', () => {
     expect(await prisma.storySession.count({ where: { deviceId: d.id } })).toBe(0)
     const audit = await prisma.auditLog.findFirstOrThrow({ where: { action: 'device.delete' } })
     expect(audit.target).toBe(code)
-    expect(audit.detail).toEqual({ entries: 1, sessions: 1, purchases: 0, shares: 0, calls: 0 })
+    expect(audit.detail).toEqual({
+      entries: 1,
+      sessions: 1,
+      shares: 0,
+      calls: 0,
+      purchasesKept: 0,
+      note: '0 purchases kept',
+    })
+  })
+
+  test('purchases outlive their device (deviceId null), ledger rows go', async () => {
+    const d = await newDevice()
+    const code = (await prisma.device.findUniqueOrThrow({ where: { id: d.id } })).code
+    await fulfillCheckout({
+      id: 'cs_keep_1',
+      amountTotal: 999,
+      paymentStatus: 'paid',
+      customerEmail: null,
+      metadata: { kind: 'pack', packId: 'pack_40', deviceCode: code },
+    })
+    const r = await deleteDevice(d.id, 'admin@example.com')
+    expect(r.counts?.purchasesKept).toBe(1)
+    const p = await prisma.purchase.findUniqueOrThrow({ where: { externalId: 'stripe:cs_keep_1' } })
+    expect(p.deviceId).toBe(null)
+    expect(p.grossCents).toBe(999)
+    expect(await prisma.ledgerEntry.count({ where: { deviceId: d.id } })).toBe(0)
+    const audit = await prisma.auditLog.findFirstOrThrow({ where: { action: 'device.delete', target: code } })
+    expect(field(audit.detail, 'note')).toBe('1 purchases kept')
+  })
+
+  test('idle retention keeps the purchase rows of the devices it deletes', async () => {
+    const d = await newDevice()
+    const code = (await prisma.device.findUniqueOrThrow({ where: { id: d.id } })).code
+    await fulfillCheckout({
+      id: 'cs_keep_2',
+      amountTotal: 999,
+      paymentStatus: 'paid',
+      customerEmail: null,
+      metadata: { kind: 'pack', packId: 'pack_40', deviceCode: code },
+    })
+    await prisma.device.update({
+      where: { id: d.id },
+      data: { balanceSec: 0, lastSeenAt: new Date(Date.now() - 600 * DAY) },
+    })
+    expect((await runRetention()).devicesDeleted).toBe(1)
+    const p = await prisma.purchase.findUniqueOrThrow({ where: { externalId: 'stripe:cs_keep_2' } })
+    expect(p.deviceId).toBe(null)
   })
 })
 

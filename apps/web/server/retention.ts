@@ -11,7 +11,7 @@ export const RETENTION = {
   sessionDays: 180,
   /** App Store notification payloads. */
   appleNotificationDays: 180,
-  /** A device with no minutes left, not comped, unseen this long, is deleted with everything on it. */
+  /** A device with no minutes left, not comped, unseen this long, is deleted (its purchase rows stay, deviceId null). */
   idleDeviceDays: 548,
 } as const
 

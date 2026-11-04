@@ -185,10 +185,11 @@ model CallLog {
 }
 
 /// A pack bought (IAP or Stripe) or a gift redeemed. `externalId` dedupes Apple transaction ids and Stripe sessions.
+/// Kept for accounting when its device is deleted (admin delete, idle retention): deviceId becomes null.
 model Purchase {
   id                    String    @id @default(cuid())
-  deviceId              String    @map("device_id")
-  device                Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  deviceId              String?   @map("device_id")
+  device                Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   channel               String // iap | stripe | gift
   packId                String    @map("pack_id")
   seconds               Int
