@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "clean": "rimraf dist",
     "typecheck": "tsgo --noEmit",
+    "test": "bun test ./server",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
