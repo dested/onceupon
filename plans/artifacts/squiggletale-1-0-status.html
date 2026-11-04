@@ -1,0 +1,597 @@
+<title>Squiggletale 1.0 Status</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&family=Patrick+Hand&display=swap">
+<style>
+/* Layout: one paper column; sections are pages of a status notebook. Single theme by design (Sal: one theme, never dark mode). */
+:root {
+  --paper: #fbf6ea;
+  --paper-deep: #efe6d2;
+  --ink: #3b2f2f;
+  --ink-soft: #7a6a5a;
+  --crayon-red: #d83a3a;
+  --crayon-yellow: #fbbf24;
+  --crayon-green: #1f9d4f;
+  --crayon-blue: #3b6fd6;
+  --lilac: #e6ddec;
+  --purple: #7b5c91;
+  --sage: #dce7d5;
+  --coral: #d9937e;
+  --card: #fffdf7;
+  --font-hand: "Patrick Hand", "Comic Sans MS", "Chalkboard SE", cursive;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Menlo, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { background: var(--paper); }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+}
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 40px; }
+h1, h2, h3 { font-family: var(--font-hand); font-weight: 400; text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2.4rem, 6vw, 3.6rem); }
+h2 { font-size: 2rem; }
+h3 { font-size: 1.4rem; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+a { color: var(--crayon-blue); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--crayon-yellow); outline-offset: 2px; }
+section { display: grid; gap: 16px; min-width: 0; }
+
+header.top { display: grid; gap: 14px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 2px solid var(--ink); border-radius: 999px; padding: 2px 12px;
+  font-family: var(--font-hand); font-size: 1.1rem; background: var(--card);
+}
+.pill.red { background: #fde2e2; }
+.pill.yellow { background: #fff1c7; }
+.pill.green { background: #dcf2e2; }
+.dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink); }
+.dot.red { background: var(--crayon-red); }
+.dot.yellow { background: var(--crayon-yellow); }
+.dot.green { background: var(--crayon-green); }
+
+.sticker {
+  background: var(--card); border: 2.5px solid var(--ink); border-radius: 16px;
+  box-shadow: 4px 4px 0 var(--ink); padding: 18px 20px; display: grid; gap: 10px; min-width: 0;
+}
+.sticker.alert { background: #fde2e2; transform: rotate(-0.4deg); }
+.sticker.lilac { background: var(--lilac); }
+.sticker.sage { background: var(--sage); }
+
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+
+.tally { display: grid; gap: 4px; }
+.tally .n { font-family: var(--font-hand); font-size: 2.6rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.tally .l { color: var(--ink-soft); }
+.sev { display: flex; flex-wrap: wrap; gap: 6px; font-size: 0.92rem; }
+.sev span { border: 1.5px solid var(--ink); border-radius: 8px; padding: 0 8px; background: var(--paper); font-variant-numeric: tabular-nums; }
+.sev .b { background: #fde2e2; }
+.sev .m { background: #fff1c7; }
+
+ol.asks, ol.decide { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; counter-reset: q; }
+ol.asks > li, ol.decide > li {
+  counter-increment: q; display: grid; grid-template-columns: 40px 1fr; gap: 12px; align-items: start;
+}
+ol.asks > li::before, ol.decide > li::before {
+  content: counter(q); font-family: var(--font-hand); font-size: 1.5rem; width: 36px; height: 36px;
+  border: 2.5px solid var(--ink); border-radius: 50%; display: grid; place-items: center; background: var(--crayon-yellow);
+}
+ol.decide > li::before { background: var(--lilac); }
+.qbody { display: grid; gap: 6px; min-width: 0; }
+.qbody strong { font-size: 1.05rem; }
+.rec { color: var(--crayon-green); font-weight: 700; }
+
+.cmd { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
+.cmd pre {
+  margin: 0; flex: 1; min-width: 0; overflow-x: auto; background: var(--ink); color: var(--paper);
+  border-radius: 10px; padding: 10px 12px; font-family: var(--font-mono); font-size: 0.86rem; white-space: pre;
+}
+.cmd button {
+  font-family: var(--font-hand); font-size: 1.1rem; background: var(--crayon-yellow); color: var(--ink);
+  border: 2.5px solid var(--ink); border-radius: 10px; box-shadow: 3px 3px 0 var(--ink); padding: 0 14px; cursor: pointer; min-height: 44px;
+}
+.cmd button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+
+.tablewrap { overflow-x: auto; border: 2.5px solid var(--ink); border-radius: 14px; background: var(--card); box-shadow: 4px 4px 0 var(--ink); }
+table { border-collapse: collapse; width: 100%; font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 12px; vertical-align: top; border-bottom: 1.5px solid var(--paper-deep); }
+th { font-family: var(--font-hand); font-size: 1.15rem; font-weight: 400; background: var(--paper-deep); border-bottom: 2px solid var(--ink); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+tr.hl td { background: #fff7dc; }
+
+.bars { display: grid; gap: 10px; }
+.bar { display: grid; grid-template-columns: minmax(150px, 230px) 1fr 76px; gap: 10px; align-items: center; }
+.bar .lab { font-size: 0.95rem; }
+.bar .track { height: 22px; border: 2px solid var(--ink); border-radius: 8px; background: var(--paper); position: relative; overflow: hidden; }
+.bar .fill { position: absolute; inset: 0 auto 0 0; border-right: 2px solid var(--ink); }
+.bar .fill.typ { background: var(--coral); }
+.bar .fill.con { background: repeating-linear-gradient(45deg, var(--coral) 0 6px, var(--paper) 6px 10px); }
+.bar .val { font-family: var(--font-mono); font-size: 0.88rem; text-align: right; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.9rem; color: var(--ink-soft); }
+.legend i { display: inline-block; width: 18px; height: 12px; border: 2px solid var(--ink); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+ul.tight { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+ul.tight li { max-width: 72ch; }
+
+details { border: 2px dashed var(--ink-soft); border-radius: 12px; padding: 10px 14px; background: var(--paper); }
+details[open] { background: var(--card); }
+summary { cursor: pointer; font-family: var(--font-hand); font-size: 1.2rem; min-height: 32px; }
+details > div { margin-top: 10px; }
+
+.consent-stage { display: grid; place-items: center; padding: 26px 12px; background: var(--paper-deep); border-radius: 18px; border: 2.5px solid var(--ink); }
+.consent {
+  width: min(460px, 100%); background: var(--paper); border: 3px solid var(--ink); border-radius: 22px;
+  box-shadow: 6px 6px 0 var(--ink); padding: 24px 24px 20px; display: grid; gap: 14px; transform: rotate(-0.6deg);
+  font-family: var(--font-hand); font-size: 1.22rem; line-height: 1.35;
+}
+.consent h3 { font-size: 1.9rem; }
+.consent p { max-width: none; }
+.consent .btns { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.consent .yes, .consent .no {
+  font-family: var(--font-hand); font-size: 1.3rem; border: 2.5px solid var(--ink); border-radius: 14px;
+  box-shadow: 3px 3px 0 var(--ink); padding: 6px 22px; min-height: 48px; color: var(--ink);
+}
+.consent .yes { background: var(--crayon-green); color: #fff; }
+.consent .no { background: var(--paper); }
+.consent .pp { margin-left: auto; color: var(--crayon-blue); text-decoration: underline; }
+
+.lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+.lane h3 { font-size: 1.35rem; }
+.lane .who { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-soft); }
+.lane ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 0.94rem; }
+
+.path { font-family: var(--font-mono); font-size: 0.82rem; word-break: break-all; color: var(--ink-soft); }
+.pending { font-family: var(--font-hand); font-size: 1.2rem; color: var(--purple); }
+
+@media (max-width: 560px) {
+  .bar { grid-template-columns: 1fr 64px; }
+  .bar .lab { grid-column: 1 / -1; }
+  .consent .pp { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <h1>Squiggletale 1.0</h1>
+  <div class="meta">
+    <span class="pill">2026-11-04</span>
+    <span class="pill red"><span class="dot red"></span>Production drawing down</span>
+    <span class="pill yellow"><span class="dot yellow"></span>Audit 4 of 5 reports in</span>
+    <span class="pill">Next: your answers, then fixes</span>
+  </div>
+</header>
+
+<section>
+  <h2>Where we are</h2>
+  <div class="sticker alert">
+    <h3>Drawing is down in production right now</h3>
+    <p>The Anthropic key in production and on this machine was revoked (both answer 401). Every draw fails in about 180 ms, the child sees a blank page, and the minutes are still charged. A new key fixes it in minutes. It's the first item below.</p>
+  </div>
+  <div class="grid3">
+    <div class="sticker">
+      <div class="tally"><span class="n">33</span><span class="l">Server, money and privacy findings</span></div>
+      <div class="sev"><span class="b">3 blockers</span><span class="m">19 must</span><span>10 polish</span><span>1 for 1.1</span></div>
+    </div>
+    <div class="sticker">
+      <div class="tally"><span class="n">40</span><span class="l">Studio and iOS shell findings</span></div>
+      <div class="sev"><span class="b">3 blockers</span><span class="m">22 must</span><span>14 polish</span><span>1 for 1.1</span></div>
+    </div>
+    <div class="sticker">
+      <div class="tally"><span class="n">21</span><span class="l">Simulator walk findings, 5 devices</span></div>
+      <div class="sev"><span class="b">4 blockers</span><span class="m">10 must</span><span>7 polish</span></div>
+    </div>
+    <div class="sticker">
+      <div class="tally"><span class="n">10</span><span class="l">Store preflight failures</span></div>
+      <div class="sev"><span>6 warnings</span><span>7 pass</span></div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="sticker sage">
+      <h3>Good news</h3>
+      <ul class="tight">
+        <li>A minute of story costs about <strong>1.3¢</strong> to serve now, against the 3.4¢ the pricing plan assumed. Every pack keeps 65–94% margin even if every minute is used.</li>
+        <li>On-device ears (Apple SpeechAnalyzer) cost $0 and keep the child's audio on the iPad.</li>
+        <li>iPad-sized layouts look right in the browser at all three iPad sizes (the simulator walk confirms on real builds). No analytics or ads SDKs, no leaked keys in the bundle, and the review prompt never fires.</li>
+        <li>App Store Connect has the app at 1.0, Prepare for Submission, with the three packs created.</li>
+      </ul>
+    </div>
+    <div class="sticker">
+      <h3>Still running</h3>
+      <ul class="tight">
+        <li><strong>Simulator re-run</strong> of drawing, The End, sharing and video export, once the key is back. <span class="pending">pending</span></li>
+        <li><strong>Haiku 5.5 vs Sonnet 5.5 drawing bench</strong>: plumbing committed, blocked on the new Anthropic key. <span class="pending">pending</span></li>
+        <li><strong>Voice tests with a kid's voice</strong>: wait on BlackHole on the mini. <span class="pending">pending</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Waiting on you</h2>
+  <ol class="asks">
+    <li><div class="qbody">
+      <strong>New Anthropic key (production is down until this lands)</strong>
+      <div class="cmd"><pre>keys new anthropic --project onceupon-f</pre><button type="button" data-copy="! keys new anthropic --project onceupon-f">Copy</button></div>
+      <div class="cmd"><pre>keys add anthropic --project onceupon-f --clipboard --env apps/web/.env --replace</pre><button type="button" data-copy="! keys add anthropic --project onceupon-f --clipboard --env apps/web/.env --replace">Copy</button></div>
+      <p>Then I push it to Drydock, redeploy, prove a real drawing end to end, and restart the bench.</p>
+    </div></li>
+    <li><div class="qbody">
+      <strong>Anthropic Console spend limit</strong>
+      <p>Today the only hard ceiling on Claude spend is the org's rate limit. Set a monthly limit in the Console (Settings → Limits). I recommend <strong>$500 a month</strong> until revenue shows up. While you're there, read Settings → Privacy Controls → Data retention period and tell me if it says zero retention; the privacy policy will name it.</p>
+    </div></li>
+    <li><div class="qbody">
+      <strong>BlackHole on the Mac mini (needs sudo)</strong>
+      <div class="cmd"><pre>ssh -t mini 'brew install --cask blackhole-2ch'</pre><button type="button" data-copy="! ssh -t mini 'brew install --cask blackhole-2ch'">Copy</button></div>
+      <p>It gives the simulators a microphone, so we can play kid-voice clips into every ears engine.</p>
+    </div></li>
+    <li><div class="qbody">
+      <strong>ElevenLabs key</strong>
+      <div class="cmd"><pre>keys new elevenlabs --project onceupon-f</pre><button type="button" data-copy="! keys new elevenlabs --project onceupon-f">Copy</button></div>
+      <p>The intro and coach voices are OpenAI TTS today. They get re-recorded on Eleven v4, and the kid-voice test clips come from it too.</p>
+    </div></li>
+    <li><div class="qbody">
+      <strong>Small Business Program</strong>
+      <p>Confirm QuickGame World Inc. is enrolled. Apple's cut is 15% if it is and 30% if not. The margins below assume 15%.</p>
+    </div></li>
+    <li><div class="qbody">
+      <strong>Namecheap nameservers (later in the run)</strong>
+      <p>Once I create the squiggletale.com zone in Route53, I'll hand you the four nameservers to paste into Namecheap.</p>
+    </div></li>
+  </ol>
+</section>
+
+<section>
+  <h2>Decisions for you</h2>
+  <ol class="decide">
+    <li><div class="qbody">
+      <strong>The free first story</strong>
+      <p><span class="rec">Rec: 5 minutes, plus a 3-minute Saturday story every week.</span> Today it's 2 minutes, and a typical story runs about 5 (the packs say "about eight stories" for 40 minutes). The first story runs out mid-story, which is a bad first impression for a child and a parent. Cost: about 6.5¢ per install on Sonnet (0.5¢ on Haiku), so 1,000 installs a day costs $65.</p>
+    </div></li>
+    <li><div class="qbody">
+      <strong>Quiet time stops the meter sooner</strong>
+      <p><span class="rec">Rec: the coach nudges after 30 s of quiet and the story ends after 60 s.</span> Today it's 90 s and 210 s, so a child who walks away loses 3.5 paid minutes.</p>
+    </div></li>
+    <li><div class="qbody">
+      <strong>Pricing model for 1.0</strong>
+      <p><span class="rec">Rec: keep the three packs and their prices.</span> They're built, verified on the server and already in App Store Connect, and consumables are the easiest money to get through a first Kids review. Revisit a subscription or a one-time unlock in 1.1 with four weeks of real minutes per story and purchase rates. Options and numbers are in the next section.</p>
+    </div></li>
+    <li><div class="qbody">
+      <strong>Drawing model</strong>
+      <p><span class="rec">Rec: switch to Haiku 5.5 only if the bench shows equal pictures; otherwise stay on Sonnet 5.5.</span> Haiku is about 15× cheaper per minute after its larger tokenizer, which is what would make a generous free tier or an unlimited plan safe. I'll show you the side-by-side contact sheets before switching.</p>
+    </div></li>
+    <li><div class="qbody">
+      <strong>Gift codes inside the app</strong>
+      <p><span class="rec">Rec: hide gift-code and family-code redemption in the iOS app for 1.0</span>, and keep redemption on the website. Redeeming Stripe-sold codes in a Kids app is the kind of money question that sends a first review to the specialist queue (3.1.1). It comes back in 1.1 with notes.</p>
+    </div></li>
+    <li><div class="qbody">
+      <strong>The child's first name on shared story pages</strong>
+      <p><span class="rec">Rec: cut the "Who made it?" field for 1.0.</span> It puts a child's name on a public URL.</p>
+    </div></li>
+    <li><div class="qbody">
+      <strong>The support address</strong>
+      <p><span class="rec">Rec: support@squiggletale.com, forwarded to your inbox.</span> Today the app, the privacy policy and the App Store listing would all show sal@quickga.me. I set up the forwarding when the domain moves.</p>
+    </div></li>
+    <li><div class="qbody">
+      <strong>The parent consent card</strong>
+      <p><span class="rec">Rec: ship this card</span> on the first mic tap or first typed story, behind the parental gate. "Not now" keeps the mic and typing off; the bookshelf, replays and intro still work. Grown-ups gets a "Drawing with AI" row to turn it off. The server refuses to draw until a device has said yes.</p>
+      <div class="consent-stage">
+        <div class="consent" role="img" aria-label="Mock of the parent consent card">
+          <h3>Before the first story</h3>
+          <p>To draw a story, Squiggletale sends the words your child says, as text, to our server, which asks Anthropic's Claude AI to turn them into a drawing.</p>
+          <p>Speech becomes words on this device. Recordings of your child's voice never leave it unless you share a story.</p>
+          <p>Anthropic doesn't use these words to train its models and deletes them within 30 days.</p>
+          <div class="btns"><span class="yes">I agree</span><span class="no">Not now</span><span class="pp">Privacy Policy</span></div>
+        </div>
+      </div>
+    </div></li>
+  </ol>
+</section>
+
+<section>
+  <h2>What a minute costs</h2>
+  <div class="sticker">
+    <div class="bars" role="img" aria-label="Cost per mic minute: old plan 3.4 cents; Sonnet 5.5 typical 1.3, conservative 3.0; Haiku 5.5 estimate typical 0.09, conservative 0.2">
+      <div class="bar"><span class="lab">Old plan (Sonnet 5 + Deepgram)</span><span class="track"><span class="fill typ" style="width:100%"></span></span><span class="val">3.4¢</span></div>
+      <div class="bar"><span class="lab">Sonnet 5.5, conservative</span><span class="track"><span class="fill con" style="width:88.2%"></span></span><span class="val">3.0¢</span></div>
+      <div class="bar"><span class="lab">Sonnet 5.5, typical</span><span class="track"><span class="fill typ" style="width:38.2%"></span></span><span class="val">1.3¢</span></div>
+      <div class="bar"><span class="lab">Haiku 5.5, conservative (est.)</span><span class="track"><span class="fill con" style="width:5.9%"></span></span><span class="val">0.2¢</span></div>
+      <div class="bar"><span class="lab">Haiku 5.5, typical (est.)</span><span class="track"><span class="fill typ" style="width:2.6%"></span></span><span class="val">0.09¢</span></div>
+    </div>
+    <div class="legend"><span><i style="background:var(--coral)"></i>typical: 6 draws a mic minute</span><span><i style="background:repeating-linear-gradient(45deg,var(--coral) 0 6px,var(--paper) 6px 10px)"></i>conservative: 8 draws, plus 30% restarts</span><span>Ears on device: $0 in every row but the first</span></div>
+  </div>
+  <p>Measured: 1 draw on Sonnet 5.5 kit costs $0.00168 (5,761 tokens read from cache, 95 fresh, 34 out). Haiku 5.5 is $0.10 / $0.50 per million tokens against Sonnet's $2 / $10, with a tokenizer that uses about 30% more tokens; the bench replaces this estimate.</p>
+
+  <h3>Packs at full use (Sonnet 5.5)</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Pack</th><th class="num">Price</th><th class="num">You keep (15%)</th><th class="num">Cost if every minute is used</th><th class="num">Margin</th><th class="num">Per minute</th></tr></thead>
+      <tbody>
+        <tr><td>Story pack, 40 min</td><td class="num">$9.99</td><td class="num">$8.49</td><td class="num">$0.52–1.20</td><td class="num">86–94%</td><td class="num">25¢</td></tr>
+        <tr class="hl"><td>Big pack, 120 min (featured)</td><td class="num">$19.99</td><td class="num">$16.99</td><td class="num">$1.56–3.60</td><td class="num">79–91%</td><td class="num">17¢</td></tr>
+        <tr><td>Family pack, 400 min</td><td class="num">$39.99</td><td class="num">$33.99</td><td class="num">$5.20–12.00</td><td class="num">65–85%</td><td class="num">10¢</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Where the cost risk actually is</h3>
+  <p>Paying minutes are cheap. The exposure is free devices and abuse: today our server takes whatever prompt the client sends, devices are free to create, and nothing stops spend globally.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Scenario</th><th>Today</th><th>After the fixes</th></tr></thead>
+      <tbody>
+        <tr><td>1,000 honest free installs a day</td><td>$26–60 a day</td><td>$65–150 a day with a 5-minute first story on Sonnet; $4–10 on Haiku; capped by a daily stop for free devices</td></tr>
+        <tr class="hl"><td>A script abusing the server as free Claude</td><td><strong>Unbounded.</strong> Up to $0.45 a call, unlimited parallel calls, unlimited new devices</td><td>Only our prompts accepted, about 3¢ a call at most, one call at a time per device, sign-ups rate-limited per IP, free devices stopped at a daily line</td></tr>
+        <tr><td>Same abuser on cloud ears</td><td>About $18 per device per day on Deepgram</td><td>$0: no cloud ears in the app, keys removed from production</td></tr>
+        <tr><td>A runaway client loop</td><td>$3 per device per day; 10,000 devices is $30,000</td><td>One call in flight, calls tied to charged minutes, global daily stop, Console monthly limit</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Pricing options</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Model</th><th>How it works</th><th>For</th><th>Against</th></tr></thead>
+      <tbody>
+        <tr class="hl"><td><strong>Packs (rec for 1.0)</strong></td><td>$9.99 / $19.99 / $39.99 for 40 / 120 / 400 minutes, plus the free first story and the Saturday story</td><td>Built and verified. Simplest Kids review. No cost risk: you're paid before the minutes run</td><td>A meter is a little anxious for kids. No recurring revenue</td></tr>
+        <tr><td>Subscription</td><td>About $5.99 a month or $39.99 a year, with a fair-use daily cap</td><td>Recurring revenue; no meter for the child</td><td>More review surface (3.1.2 terms, manage subscription). Needs new IAPs and a new paywall. Better as 1.1 with data</td></tr>
+        <tr><td>One-time unlock</td><td>$19.99 forever, with a daily cap</td><td>Parents love it; easiest message</td><td>Only safe on Haiku: a heavy user at 30 min a day costs $142 a year on Sonnet, $10 on Haiku</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Voice</h2>
+  <div class="grid2">
+    <div class="sticker">
+      <h3>The 1.0 ears</h3>
+      <ul class="tight">
+        <li><strong>Apple SpeechAnalyzer</strong> first (iOS 26+, on device, true streaming, $0, no download in our app).</li>
+        <li><strong>Apple on-device dictation</strong> as the fallback for older iPads.</li>
+        <li>If neither can run, the child sees a clear message and can still type. Today the app quietly falls back to cloud ears on five different paths; 1.0 removes every one.</li>
+        <li><strong>Whistle</strong> (17 MB) stays out unless the kid-voice test shows it clearly beats Apple, and then only with its telemetry off.</li>
+      </ul>
+    </div>
+    <div class="sticker">
+      <h3>What we don't know yet</h3>
+      <ul class="tight">
+        <li>No engine has ever been measured on a child's voice, ours or anyone's in your projects. The voice test scores 20–30 clips with known words per engine: word error rate and lag.</li>
+        <li>Interruptions (a call, Siri, AirPods) leave the mic showing "listening" while hearing nothing, and the meter keeps charging. Fixed in the native runners.</li>
+        <li>The 90-second coach line "Just say: The End!" plays through the speaker, gets heard by the mic, and ends the story by itself. Fixed by muting the ears while the coach talks.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="sticker lilac">
+    <h3>A local drawing model</h3>
+    <p>The ears are already local. Drawing locally means Apple's on-device Foundation Model, and today it doesn't fit: its context is about 4,000 tokens and our drawing instructions alone are 5,757. It would need a much smaller prompt or a trained adapter, and its picture quality is unknown. I'd run it as a 1.x experiment once Haiku has set the quality bar, not as part of 1.0.</p>
+  </div>
+</section>
+
+<section>
+  <h2>On the simulators</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Step</th><th>iPhone 18 Pro</th><th>iPhone 17e</th><th>iPad Pro 13</th><th>iPad (A16)</th><th>iPad mini</th></tr></thead>
+      <tbody>
+        <tr><td>Launch and intro</td><td>Pass, 5.7 s to first paint</td><td>Pass</td><td>Pass</td><td>9–12 s of blank paper</td><td>Pass</td></tr>
+        <tr><td>Permissions</td><td>Speech denied: cloud ears</td><td>Mic denied: cloud ears</td><td>Same as A16</td><td>Pass on Allow; false mic text</td><td>Same as A16</td></tr>
+        <tr><td>Parental gate</td><td>Pass, too easy</td><td>Answers under the keyboard</td><td>Pass</td><td>Pass</td><td>Pass</td></tr>
+        <tr class="hl"><td>Typed story</td><td colspan="5">Blocked: every drawing fails on the revoked key, and minutes still count down (2:00 → 1:56 → 1:49)</td></tr>
+        <tr><td>Shelf, replay, delete</td><td>Pass</td><td>Not run</td><td>Not run</td><td>Pass</td><td>Not run</td></tr>
+        <tr><td>Grown-ups</td><td>Pass</td><td>Not run</td><td>Pass</td><td>Legal links reach the web shop</td><td>Pass</td></tr>
+        <tr><td>Money</td><td>Pass; landscape paywall clipped</td><td>Not run</td><td>Pass</td><td>StoreKit and Restore pass; minutes chip stale</td><td>Pass</td></tr>
+        <tr><td>Video export</td><td>Not run</td><td>Not run</td><td>Not run</td><td>Hangs at 3%; Cancel does nothing</td><td>Not run</td></tr>
+        <tr><td>Lifecycle</td><td>Landscape broken</td><td>Dynamic Type ignored</td><td>Pass</td><td>Background, kill, relaunch pass</td><td>Pass</td></tr>
+        <tr><td>Voice with a real voice</td><td colspan="5">Waits on BlackHole</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="grid2">
+    <div class="sticker">
+      <h3>What the walk adds</h3>
+      <ul class="tight">
+        <li>Denying the mic shows "I'm listening", burns the free minutes to zero on cloud ears, and leaves no way to Settings.</li>
+        <li>Privacy, Terms and Support open inside the app with the full site nav, so the Stripe shop is one tap away.</li>
+        <li>The minutes chip shows 2:00 while the real balance is 1:49.</li>
+        <li>A failed sign-up with our server reads "needs the internet" at 0:00, with no retry.</li>
+        <li>The base iPad shows blank paper for 9–12 s at first launch.</li>
+        <li>The web inspector is switched on in the release build.</li>
+      </ul>
+    </div>
+    <div class="sticker sage">
+      <h3>Already working</h3>
+      <ul class="tight">
+        <li>Nothing prompts at launch. The gate comes before the first mic use, and speech is asked before the mic.</li>
+        <li>The three packs load from the App Store sandbox at $9.99, $19.99 and $39.99. Buy goes through the gate to Apple's sheet, and Restore works.</li>
+        <li>At zero, "The crayon fell asleep" end card leads to the paywall.</li>
+        <li>Stories survive kill and relaunch; iPad landscape is right on all three iPads.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="sticker lilac">
+    <h3>Decided: iPhone stays in portrait</h3>
+    <p>On a landscape iPhone the book shrinks to a strip and the paywall's Buy button is cut off. For 1.0 the iPhone locks to portrait, where the paper already fits well; iPads keep all four orientations.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Must fix before review</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Id</th><th>What</th><th>Why it matters</th></tr></thead>
+      <tbody>
+        <tr class="hl"><td class="mono">V-14</td><td>Production App Store purchases can't be verified (sandbox setting, no app id)</td><td>Review passes on sandbox buys, then real parents pay and get no minutes</td></tr>
+        <tr><td class="mono">V-03</td><td>The server rejects every draw after about 20 sentences</td><td>Paid stories stop drawing about 3 minutes in, while still charging</td></tr>
+        <tr><td class="mono">S-01</td><td>Five paths still send a child's audio to Deepgram or OpenAI</td><td>Breaks the Kids decision (on-device ears only)</td></tr>
+        <tr><td class="mono">S-02 · V-20</td><td>No parent consent before story words go to Claude</td><td>Guideline 5.1.2(i)</td></tr>
+        <tr><td class="mono">R4 · V-27</td><td>Legal pages inside the app show the site nav, one tap from the Stripe shop</td><td>Guidelines 1.3 and 3.1.1</td></tr>
+        <tr><td class="mono">S-03</td><td>The video Share button opens the iOS share sheet with no parental gate</td><td>Guideline 1.3</td></tr>
+        <tr><td class="mono">V-26</td><td>The privacy policy contradicts the app: names Deepgram and OpenAI, never names Anthropic, no retention, no postal address</td><td>Kids Category and COPPA notice requirements</td></tr>
+        <tr><td class="mono">V-17 · S-04</td><td>Stripe-sold gift codes unlock minutes inside the app</td><td>Guideline 3.1.1 risk</td></tr>
+        <tr><td class="mono">V-06</td><td>The relay is an open Claude proxy</td><td>Unbounded cost</td></tr>
+        <tr><td class="mono">S-13</td><td>A failed drawing shows nothing and still charges</td><td>What's happening in production right now</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <details>
+    <summary>Everything else going into 1.0</summary>
+    <div class="grid2">
+      <div>
+        <h3>Server, money, privacy</h3>
+        <ul class="tight">
+          <li>One draw in flight per device; aborted calls counted; draws tied to charged minutes (V-07, V-01)</li>
+          <li>Global daily spend stop for free devices; alerts every 10 min with working email (V-08, V-32)</li>
+          <li>No cloud-ears tokens for iOS; Deepgram and OpenAI keys out of production (V-09)</li>
+          <li>20 s upstream timeout, 1 retry, first-token deadline (V-10)</li>
+          <li>Per-IP rate limits on sign-up and public mutations (V-02, V-29)</li>
+          <li>No charge when drawing failed (V-05)</li>
+          <li>Stripe webhook records the event after crediting, not before (V-15)</li>
+          <li>Unfinished App Store transactions retried at launch (V-16)</li>
+          <li>Admin sign-up closed after the two accounts exist (V-28)</li>
+          <li>Admin "delete device"; retention job (words 30 days, call logs 180 days, idle devices 18 months) (V-21, V-22)</li>
+          <li>Ad attribution off (V-23); no request bodies in error logs (V-24)</li>
+          <li>Deploys stop running <code>--accept-data-loss</code> on the production database (V-31)</li>
+          <li>Sandbox purchases excluded from revenue; first money-path tests (V-18, V-33)</li>
+        </ul>
+      </div>
+      <div>
+        <h3>App</h3>
+        <ul class="tight">
+          <li>Mic or speech permission denied: a message and a gated "Open Settings" (S-09)</li>
+          <li>Pause-then-resume race; stuck "Getting ready…" during the first model download (S-11, S-14, S-15, S-17)</li>
+          <li>True mic purpose string: recordings stay on the device unless shared (S-05)</li>
+          <li>A harder parental gate: spelled-out multiplication (S-06)</li>
+          <li>Engineer controls out of Grown-ups: the ears picker and mic panel (S-18)</li>
+          <li>Phone landscape and small iPhone layouts; paywall links to Privacy and Terms (S-21, S-22, S-23)</li>
+          <li>Replay matches the studio; copy fixes; tap targets at 44 px; taglines removed (S-26, S-27, S-28)</li>
+          <li>MP4: the real logo and squiggletale.com on the end card; AAC audio checked in the iOS WebView (S-30, S-31)</li>
+          <li>Unused plugins out (notifications, store review, orientation, Face ID string, attribution module) (S-33, S-07)</li>
+          <li>Intro and coach voices re-recorded on ElevenLabs v4 (S-39)</li>
+          <li>VoiceOver follows the story; reduced motion calms the stage (S-36, S-37)</li>
+          <li>The offline copy bundled in the app points at production, not localhost (V-30)</li>
+          <li>Minutes chip always shows the real balance; a failed sign-up retries (M2, M9)</li>
+          <li>Video export: Cancel works, a stalled encoder is caught (M6)</li>
+          <li>Splash stays up until the studio paints; web inspector off in release (P2, P7)</li>
+          <li>iPhone locked to portrait; the gate asks once when buying from Grown-ups (M8, P4)</li>
+        </ul>
+      </div>
+    </div>
+  </details>
+</section>
+
+<section>
+  <h2>The fix run</h2>
+  <p>Four agents, each owning its own files, with the shared contracts written by me first. I review every hand-off, push only after a clean typecheck and test run on the exact commit, and the simulator walk re-runs on the result.</p>
+  <div class="lanes">
+    <div class="sticker lane">
+      <h3>Server</h3>
+      <span class="who">opus-high · apps/web/server</span>
+      <ul><li>Relay lockdown and spend stop</li><li>Consent record and enforcement</li><li>Purchases, Stripe, retention, delete</li><li>Rate limits, timeouts, tests</li></ul>
+    </div>
+    <div class="sticker lane">
+      <h3>Studio voice and safety</h3>
+      <span class="who">opus-high · src/story, src/speech, gates</span>
+      <ul><li>Cloud ears gone from the app</li><li>Consent card and "Not now"</li><li>Every voice failure gets a message</li><li>Share gate, gift codes hidden, harder gate</li></ul>
+    </div>
+    <div class="sticker lane">
+      <h3>Studio polish</h3>
+      <span class="who">opus-high · layouts, paywall, replay, mp4</span>
+      <ul><li>Phone landscape, small phones</li><li>Paywall, replay, copy, tap targets</li><li>MP4 end card and logo</li><li>Accessibility, smaller bundle</li></ul>
+    </div>
+    <div class="sticker lane">
+      <h3>iOS shell</h3>
+      <span class="who">opus-high · apps/mobile, builds on the mini</span>
+      <ul><li>Interruptions and AirPods in the Swift ears</li><li>Plugins, Whistle, attribution out</li><li>Purpose strings, open Settings</li><li>Release bundle, unfinished purchases</li></ul>
+    </div>
+  </div>
+  <div class="sticker">
+    <h3>What I do myself</h3>
+    <ul class="tight">
+      <li>Production key, Drydock env (Apple production verifier, alerts), redeploys</li>
+      <li>Privacy policy, terms and support pages rewritten for the 1.0 app; legal pages without the shop nav</li>
+      <li>squiggletale.com: Route53 zone, Drydock domain and TLS, redirects that never touch the API, Stripe and Apple webhook URLs</li>
+      <li>New voices on ElevenLabs v4 (you pick the narrator from three samples)</li>
+      <li>Store packet: review notes for your cold read, demo video, iPhone and 13" iPad screenshots, IAP metadata, privacy labels, age rating, TestFlight build from the mini</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>After 1.0</h2>
+  <div class="grid2">
+    <div class="sticker">
+      <h3>1.1</h3>
+      <ul class="tight">
+        <li>Colored pencils and markers next to the crayon</li>
+        <li>The website rebuilt from scratch on squiggletale.com</li>
+        <li>Gift codes in the app, with notes for review</li>
+        <li>Pricing revisited with real data: subscription or unlock test</li>
+        <li>App Attest to make free devices expensive to fake</li>
+        <li>Apple Ads seed campaign, with attribution switched back on</li>
+      </ul>
+    </div>
+    <div class="sticker">
+      <h3>Ideas worth a look</h3>
+      <ul class="tight">
+        <li>Read-aloud replay: a warm narrator reads the child's own story back over the drawing</li>
+        <li>Characters that come back: "the dragon from last time"</li>
+        <li>Sibling profiles on one iPad, each with a bookshelf</li>
+        <li>A printed book of a story, sold on the website</li>
+        <li>A local drawing model experiment (see Voice)</li>
+        <li>Android, once iOS has a month of data</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Reports</h2>
+  <ul class="tight">
+    <li class="path">W:\junk\onceupon-f\audit-server.md</li>
+    <li class="path">W:\junk\onceupon-f\audit-studio.md</li>
+    <li class="path">W:\junk\onceupon-f\sim\report.md</li>
+    <li class="path">W:\junk\onceupon-f\sim\</li>
+    <li class="path">W:\junk\onceupon-f\ears-digest.md</li>
+    <li class="path">W:\junk\onceupon-f\preflight-2026-11-04.txt</li>
+    <li class="path">W:\junk\onceupon-f\studio-shots\</li>
+    <li class="path">W:\code\onceupon-f\plans\2026-11-04-launch-1-0.md</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+document.querySelectorAll('button[data-copy]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var text = b.getAttribute('data-copy') || '';
+    var done = function () { var t = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = t; }, 1400); };
+    try {
+      navigator.clipboard.writeText(text).then(done, function () { selectPre(b); });
+    } catch (e) { selectPre(b); }
+  });
+});
+function selectPre(b) {
+  var pre = b.parentElement && b.parentElement.querySelector('pre');
+  if (!pre) return;
+  var r = document.createRange(); r.selectNodeContents(pre);
+  var s = window.getSelection(); if (s) { s.removeAllRanges(); s.addRange(r); }
+}
+</script>
