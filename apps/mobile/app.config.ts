@@ -18,9 +18,9 @@ const EAS_PROJECT_ID = process.env.EAS_PROJECT_ID ?? '2606405b-8283-4717-a35b-25
 const PAPER = '#fbf6ea'
 
 // Info.plist usage strings (parents read these in the iOS permission prompts).
-const MIC_USAGE = `${BRAND.name} listens while your child tells a story so the crayon can draw it. Audio is transcribed live and never stored.`
+const MIC_USAGE = `${BRAND.name} listens while your child tells a story so the crayon can draw it. Speech is turned into words on this device, and the recording stays on this device unless a grown-up shares the story.`
 const PHOTOS_ADD_USAGE = `${BRAND.name} saves your story videos to your Photos.`
-const SPEECH_USAGE = `${BRAND.name} turns your child's spoken story into words so the crayon can draw it.`
+const SPEECH_USAGE = `${BRAND.name} turns your child's spoken story into words on this device so the crayon can draw it.`
 // The splash image's paper tone (sampled from the generated icon) so the letterbox matches the art.
 const SPLASH_PAPER = '#f9f0d0'
 
@@ -100,11 +100,8 @@ export default ({ config }: ConfigContext): ExpoConfig =>
         // handlers and evaluateJavaScript on any navigation it does not treat as app-bound (file:// never
         // is), which silently removed window.ReactNativeWebView and broke the whole bridge.
         ITSAppUsesNonExemptEncryption: false,
-        UISupportedInterfaceOrientations: [
-          'UIInterfaceOrientationLandscapeLeft',
-          'UIInterfaceOrientationLandscapeRight',
-          'UIInterfaceOrientationPortrait',
-        ],
+        // iPhone is portrait only for 1.0 (its landscape layout is broken); iPad keeps all four.
+        UISupportedInterfaceOrientations: ['UIInterfaceOrientationPortrait'],
         'UISupportedInterfaceOrientations~ipad': [
           'UIInterfaceOrientationPortrait',
           'UIInterfaceOrientationPortraitUpsideDown',
@@ -128,11 +125,10 @@ export default ({ config }: ConfigContext): ExpoConfig =>
     plugins: [
       'expo-iap',
       'expo-updates',
-      'expo-secure-store',
-      [
-        'expo-splash-screen',
-        { image: './assets/splash.png', backgroundColor: SPLASH_PAPER, resizeMode: 'contain' },
-      ],
+      // Keychain only, never biometrics: no NSFaceIDUsageDescription.
+      ['expo-secure-store', { faceIDPermission: false }],
+      // Stays up until the studio's `ready` (StudioWebView has a 20 s backstop).
+      ['expo-splash-screen', { image: './assets/splash.png', backgroundColor: SPLASH_PAPER, imageWidth: 220 }],
       'expo-dev-client',
       // Add-only Photos access for saving exported videos; never the full-library read permission.
       [
@@ -154,10 +150,7 @@ export default ({ config }: ConfigContext): ExpoConfig =>
       ],
       'expo-web-browser',
       'expo-localization',
-      'expo-screen-orientation',
       'expo-system-ui',
-      // Installed for later; the app never prompts on its own (kids app, grown-up action only).
-      'expo-notifications',
       [
         'expo-speech-recognition',
         { speechRecognitionPermission: SPEECH_USAGE, microphonePermission: MIC_USAGE },

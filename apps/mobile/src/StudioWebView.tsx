@@ -15,9 +15,12 @@ import { localSource, remoteSource, type StudioSource } from './studio-source'
 const PAPER = '#fbf6ea'
 // If the remote studio has not loaded in this long, give up and show the bundled copy.
 const REMOTE_LOAD_TIMEOUT_MS = 12_000
-// The splash normally hides on the `ready` bridge message (studio's first paint); this is the
-// backstop if it never arrives. Past this the paper background shows while the page finishes.
-const SPLASH_BACKSTOP_MS = 3_000
+// The splash hides on the `ready` bridge message (the studio's first paint), so the child never sees
+// blank paper while the page loads; this is the backstop if `ready` never arrives.
+const SPLASH_BACKSTOP_MS = 20_000
+// Safari Web Inspector: dev builds, and the mini's simulator builds (EXPO_PUBLIC_WEBVIEW_DEBUG=1 at
+// bundle time). Store builds leave it off.
+const WEBVIEW_DEBUG = __DEV__ || process.env.EXPO_PUBLIC_WEBVIEW_DEBUG === '1'
 
 interface Insets {
   top: number
@@ -204,9 +207,7 @@ export function StudioWebView({ initialSource }: { initialSource: StudioSource }
         scrollEnabled={false}
         setSupportMultipleWindows={false}
         dataDetectorTypes="none"
-        // Safari Web Inspector on device builds too: this is the last native build, and the WebView
-        // is where every field bug will live. Exposes nothing a user could reach.
-        webviewDebuggingEnabled
+        webviewDebuggingEnabled={WEBVIEW_DEBUG}
         contentInsetAdjustmentBehavior="never"
         allowFileAccess
         allowFileAccessFromFileURLs
