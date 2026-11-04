@@ -74,18 +74,8 @@ export interface BridgeApi {
    * denied Photos access; any other failure rejects.
    */
   'media.saveVideo': { input: { base64: string; filename: string }; output: { saved: boolean } }
-  /** The shell's audio session: `playsInSilent` lets story sounds play with the silent switch on. */
-  'audio.mode': { input: { playsInSilent: boolean }; output: Record<string, never> }
   /** Keep the screen awake (live story, replay, export). */
   'awake.set': { input: { on: boolean }; output: Record<string, never> }
-  'orientation.lock': { input: { mode: 'any' | 'landscape' | 'portrait' }; output: Record<string, never> }
-  /** The system review prompt; iOS decides whether it actually shows, so `shown` means "asked". */
-  'review.request': { input: Record<string, never>; output: { shown: boolean } }
-  /** Never prompts unless `request` is true (kids app: a grown-up action only). */
-  'notify.permission': {
-    input: { request: boolean }
-    output: { status: 'granted' | 'denied' | 'undetermined' }
-  }
   /**
    * On-device speech recognition: SpeechAnalyzer on iPadOS 26+ (`analyzer`), else on-device
    * SFSpeechRecognizer (`sfspeech`); `whistle` (the bundled Cactus Whistle model) only when asked

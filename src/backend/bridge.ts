@@ -27,7 +27,6 @@ const INTERACTIVE: ReadonlySet<BridgeName> = new Set<BridgeName>([
   'share.url',
   'share.file',
   'media.saveVideo',
-  'notify.permission',
   'speech.start',
 ])
 /** How long a request waits for `window.ReactNativeWebView` if the shell flagged itself but the handler is late. */
