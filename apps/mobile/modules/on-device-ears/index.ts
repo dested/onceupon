@@ -16,14 +16,17 @@ type EarsEvents = {
   onEnd: (e: Record<string, never>) => void
 }
 
-declare class OnDeviceEarsNative extends NativeModule<EarsEvents> {
+/** The native shape both ears modules share (modules/whistle-ears speaks it too). */
+export declare class EarsNativeModule extends NativeModule<EarsEvents> {
   isAvailable(locale: string): Promise<boolean>
   start(locale: string, recordPath: string | null): Promise<boolean>
   stop(): Promise<{ uri: string; ms: number } | null>
 }
 
-/** The native shape both ears modules share (modules/whistle-ears speaks it too). */
-export type EarsNativeModule = OnDeviceEarsNative
+declare class OnDeviceEarsNative extends EarsNativeModule {
+  /** Downloads and installs the locale's model if missing; no prompt, no mic. False when it cannot. */
+  prepare(locale: string): Promise<boolean>
+}
 
 let cached: OnDeviceEarsNative | null | undefined
 
@@ -48,6 +51,20 @@ export async function analyzerAvailable(locale: string): Promise<boolean> {
   if (!mod) return false
   try {
     return await mod.isAvailable(locale)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Gets the analyzer's language model onto the device without prompting or listening. False when the
+ * locale has no model, the download fails (offline) or the build predates `prepare`. Never throws.
+ */
+export async function analyzerPrepare(locale: string): Promise<boolean> {
+  const mod = onDeviceEars()
+  if (!mod) return false
+  try {
+    return await mod.prepare(locale)
   } catch {
     return false
   }

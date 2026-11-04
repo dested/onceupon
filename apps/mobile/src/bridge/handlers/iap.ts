@@ -3,6 +3,7 @@ import {
   fetchProducts,
   finishTransaction,
   getAvailablePurchases,
+  getPendingTransactionsIOS,
   initConnection,
   purchaseErrorListener,
   purchaseUpdatedListener,
@@ -11,6 +12,7 @@ import {
   type ProductOrSubscription,
   type Purchase,
 } from 'expo-iap'
+import { Platform } from 'react-native'
 import { z } from 'zod'
 import { BridgeHostError, parseInput, type Handler } from '../host'
 
@@ -144,6 +146,25 @@ class Iap {
     return { jws }
   }
 
+  /**
+   * Paid but never finished (the app died before `iap.finish`, or verify failed offline). StoreKit 2
+   * keeps them in `Transaction.unfinished` until finished; the studio verifies and finishes each at boot.
+   */
+  unfinished: Handler<'iap.pending'> = async () => {
+    if (Platform.OS !== 'ios') return { transactions: [] }
+    await this.connect()
+    const queued = await getPendingTransactionsIOS()
+    const transactions: Array<{ jws: string; transactionId: string; productId: string }> = []
+    for (const purchase of queued) {
+      const { purchaseToken: jws, transactionId, productId } = purchase
+      if (typeof jws !== 'string' || jws.length === 0) continue
+      if (typeof transactionId !== 'string' || transactionId.length === 0) continue
+      this.finishable.set(transactionId, purchase)
+      transactions.push({ jws, transactionId, productId })
+    }
+    return { transactions }
+  }
+
   private readonly finishSchema = z.object({ transactionId: z.string() })
   finish: Handler<'iap.finish'> = async (input) => {
     const { transactionId } = parseInput(this.finishSchema, input)
@@ -161,3 +182,4 @@ export const iapProducts = iap.products
 export const iapPurchase = iap.purchase
 export const iapRestore = iap.restore
 export const iapFinish = iap.finish
+export const iapPending = iap.unfinished

@@ -2,9 +2,10 @@ import { Directory, File, Paths } from 'expo-file-system'
 import { ExpoSpeechRecognitionModule, type ExpoSpeechRecognitionResultEvent } from 'expo-speech-recognition'
 import { z } from 'zod'
 import { SPEECH_ENGINES, type SpeechEngine } from '../../../../../packages/shared/src/bridge'
-import { analyzerAvailable, onDeviceEars, type EarsNativeModule } from '../../../modules/on-device-ears'
+import { analyzerAvailable, analyzerPrepare, onDeviceEars, type EarsNativeModule } from '../../../modules/on-device-ears'
 import { whistleAvailable, whistleEars } from '../../../modules/whistle-ears'
 import { parseInput, type Emit, type Handler } from '../host'
+import { fromSfSpeechCode, fromSwiftCode, fromThrownMessage } from './speech-codes'
 
 // On-device ears (free, no network after the first model download). Three engines behind one contract:
 // - `analyzer`: SpeechAnalyzer on iPadOS 26+ (modules/on-device-ears), segments finalize as the child
@@ -73,7 +74,7 @@ function listenNative(mod: EarsNativeModule, emit: Emit): Session['subs'] {
       emit('speech.result', { results, isFinal: e.volatile === '' })
     }),
     mod.addListener('onLevel', (e) => emit('speech.level', { level: e.level })),
-    mod.addListener('onError', (e) => emit('speech.error', { code: e.code, message: e.message })),
+    mod.addListener('onError', (e) => emit('speech.error', { code: fromSwiftCode(e.code), message: e.message })),
     mod.addListener('onEnd', () => emit('speech.end', {})),
   ]
 }
@@ -101,7 +102,7 @@ function listenSfSpeech(emit: Emit, s: Session): void {
     // volumechange is -2..10; the studio's level is 0..1 with a voice around 0.3+.
     mod.addListener('volumechange', (ev) => emit('speech.level', { level: Math.max(0, Math.min(1, ev.value / 10)) })),
     mod.addListener('result', (ev) => emit('speech.result', { results: toResults(ev), isFinal: ev.isFinal })),
-    mod.addListener('error', (ev) => emit('speech.error', { code: ev.error, message: ev.message })),
+    mod.addListener('error', (ev) => emit('speech.error', { code: fromSfSpeechCode(ev.error), message: ev.message })),
     mod.addListener('end', () => {
       emit('speech.end', {})
       resolveEnd?.({ uri: null, ms: 0 })
@@ -160,7 +161,7 @@ export const speechStart: Handler<'speech.start'> = async (input, ctx) => {
     } catch (e) {
       endSession()
       const message = e instanceof Error ? e.message : String(e)
-      ctx.emit('speech.error', { code: /not-allowed/.test(message) ? 'not-allowed' : engine, message })
+      ctx.emit('speech.error', { code: fromThrownMessage(message), message })
       return { available: false }
     }
     return { available: true, engine }
@@ -168,7 +169,11 @@ export const speechStart: Handler<'speech.start'> = async (input, ctx) => {
 
   const mod = ExpoSpeechRecognitionModule
   const perm = await mod.requestPermissionsAsync()
-  if (!perm.granted) return { available: false }
+  if (!perm.granted) {
+    // Mic or Speech Recognition is off: the studio shows the grown-up message and a gated Open Settings.
+    ctx.emit('speech.error', { code: 'not-allowed', message: 'microphone or speech recognition permission denied' })
+    return { available: false }
+  }
   listenSfSpeech(ctx.emit, s)
   session = s
   mod.start({
@@ -183,6 +188,19 @@ export const speechStart: Handler<'speech.start'> = async (input, ctx) => {
       : {}),
   })
   return { available: true, engine }
+}
+
+const prepareSchema = z.object({ locale: z.string().min(2) })
+/**
+ * Readies the engine the shell would pick, without a prompt or the mic: the analyzer downloads its
+ * language model if missing (awaited), sfspeech and whistle have nothing to fetch.
+ */
+export const speechPrepare: Handler<'speech.prepare'> = async (input) => {
+  const { locale } = parseInput(prepareSchema, input)
+  const engine = pickEngine(await availableEngines(locale, true))
+  if (!engine) return { ready: false }
+  if (engine === 'analyzer') return { ready: await analyzerPrepare(locale) }
+  return { ready: true }
 }
 
 export const speechStop: Handler<'speech.stop'> = async () => {

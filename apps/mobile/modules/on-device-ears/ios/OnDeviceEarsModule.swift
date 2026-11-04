@@ -8,7 +8,7 @@ import Speech
 //   onReady  {}                                     capturing and transcribing (after any model download)
 //   onResult { finals: [String], volatile: String } every finalized segment so far + the live tail
 //   onLevel  { level: Double }                      loudness 0..1, ~10x a second
-//   onError  { code: String, message: String }
+//   onError  { code: String, message: String }        codes: not-allowed, interrupted, model, unsupported-locale, transcriber (JS maps the rest to failed)
 //   onEnd    {}
 // The JS side (index.ts) falls back to SFSpeechRecognizer when `isAvailable` is false.
 public class OnDeviceEarsModule: Module {
@@ -22,6 +22,14 @@ public class OnDeviceEarsModule: Module {
     AsyncFunction("isAvailable") { (locale: String) async -> Bool in
       if #available(iOS 26.0, *) {
         return await AnalyzerRunner.supports(locale: locale)
+      }
+      return false
+    }
+
+    // Gets the language model onto the device ahead of the first story: no prompt, no mic.
+    AsyncFunction("prepare") { (locale: String) async -> Bool in
+      if #available(iOS 26.0, *) {
+        return await AnalyzerRunner.prepare(locale: locale)
       }
       return false
     }
@@ -94,6 +102,37 @@ final class AnalyzerRunner {
     return await matchLocale(locale) != nil
   }
 
+  static func makeTranscriber(_ locale: Locale) -> SpeechTranscriber {
+    return SpeechTranscriber(
+      locale: locale,
+      transcriptionOptions: [],
+      reportingOptions: [.volatileResults],
+      attributeOptions: []
+    )
+  }
+
+  /// Downloads and installs the model for the locale if it is missing. True once it is on the device.
+  static func prepare(locale identifier: String) async -> Bool {
+    guard let locale = await matchLocale(identifier) else { return false }
+    do {
+      try await installModel(for: makeTranscriber(locale))
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /// First use downloads the language model (needs the network once).
+  static func installModel(for transcriber: SpeechTranscriber) async throws {
+    do {
+      if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+        try await request.downloadAndInstall()
+      }
+    } catch {
+      throw EarsError("model", error.localizedDescription)
+    }
+  }
+
   func start(locale identifier: String, recordPath: String?) async throws {
     guard let locale = await AnalyzerRunner.matchLocale(identifier) else {
       throw EarsError("unsupported-locale", "no on-device model for \(identifier)")
@@ -102,17 +141,9 @@ final class AnalyzerRunner {
       throw EarsError("not-allowed", "microphone permission denied")
     }
 
-    let transcriber = SpeechTranscriber(
-      locale: locale,
-      transcriptionOptions: [],
-      reportingOptions: [.volatileResults],
-      attributeOptions: []
-    )
+    let transcriber = AnalyzerRunner.makeTranscriber(locale)
     self.transcriber = transcriber
-    // First use downloads the language model (needs the network once).
-    if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-      try await request.downloadAndInstall()
-    }
+    try await AnalyzerRunner.installModel(for: transcriber)
 
     let analyzer = SpeechAnalyzer(modules: [transcriber])
     self.analyzer = analyzer
