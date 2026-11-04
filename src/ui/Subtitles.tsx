@@ -25,6 +25,7 @@ export function Subtitles({ className = '' }: { className?: string }) {
     <div className={`subtitles pointer-events-none absolute overflow-hidden ${className}`}>
       <p
         className="max-w-full shrink-0 rounded-xl bg-paper/80 px-4 py-1 font-hand leading-tight text-ink"
+        aria-live="polite"
         data-testid="subtitles">
         {doneTail}
         {drawing && (

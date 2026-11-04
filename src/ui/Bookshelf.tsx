@@ -52,7 +52,7 @@ export function Bookshelf() {
         <IconButton label="Back to drawing" onClick={back}>
           <ArrowLeft size={24} strokeWidth={3} />
         </IconButton>
-        <h1 className="font-scrawl text-4xl">Our stories</h1>
+        <h1 className="font-scrawl text-4xl">My stories</h1>
         <div className="ml-auto flex items-center gap-3">
           {hosted && <MinutesChip />}
           {hosted && (

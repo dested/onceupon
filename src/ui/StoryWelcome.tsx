@@ -70,7 +70,7 @@ export function StoryWelcome({ listening }: { listening: boolean }) {
           <>
             Your story starts
             <br />
-            <span>with you.</span>
+            <span>with you</span>
           </>
         ) : (
           <>
@@ -80,14 +80,7 @@ export function StoryWelcome({ listening }: { listening: boolean }) {
           </>
         )}
       </h1>
-      <p>
-        {listening
-          ? 'I’m listening. Tell me how your story begins…'
-          : 'You tell the story. I’ll bring it to life.'}
-      </p>
-      {!listening && (
-        <span className="welcome-whisper">A dragon? A moon picnic? Anything you dream up.</span>
-      )}
+      {listening && <p>I’m listening…</p>}
     </div>
   )
 }

@@ -180,6 +180,11 @@ export class Stage {
       cursorRest?: Vec
       /** Default pop (the picture-book look); classic is the original flat crayon. */
       style?: StageStyle
+      /**
+       * Calm mode: no idle breathing, no particle effects, page turns cut. Defaults to the viewer's
+       * prefers-reduced-motion for live stages; a stage on its own clock (video export, lab) stays full.
+       */
+      reducedMotion?: boolean
     }
   ) {
     this.style = opts.style ?? 'pop'
@@ -196,7 +201,21 @@ export class Stage {
     this.seed = opts.seed
     this.fx = new FxSystem(opts.seed)
     this.audio = opts.audio ?? null
+    this.motionQuery =
+      opts.reducedMotion === undefined && opts.clock === undefined && typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-reduced-motion: reduce)')
+        : null
+    this.calmFixed = opts.reducedMotion ?? false
+    this.fx.enabled = !this.calm
     this.resize()
+  }
+
+  private readonly motionQuery: MediaQueryList | null
+  private readonly calmFixed: boolean
+
+  /** Reduced motion right now (the OS setting can change while the app is open). */
+  private get calm(): boolean {
+    return this.motionQuery ? this.motionQuery.matches : this.calmFixed
   }
 
   /** Reveal everything immediately (used by replay scrubbing). */
@@ -415,7 +434,8 @@ export class Stage {
         snap.height = this.canvas.height
         snap.getContext('2d', this.ctxOpts)?.drawImage(this.canvas, 0, 0)
         if (this.onPageSnapshot) this.onPageSnapshot(this.thumbnail(), ev.page.index - 1)
-        this.pageTurn = { img: snap, t0: now }
+        // Reduced motion: the new page simply replaces the old one.
+        this.pageTurn = this.calm ? null : { img: snap, t0: now }
         this.pageCount = ev.page.index
         this.views.clear()
         this.queue = []
@@ -671,7 +691,7 @@ export class Stage {
     let dx = 0
     let dy = 0
     // Everything alive breathes a little; scenery half as much, the sky/ground and finale not at all.
-    const life = v.id === BG_ID || v.noLife ? 0 : v.z < 0 ? 0.5 : 1
+    const life = v.id === BG_ID || v.noLife || this.calm ? 0 : v.z < 0 ? 0.5 : 1
     let rot = Math.sin(bt * 0.9) * 0.006 * life
     let breath = 1 + Math.sin(bt * 1.3) * 0.006 * life
     switch (v.anim) {
@@ -794,6 +814,7 @@ export class Stage {
   }
 
   private frame(now: number): void {
+    this.fx.enabled = !this.calm
     const dt = Math.min(0.1, (now - this.last) / 1000)
     this.last = now
     const ctx = this.ctx

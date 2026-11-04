@@ -45,6 +45,8 @@ function starPts(cx: number, cy: number, s: number): Vec[] {
 export class FxSystem {
   private particles: Particle[] = []
   private rng: Rng
+  /** False under reduced motion: nothing spawns (bursts, sparkles, scribble-outs). */
+  enabled = true
 
   constructor(seed: number) {
     this.rng = mulberry32(seed ^ 0x5f3759df)
@@ -59,6 +61,7 @@ export class FxSystem {
   }
 
   spawn(kind: FxKind, x: number, y: number, size: number, now: number): void {
+    if (!this.enabled) return
     const r = this.rng
     const add = (p: Omit<Particle, 'born' | 'seed'>): void => {
       this.particles.push({ ...p, born: now, seed: Math.floor(r() * 1e6) })
@@ -127,6 +130,7 @@ export class FxSystem {
 
   /** A quick gray scribble over a rectangle (used when an object is removed). */
   scribble(minX: number, minY: number, maxX: number, maxY: number, now: number): void {
+    if (!this.enabled) return
     const pts: Vec[] = []
     const rows = Math.max(3, Math.ceil((maxY - minY) / 3))
     for (let i = 0; i <= rows; i++) {

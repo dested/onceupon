@@ -1114,6 +1114,76 @@ button {
   }
 }
 
+/* Typing tray open: the tray covers the paper's bottom ~130 px, so the words and the notes ride above it. */
+.story-studio:has(#story-type-form) .story-subtitles {
+  bottom: 146px;
+}
+.story-studio:has(#story-type-form) .story-note {
+  bottom: 152px;
+  z-index: 3;
+}
+
+/* 44 px hit areas for small controls, without changing how they look. */
+.minutes-chip,
+[data-testid='parent-close'] {
+  position: relative;
+}
+.minutes-chip::before {
+  content: '';
+  position: absolute;
+  inset: -4px -2px;
+}
+[data-testid='parent-close']::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
+}
+label:has(> input[type='checkbox']) {
+  min-height: 44px;
+}
+.keyboard-button {
+  min-width: 46px;
+}
+
+/* The wordmark and the minutes chip never wrap (the chip grows a "z" when it turns coral). */
+.studio-wordmark,
+.studio-wordmark > span,
+.minutes-chip {
+  white-space: nowrap;
+}
+@media (max-width: 379px) {
+  .studio-wordmark {
+    display: none;
+  }
+}
+
+/* Short screens (phone landscape, iPad split views): drop the welcome subcopy and the status pill,
+   one subtitle line during the finale, icon-only ending actions. */
+@media (max-height: 480px) {
+  .story-welcome p,
+  .welcome-whisper,
+  .paper-state {
+    display: none;
+  }
+  .story-studio:has(.story-finished) .story-subtitles {
+    max-height: calc(1.25em + 0.3rem);
+    /* The line above's descenders peek into the box: fade the top edge. */
+    -webkit-mask-image: linear-gradient(to top, #000 72%, transparent 100%);
+    mask-image: linear-gradient(to top, #000 72%, transparent 100%);
+  }
+  .finished-actions {
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+  .finished-actions .studio-button {
+    gap: 0;
+    min-width: 48px;
+    padding: 8px 12px;
+    font-size: 0;
+    line-height: 0;
+  }
+}
+
 /* Replay: the studio's book with a header toolbar and a scrubber row instead of the mic dock. */
 .story-studio.replay-studio {
   grid-template-rows: auto minmax(0, 1fr) auto;
