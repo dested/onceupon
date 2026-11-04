@@ -10,10 +10,14 @@ interface Params {
  * - Sonnet 5.5 refuses `disabled` (400); its lowest setting is `between_tools` (no thinking without tools).
  * - Opus 5.5 and Fable/Mythos 5.1 refuse both; adaptive at low effort, thinking not returned.
  * - Sonnet 5, Opus 5, Fable 5 and the 4.6+ models accept `disabled`. Haiku 4.5 does not think by default.
+ * - Haiku 5.5 thinks adaptively at effort medium by default (kit first ink ~2.7 s). Probed 2026-11-04 on the
+ *   kit quick set, 2x8 calls each: `disabled` first ink p50 0.80 s, steady (max 1.2 s), ~40 output tokens;
+ *   adaptive + effort low p50 0.80 s too but 2.7-4.4 s spikes on story beats and 4-5x the output. So `disabled`.
  * Mirrored in apps/web/server/anthropic-thinking.ts (the relay); change both together.
  */
 export function fastThinking(model: string): Params {
   if (/sonnet-5-5/.test(model)) return { thinking: { type: 'between_tools' } }
+  if (/haiku-5-5/.test(model)) return { thinking: { type: 'disabled' } }
   if (/opus-5-5|fable-5-1|mythos-5-1/.test(model)) {
     return { thinking: { type: 'adaptive', display: 'omitted' }, output_config: { effort: 'low' } }
   }
