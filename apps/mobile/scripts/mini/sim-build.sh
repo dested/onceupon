@@ -25,7 +25,8 @@ mkdir -p $OUT
 cd $REPO
 if (( sync )); then
   git fetch -q origin
-  git checkout -q --detach origin/master
+  # -f: the last run's sync-studio rewrote the tracked assets/studio.html; it is regenerated below anyway.
+  git checkout -q -f --detach origin/master
 fi
 echo "commit $(git rev-parse --short HEAD) $(git log -1 --format=%s)"
 
@@ -33,8 +34,7 @@ echo "commit $(git rev-parse --short HEAD) $(git log -1 --format=%s)"
 bun install --frozen-lockfile
 (cd apps/mobile && bun install --frozen-lockfile)
 if (( studio )); then
-  bun run build:hosted
-  (cd apps/mobile && bun run sync-studio)
+  (cd apps/mobile && bun run sync-studio)   # builds dist-hosted itself (VITE_API_ORIGIN = BRAND.origin), then copies it
 fi
 
 # 3. Native build, holding the mini's one-build lock (released on any exit).
