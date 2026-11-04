@@ -2,9 +2,16 @@ import { Directory, File, Paths } from 'expo-file-system'
 import { ExpoSpeechRecognitionModule, type ExpoSpeechRecognitionResultEvent } from 'expo-speech-recognition'
 import { z } from 'zod'
 import { SPEECH_ENGINES, type SpeechEngine } from '../../../../../packages/shared/src/bridge'
-import { analyzerAvailable, analyzerPrepare, onDeviceEars, type EarsNativeModule } from '../../../modules/on-device-ears'
+import {
+  analyzerAvailable,
+  analyzerPrepare,
+  onDeviceEars,
+  sfspeechNativeAvailable,
+  type EarsNativeModule,
+} from '../../../modules/on-device-ears'
 import { whistleAvailable, whistleEars } from '../../../modules/whistle-ears'
 import { parseInput, type Emit, type Handler } from '../host'
+import { listEngines, pickEngine, sfspeechUsable } from './engines'
 import { fromSfSpeechCode, fromSwiftCode, fromThrownMessage } from './speech-codes'
 
 // On-device ears (free, no network after the first model download). Three engines behind one contract:
@@ -110,20 +117,21 @@ function listenSfSpeech(emit: Emit, s: Session): void {
   )
 }
 
-/** Every engine this iPad can run for the locale, in the shell's own order of preference. */
+/** Every engine that can actually start for the locale here, in the shell's own order of preference. */
 async function availableEngines(locale: string, onDevice: boolean): Promise<SpeechEngine[]> {
-  const out: SpeechEngine[] = []
-  if (await analyzerAvailable(locale)) out.push('analyzer')
   const mod = ExpoSpeechRecognitionModule
-  if (mod.isRecognitionAvailable() && (!onDevice || mod.supportsOnDeviceRecognition())) out.push('sfspeech')
-  if (await whistleAvailable(locale)) out.push('whistle')
-  return out
-}
-
-/** The asked-for engine when it can run, else the shell's pick (never whistle by itself). */
-function pickEngine(engines: SpeechEngine[], want?: SpeechEngine): SpeechEngine | null {
-  if (want && engines.includes(want)) return want
-  return engines.find((e) => e !== 'whistle') ?? null
+  const [analyzer, native, whistle] = await Promise.all([
+    analyzerAvailable(locale),
+    sfspeechNativeAvailable(locale, onDevice),
+    whistleAvailable(locale),
+  ])
+  const sfspeech = sfspeechUsable({
+    native,
+    recognitionAvailable: mod.isRecognitionAvailable(),
+    onDeviceSupported: mod.supportsOnDeviceRecognition(),
+    onDevice,
+  })
+  return listEngines({ analyzer, sfspeech, whistle })
 }
 
 const availableSchema = z.object({ locale: z.string().min(2) })

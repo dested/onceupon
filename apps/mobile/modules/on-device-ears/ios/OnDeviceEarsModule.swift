@@ -26,6 +26,13 @@ public class OnDeviceEarsModule: Module {
       return false
     }
 
+    // The on-device SFSpeechRecognizer for this locale, not the device default: it exists, is available
+    // now and (when asked) recognizes on device. expo-speech-recognition only checks the default locale.
+    AsyncFunction("sfspeechAvailable") { (locale: String, onDevice: Bool) -> Bool in
+      guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: locale)) else { return false }
+      return recognizer.isAvailable && (!onDevice || recognizer.supportsOnDeviceRecognition)
+    }
+
     // Gets the language model onto the device ahead of the first story: no prompt, no mic.
     AsyncFunction("prepare") { (locale: String) async -> Bool in
       if #available(iOS 26.0, *) {
@@ -100,8 +107,16 @@ final class AnalyzerRunner {
     return supported.first { $0.identifier(.bcp47) == want }
   }
 
+  /// True only when the analyzer can really run here: the transcriber exists on this device (false on
+  /// the Simulator) and the locale's model is installed, downloading or installable.
   static func supports(locale: String) async -> Bool {
-    return await matchLocale(locale) != nil
+    guard SpeechTranscriber.isAvailable, let match = await matchLocale(locale) else { return false }
+    switch await AssetInventory.status(forModules: [makeTranscriber(match)]) {
+    case .installed, .supported, .downloading:
+      return true
+    default:
+      return false
+    }
   }
 
   static func makeTranscriber(_ locale: Locale) -> SpeechTranscriber {

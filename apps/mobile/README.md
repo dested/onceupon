@@ -22,7 +22,7 @@ src/studio-source.ts     remote vs bundled-offline source selection
 src/bridge/host.ts       the bridge dispatcher (unit-tested; handlers injected)
 src/bridge/handlers/     one file per capability group (real Expo module wiring)
 modules/apple-attribution local Expo module: AAAttribution.attributionToken()
-assets/                  icon.png (1024², GPT Image, the crayon-drawing-a-dragon sticker), splash.png (2048², the icon centered on cream), studio.html (synced hosted build)
+assets/                  icon.png (1024², GPT Image, the crayon-drawing-a-dragon sticker), splash.png (1088², the icon art cropped with ~10% padding on flat #f9f0d0 paper; shown 220 pt wide), studio.html (synced hosted build)
 ```
 
 ## Install
