@@ -15,9 +15,9 @@ import { JsonDialect } from '~/llm/json-dsl'
 import { storyBlocks } from '~/llm/prompt'
 import type { PromptBlock } from '~/llm/providers'
 import type { Dialect } from '~/llm/dialect'
-import { colorName } from '~/engine/colors'
+import { colorName, isColorToken } from '~/engine/colors'
 import { extent, rngFor, xform, type KitShape, type PathCmd } from './geom'
-import { kitColor } from './palette'
+import { KIT_COLORS, kitColor } from './palette'
 import { findKit } from './library'
 import { findPlace, type PlaceDrawing } from './library/places'
 import { roleWear } from './library/people'
@@ -75,6 +75,22 @@ const isMood = (s: string): s is Mood => (MOODS as readonly string[]).includes(s
 const isPose = (s: string): s is Pose => (POSES as readonly string[]).includes(s)
 const POSE_ALIAS: Record<string, Pose> = { sitting: 'sit', sits: 'sit', sleeping: 'sleep', asleep: 'sleep', lying: 'sleep', flying: 'fly', swimming: 'swim' }
 const MOOD_ALIAS: Record<string, Mood> = { scared: 'surprised', shocked: 'surprised', crying: 'sad', mad: 'angry', tired: 'sleepy', smiling: 'happy', excited: 'happy' }
+
+/**
+ * The prompt's crayon list is the kit palette, but freehand `draw` and `recolor` go through the ops
+ * parser, which knows fewer names (darkbrown, mint, cream, beige... failed or turned near-black).
+ * Spell those as hex for these two verbs only, so a speech bubble's words are never touched.
+ */
+function opsColors(line: string, verb: string): string {
+  if (verb !== 'draw' && verb !== 'recolor') return line
+  return line
+    .split(/(\s+)/)
+    .map((t) => {
+      const hex = KIT_COLORS[t.toLowerCase()]
+      return hex && !isColorToken(t) ? hex : t
+    })
+    .join('')
+}
 
 /**
  * A skip line (trimmed): `skip`, or a comment whose whole content is "nothing" (`# nothing`,
@@ -137,15 +153,16 @@ export class KitDialect implements Dialect {
     if (!line || line.startsWith('#') || line.startsWith('//')) return { ok: true, cmds: [] }
     const toks = tokenize(line)
     const verb = toks[0]?.text.toLowerCase() ?? ''
-    // `wait`: the words so far describe nothing drawable yet (the prompt's no-op; not a skip).
-    if (verb === 'wait' && toks.length === 1) return { ok: true, cmds: [] }
+    // `pass`: the new words name nothing to draw yet (the prompt's no-op; not a skip). `wait` was its
+    // first name ("Wait, I need to..." preambles followed it), still accepted for saved replays.
+    if ((verb === 'pass' || verb === 'wait') && toks.length === 1) return { ok: true, cmds: [] }
     try {
       if (verb === 'place') return this.placeLine(toks.slice(1))
       if (verb === 'hide') return this.hideLine(toks.slice(1), line)
       const def = findKit(verb)
       if (def) return this.subjectLine(def, toks.slice(1), line)
       // ops verbs; containers carry their front along on move/rm/pose
-      const res = parseOpsLine(line)
+      const res = parseOpsLine(opsColors(line, verb))
       if (!res.ok) return res
       if (res.op === null) return { ok: true, cmds: [] }
       const pre = verb === 'move' || verb === 'mv' ? this.beforeMove(toks) : []
@@ -202,9 +219,20 @@ export class KitDialect implements Dialect {
     const cmds: Command[] = []
     let z = -1
     if (behind) {
-      const target = this.inner.snapshotData().entities.find((e) => e.id === behind)
+      const find = (eid: string) => this.inner.snapshotData().entities.find((e) => e.id === eid)
+      const snap = find(id)
+      let target: { x: number; y: number; layer: number } | undefined = find(behind)
+      // `hide bunny tree` on a page with no tree entity (a place's own trees are scenery): grow one
+      // beside the hider on the ground, as the prompt's hide recipe asks, instead of failing the line.
+      const cover = target ? null : findKit(behind)
+      if (!target && snap && cover) {
+        const x = Math.round(snap.x > 900 ? snap.x - 160 : snap.x + 160)
+        const made = this.parse(`${behind} ${x}`)
+        if (!made.ok) throw new Error(made.error)
+        cmds.push(...made.cmds)
+        target = { x, y: this.standY, layer: cover.layer ?? 0 }
+      }
       if (!target) throw new Error(`hide: no "${behind}" on the page`)
-      const snap = this.inner.snapshotData().entities.find((e) => e.id === id)
       if (snap && Math.abs(target.x - snap.x) > 4) k.flipped = target.x < snap.x
       this.run({ op: 'move', id, x: target.x, y: target.y, duration: 1.2, style: 'hop' }, source, cmds)
       z = target.layer - 1
