@@ -35,6 +35,12 @@ function dayKeys(days: number): string[] {
   return keys
 }
 
+/**
+ * Revenue counts real money only: App Store sandbox purchases (TestFlight, App Review) are left out
+ * (V-18). Stripe and gift rows carry no environment and always count.
+ */
+const REAL_MONEY: Prisma.PurchaseWhereInput = { OR: [{ channel: { not: 'iap' } }, { environment: 'Production' }] }
+
 function rangeStart(days: number): Date {
   return new Date(midnightUtc(new Date()) - (days - 1) * 86400000)
 }
@@ -79,17 +85,17 @@ export async function overview(days: number) {
       ) t WHERE first >= ${start}`,
     prisma.purchase.groupBy({
       by: ['packId'],
-      where: { createdAt: { gte: start }, refundedAt: null },
+      where: { createdAt: { gte: start }, refundedAt: null, ...REAL_MONEY },
       _count: { _all: true },
     }),
     prisma.purchase.groupBy({
       by: ['channel'],
-      where: { createdAt: { gte: start }, refundedAt: null },
+      where: { createdAt: { gte: start }, refundedAt: null, ...REAL_MONEY },
       _count: { _all: true },
       _sum: { grossCents: true, netCents: true },
     }),
     prisma.purchase.aggregate({
-      where: { createdAt: { gte: start }, refundedAt: null },
+      where: { createdAt: { gte: start }, refundedAt: null, ...REAL_MONEY },
       _sum: { grossCents: true, netCents: true },
     }),
     prisma.storySession.aggregate({ where: { startedAt: { gte: start } }, _sum: { chargedSec: true } }),
@@ -115,7 +121,8 @@ export async function overview(days: number) {
     prisma.$queryRaw<{ day: string; gross: number }[]>`
       SELECT to_char(date_trunc('day', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS day,
              coalesce(sum(gross_cents), 0)::float8 AS gross
-      FROM purchase WHERE created_at >= ${start} AND refunded_at IS NULL GROUP BY 1`,
+      FROM purchase WHERE created_at >= ${start} AND refunded_at IS NULL
+        AND (channel <> 'iap' OR environment = 'Production') GROUP BY 1`,
     prisma.$queryRaw<{ day: string; micros: number }[]>`
       SELECT to_char(date_trunc('day', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS day,
              coalesce(sum(cost_micros), 0)::float8 AS micros
@@ -442,7 +449,8 @@ export async function revenue(days: number) {
         coalesce(sum(net_cents), 0)::float8 AS net,
         coalesce(sum(gross_cents) FILTER (WHERE channel = 'iap'), 0)::float8 AS iap,
         coalesce(sum(gross_cents) FILTER (WHERE channel = 'stripe'), 0)::float8 AS web
-      FROM purchase WHERE created_at >= ${start} AND refunded_at IS NULL GROUP BY 1`,
+      FROM purchase WHERE created_at >= ${start} AND refunded_at IS NULL
+        AND (channel <> 'iap' OR environment = 'Production') GROUP BY 1`,
     prisma.giftCode.count({ where: { createdAt: { gte: start } } }),
     prisma.giftCode.count({ where: { redeemedAt: { gte: start } } }),
     prisma.giftCode.aggregate({

@@ -44,19 +44,22 @@ export async function startSession(
   if (flags.relayPaused) throw new ApiError(503, 'paused', 'stories are paused right now')
   requireAiConsent(device)
 
-  const todayCount = await prisma.storySession.count({
-    where: { deviceId: device.id, startedAt: { gte: utcMidnight() } },
-  })
-  if (todayCount >= flags.maxSessionsPerDeviceDay) {
-    throw new ApiError(429, 'cap', 'too many stories today')
-  }
-
   const fresh = await ledger.applyWeeklyGrant(device, flags)
   if (!fresh.comped && fresh.balanceSec <= 0) throw new ApiError(402, 'exhausted', 'out of minutes')
   const remainingSec = remainingFor(fresh, fresh.balanceSec)
 
-  const session = await prisma.storySession.create({
-    data: { deviceId: fresh.id, storyId: input.storyId, earsVendor: input.ears },
+  // Count and create under the device's row lock so parallel starts cannot pass the daily cap (V-04).
+  const session = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM device WHERE id = ${fresh.id} FOR UPDATE`
+    const todayCount = await tx.storySession.count({
+      where: { deviceId: fresh.id, startedAt: { gte: utcMidnight() } },
+    })
+    if (todayCount >= flags.maxSessionsPerDeviceDay) {
+      throw new ApiError(429, 'cap', 'too many stories today')
+    }
+    return tx.storySession.create({
+      data: { deviceId: fresh.id, storyId: input.storyId, earsVendor: input.ears },
+    })
   })
 
   let ears: EarsToken | null = null

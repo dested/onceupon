@@ -1,5 +1,6 @@
 import Stripe from 'stripe'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 import { env } from './env'
 import { credit } from './ledger'
@@ -125,8 +126,19 @@ export async function createGiftCheckout(params: {
  * Fulfill a paid checkout. Split out from the webhook so it can be exercised with a constructed
  * session (the webhook signature check needs a real secret). Idempotent per Stripe session id.
  */
-export async function fulfillCheckout(checkout: CompletedCheckout): Promise<{ kind: string }> {
-  if (checkout.paymentStatus !== 'paid') return { kind: 'unpaid' }
+export async function fulfillCheckout(
+  checkout: CompletedCheckout,
+  event: StripeEventRef | null = null
+): Promise<{ kind: string }> {
+  // V-15: the event id is recorded in the same transaction as the credit, so a failed fulfillment
+  // leaves no record and Stripe's retry runs it again.
+  const recordEvent = async (tx: Prisma.TransactionClient): Promise<void> => {
+    if (event) await tx.stripeEvent.create({ data: { id: event.id, type: event.type } })
+  }
+  if (checkout.paymentStatus !== 'paid') {
+    await prisma.$transaction(recordEvent)
+    return { kind: 'unpaid' }
+  }
   const meta = checkoutMeta.parse(checkout.metadata ?? {})
   const amount = checkout.amountTotal ?? 0
 
@@ -134,12 +146,16 @@ export async function fulfillCheckout(checkout: CompletedCheckout): Promise<{ ki
     const pack = packById(meta.packId)
     const externalId = `stripe:${checkout.id}`
     const seen = await prisma.purchase.findUnique({ where: { externalId }, select: { id: true } })
-    if (seen) return { kind: 'pack' }
+    if (seen) {
+      await prisma.$transaction(recordEvent)
+      return { kind: 'pack' }
+    }
     const device = await prisma.device.findUnique({ where: { code: meta.deviceCode } })
     if (!device) throw new ApiError(404, 'not_found', `Device ${meta.deviceCode} not found`)
 
     const feeCents = stripeFeeCents(amount)
     await prisma.$transaction(async (tx) => {
+      await recordEvent(tx)
       const purchase = await tx.purchase.create({
         data: {
           deviceId: device.id,
@@ -161,18 +177,99 @@ export async function fulfillCheckout(checkout: CompletedCheckout): Promise<{ ki
     return { kind: 'pack' }
   }
 
+  const already = await prisma.giftCode.findUnique({ where: { stripeSessionId: checkout.id }, select: { id: true } })
+  if (already) {
+    await prisma.$transaction(recordEvent)
+    return { kind: 'gift' }
+  }
   const feeCents = stripeFeeCents(amount)
-  await mintCode({
-    packId: meta.packId,
-    stripeSessionId: checkout.id,
-    buyerEmail: checkout.customerEmail,
-    fromName: meta.fromName,
-    toName: meta.toName,
-    message: meta.message,
-    grossCents: amount,
-    feeCents,
-  })
+  await mintCode(
+    {
+      packId: meta.packId,
+      stripeSessionId: checkout.id,
+      buyerEmail: checkout.customerEmail,
+      fromName: meta.fromName,
+      toName: meta.toName,
+      message: meta.message,
+      grossCents: amount,
+      feeCents,
+    },
+    recordEvent
+  )
   return { kind: 'gift' }
+}
+
+export interface StripeEventRef {
+  id: string
+  type: string
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
+}
+
+/** The parts of a Stripe event this server acts on (kept small so the tests can build one). */
+export type StripeEventInput =
+  | { id: string; type: 'checkout.session.completed'; checkout: CompletedCheckout }
+  | { id: string; type: 'charge.refunded'; chargeId: string; amountRefunded: number }
+  | { id: string; type: 'other'; stripeType: string }
+
+function toEventInput(event: Stripe.Event): StripeEventInput {
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object
+    return {
+      id: event.id,
+      type: event.type,
+      checkout: {
+        id: session.id,
+        amountTotal: session.amount_total,
+        paymentStatus: session.payment_status,
+        customerEmail: session.customer_details?.email ?? null,
+        metadata: session.metadata,
+      },
+    }
+  }
+  if (event.type === 'charge.refunded') {
+    const charge = event.data.object
+    return { id: event.id, type: event.type, chargeId: charge.id, amountRefunded: charge.amount_refunded }
+  }
+  return { id: event.id, type: 'other', stripeType: event.type }
+}
+
+/**
+ * Act on one verified Stripe event, at most once: a delivery whose id is already recorded is a
+ * duplicate. The record is written with the fulfillment (fulfillCheckout, V-15), or after a handled
+ * non-fulfillment event, so a failure leaves nothing recorded and Stripe's retry runs it again.
+ */
+export async function processStripeEvent(event: StripeEventInput): Promise<string> {
+  const typeName = event.type === 'other' ? event.stripeType : event.type
+  const seen = await prisma.stripeEvent.findUnique({ where: { id: event.id }, select: { id: true } })
+  if (seen) return 'duplicate'
+  const ref: StripeEventRef = { id: event.id, type: typeName }
+
+  try {
+    if (event.type === 'checkout.session.completed') {
+      await fulfillCheckout(event.checkout, ref)
+    } else {
+      if (event.type === 'charge.refunded') {
+        await raiseAlert('stripe_refund', `Stripe refund on charge ${event.chargeId}`, {
+          chargeId: event.chargeId,
+          amountRefunded: event.amountRefunded,
+        })
+      }
+      await prisma.stripeEvent.create({ data: ref })
+    }
+  } catch (err) {
+    // A concurrent delivery of the same event won the insert: that one did the work.
+    if (isUniqueViolation(err)) {
+      const recorded = await prisma.stripeEvent.findUnique({ where: { id: event.id }, select: { id: true } })
+      if (recorded) return 'duplicate'
+    }
+    throw err
+  }
+
+  log.info(`[stripe] ${typeName} ${event.id}`)
+  return typeName
 }
 
 /** Verify a webhook body and act on it. Returns the Stripe event type, or 'duplicate'. */
@@ -182,33 +279,7 @@ export async function handleStripeEvent(rawBody: Buffer, signature: string): Pro
     throw new ApiError(503, 'paused', 'Stripe webhook secret is not configured')
   }
   const event = stripe.webhooks.constructEvent(rawBody, signature, env.STRIPE_WEBHOOK_SECRET)
-
-  try {
-    await prisma.stripeEvent.create({ data: { id: event.id, type: event.type } })
-  } catch {
-    // A duplicate event id means we already processed this delivery.
-    return 'duplicate'
-  }
-
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object
-    await fulfillCheckout({
-      id: session.id,
-      amountTotal: session.amount_total,
-      paymentStatus: session.payment_status,
-      customerEmail: session.customer_details?.email ?? null,
-      metadata: session.metadata,
-    })
-  } else if (event.type === 'charge.refunded') {
-    const charge = event.data.object
-    await raiseAlert('stripe_refund', `Stripe refund on charge ${charge.id}`, {
-      chargeId: charge.id,
-      amountRefunded: charge.amount_refunded,
-    })
-  }
-
-  log.info(`[stripe] ${event.type} ${event.id}`)
-  return event.type
+  return processStripeEvent(toEventInput(event))
 }
 
 export interface SessionStatus {

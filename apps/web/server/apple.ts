@@ -7,7 +7,7 @@ import {
   type JWSTransactionDecodedPayload,
   type ResponseBodyV2DecodedPayload,
 } from '@apple/app-store-server-library'
-import type { Device } from '@prisma/client'
+import { Prisma, type Device } from '@prisma/client'
 import { prisma } from './prisma'
 import { env } from './env'
 import { credit, debit } from './ledger'
@@ -45,8 +45,48 @@ function preferredOrder(): Environment[] {
     : [Environment.SANDBOX, Environment.PRODUCTION]
 }
 
+/**
+ * V-14: in production, build the Production verifier at boot. The library throws without
+ * APPLE_APP_APPLE_ID, and every real purchase would then fail as `invalid_receipt` while sandbox
+ * (App Review) passes. The server still starts; the operator gets an error log and an alert email.
+ */
+export async function checkProductionVerifier(id: number | undefined): Promise<boolean> {
+  try {
+    new SignedDataVerifier([rootCert], true, Environment.PRODUCTION, env.APPLE_BUNDLE_ID, id)
+    return true
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    log.error(`[apple] Production verifier failed: ${message}. Real App Store purchases will not credit.`)
+    await raiseAlert(
+      'apple_verifier',
+      `The App Store Production verifier cannot be built (${message}). Real purchases will be rejected: set APPLE_APP_APPLE_ID.`,
+      { bundleId: env.APPLE_BUNDLE_ID, appAppleIdSet: id !== undefined }
+    ).catch((e: unknown) => log.error(`[apple] alert failed: ${e instanceof Error ? e.message : String(e)}`))
+    return false
+  }
+}
+
+/** Tests replace verification with a decoder of their own; null restores the real verifier. */
+let decodeOverride: ((jws: string) => Promise<JWSTransactionDecodedPayload>) | null = null
+export function setTransactionDecoderForTests(
+  fn: ((jws: string) => Promise<JWSTransactionDecodedPayload>) | null
+): void {
+  decodeOverride = fn
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
+}
+
 /** Try the configured environment first, then the other; the sandbox and production keys differ. */
 async function decodeTransaction(jws: string): Promise<JWSTransactionDecodedPayload> {
+  if (decodeOverride) {
+    try {
+      return await decodeOverride(jws)
+    } catch {
+      throw new ApiError(400, 'invalid_receipt', 'Could not verify the App Store transaction')
+    }
+  }
   let lastError: unknown = null
   for (const environment of preferredOrder()) {
     try {
@@ -85,30 +125,38 @@ export async function creditTransaction(
   const feeCents = Math.round(grossCents * 0.15)
   const currency = payload.currency ? payload.currency.toLowerCase() : 'usd'
 
-  const balanceSec = await prisma.$transaction(async (tx) => {
-    const purchase = await tx.purchase.create({
-      data: {
-        deviceId: device.id,
-        channel: 'iap',
-        packId: pack.id,
-        seconds: pack.seconds,
-        grossCents,
-        feeCents,
-        netCents: grossCents - feeCents,
-        currency,
-        externalId,
-        originalTransactionId: payload.originalTransactionId ?? null,
-        environment: payload.environment ?? env.APPLE_ENVIRONMENT,
-      },
+  let balanceSec: number
+  try {
+    balanceSec = await prisma.$transaction(async (tx) => {
+      const purchase = await tx.purchase.create({
+        data: {
+          deviceId: device.id,
+          channel: 'iap',
+          packId: pack.id,
+          seconds: pack.seconds,
+          grossCents,
+          feeCents,
+          netCents: grossCents - feeCents,
+          currency,
+          externalId,
+          originalTransactionId: payload.originalTransactionId ?? null,
+          environment: payload.environment ?? env.APPLE_ENVIRONMENT,
+        },
+      })
+      await credit(device.id, 'purchase', pack.seconds, purchase.id, productId, undefined, tx)
+      const updated = await tx.device.update({
+        where: { id: device.id },
+        data: { paying: true, lastPack: pack.id },
+        select: { balanceSec: true },
+      })
+      return updated.balanceSec
     })
-    await credit(device.id, 'purchase', pack.seconds, purchase.id, productId, undefined, tx)
-    const updated = await tx.device.update({
-      where: { id: device.id },
-      data: { paying: true, lastPack: pack.id },
-      select: { balanceSec: true },
-    })
-    return updated.balanceSec
-  })
+  } catch (err) {
+    // The same transaction verified twice at once: the unique externalId lets exactly one credit.
+    if (!isUniqueViolation(err)) throw err
+    const d = await prisma.device.findUniqueOrThrow({ where: { id: device.id }, select: { balanceSec: true } })
+    return { credited: false, seconds: pack.seconds, balanceSec: d.balanceSec, packId: pack.id }
+  }
 
   return { credited: true, seconds: pack.seconds, balanceSec, packId: pack.id }
 }

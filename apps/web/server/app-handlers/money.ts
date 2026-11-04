@@ -23,7 +23,11 @@ export const moneyHandlers: Handlers = {
   'iap.restore': deviceHandler<'iap.restore'>(iapRestoreInput, async (input, ctx) =>
     restoreTransactions(ctx.device, input.jws)
   ),
-  'gift.redeem': deviceHandler<'gift.redeem'>(giftRedeemInput, async (input, ctx) =>
-    redeemCode(ctx.device, input.code)
-  ),
+  // Guideline 3.1.1 (V-17): codes sold on the website are redeemed on the website, never inside the iOS app.
+  'gift.redeem': deviceHandler<'gift.redeem'>(giftRedeemInput, async (input, ctx) => {
+    if (ctx.device.platform === 'ios') {
+      throw new ApiError(403, 'blocked', 'Gift codes are redeemed on the website')
+    }
+    return redeemCode(ctx.device, input.code)
+  }),
 }

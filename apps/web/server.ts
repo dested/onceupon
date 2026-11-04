@@ -12,6 +12,7 @@ import { startJobs } from './server/jobs'
 import { formatError, log, requestLogger, startupBanner } from './server/logger'
 import { prisma } from './server/prisma'
 import { promptAllowList } from './server/prompt-allowlist'
+import { checkProductionVerifier } from './server/apple'
 import { appRouter } from './server/router'
 import { shareRouter } from './server/share-routes'
 import { createContext } from './server/trpc'
@@ -205,6 +206,8 @@ async function createServer() {
     startJobs()
     // Load the relay's prompt allow-list now so a broken import shows at boot, not on the first draw.
     promptAllowList().catch(() => {})
+    // Real App Store purchases need the Production verifier (V-14): log + alert, never refuse to start.
+    if (isProd) void checkProductionVerifier(env.APPLE_APP_APPLE_ID)
   })
 }
 

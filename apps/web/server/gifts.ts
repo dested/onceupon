@@ -40,28 +40,38 @@ export interface MintGiftInput {
   feeCents: number
 }
 
-/** Create a gift code from a paid Stripe session; retries on the (rare) code collision. */
-export async function mintCode(input: MintGiftInput): Promise<string> {
+/**
+ * Create a gift code from a paid Stripe session; retries on the (rare) code collision. `alsoInTx`
+ * runs in the same transaction (the Stripe event record, V-15).
+ */
+export async function mintCode(
+  input: MintGiftInput,
+  alsoInTx?: (tx: Prisma.TransactionClient) => Promise<void>
+): Promise<string> {
   const pack = packById(input.packId)
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = newGiftCode()
     try {
-      await prisma.giftCode.create({
-        data: {
-          code,
-          packId: pack.id,
-          seconds: pack.seconds,
-          grossCents: input.grossCents,
-          feeCents: input.feeCents,
-          stripeSessionId: input.stripeSessionId,
-          buyerEmail: input.buyerEmail ?? null,
-          fromName: input.fromName ?? null,
-          toName: input.toName ?? null,
-          message: input.message ?? null,
-        },
+      await prisma.$transaction(async (tx) => {
+        if (alsoInTx) await alsoInTx(tx)
+        await tx.giftCode.create({
+          data: {
+            code,
+            packId: pack.id,
+            seconds: pack.seconds,
+            grossCents: input.grossCents,
+            feeCents: input.feeCents,
+            stripeSessionId: input.stripeSessionId,
+            buyerEmail: input.buyerEmail ?? null,
+            fromName: input.fromName ?? null,
+            toName: input.toName ?? null,
+            message: input.message ?? null,
+          },
+        })
       })
       return code
     } catch (err) {
+      // A code collision retries with a new code; a duplicate session or event fails again and surfaces.
       if (isUniqueViolation(err) && attempt < 4) continue
       throw err
     }
@@ -85,14 +95,16 @@ export async function redeemCode(device: Device, code: string): Promise<RedeemRe
   const packId = toPackId(gift.packId)
 
   const balanceSec = await prisma.$transaction(async (tx) => {
-    const fresh = await tx.giftCode.findUnique({ where: { id: gift.id } })
-    if (!fresh || fresh.voidedAt) throw new ApiError(404, 'invalid_code', 'That gift code was not found')
-    if (fresh.redeemedAt) throw new ApiError(409, 'already_used', 'That gift code was already redeemed')
-
-    await tx.giftCode.update({
-      where: { id: gift.id },
+    // Guarded claim (V-04): exactly one parallel redeem flips redeemedAt.
+    const claim = await tx.giftCode.updateMany({
+      where: { id: gift.id, redeemedAt: null, voidedAt: null },
       data: { redeemedAt: new Date(), redeemedByDeviceId: device.id },
     })
+    if (claim.count === 0) {
+      const fresh = await tx.giftCode.findUnique({ where: { id: gift.id } })
+      if (!fresh || fresh.voidedAt) throw new ApiError(404, 'invalid_code', 'That gift code was not found')
+      throw new ApiError(409, 'already_used', 'That gift code was already redeemed')
+    }
     const purchase = await tx.purchase.create({
       data: {
         deviceId: device.id,
@@ -106,7 +118,7 @@ export async function redeemCode(device: Device, code: string): Promise<RedeemRe
         giftCodeId: gift.id,
       },
     })
-    await credit(device.id, 'redeem', gift.seconds, purchase.id, `gift ${fresh.code}`, undefined, tx)
+    await credit(device.id, 'redeem', gift.seconds, purchase.id, `gift ${gift.code}`, undefined, tx)
     const updated = await tx.device.update({
       where: { id: device.id },
       data: { paying: true, lastPack: packId },
@@ -163,3 +175,4 @@ export async function redeemOnWeb(code: string, deviceCode: string): Promise<Red
 function isUniqueViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
 }
+

@@ -64,17 +64,25 @@ export async function debit(
 ): Promise<{ charged: number; balanceSec: number }> {
   if (seconds <= 0) throw new Error('debit seconds must be > 0')
   const run = async (db: Prisma.TransactionClient): Promise<{ charged: number; balanceSec: number }> => {
-    const current = await db.device.findUniqueOrThrow({ where: { id: deviceId } })
-    const charged = Math.min(seconds, current.balanceSec)
-    if (charged <= 0) return { charged: 0, balanceSec: current.balanceSec }
-    const d = await db.device.update({
-      where: { id: deviceId },
-      data: { balanceSec: { decrement: charged } },
-    })
-    await db.ledgerEntry.create({
-      data: { deviceId, kind, seconds: -charged, balanceAfter: d.balanceSec, ref, note, actor: actor ?? null },
-    })
-    return { charged, balanceSec: d.balanceSec }
+    // Conditional update (V-04): the decrement only lands while the balance still covers it, so two
+    // parallel debits can never drive it negative. A lost race re-reads and tries again.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const current = await db.device.findUniqueOrThrow({ where: { id: deviceId } })
+      const charged = Math.min(seconds, current.balanceSec)
+      if (charged <= 0) return { charged: 0, balanceSec: current.balanceSec }
+      const res = await db.device.updateMany({
+        where: { id: deviceId, balanceSec: { gte: charged } },
+        data: { balanceSec: { decrement: charged } },
+      })
+      if (res.count === 0) continue
+      const d = await db.device.findUniqueOrThrow({ where: { id: deviceId }, select: { balanceSec: true } })
+      await db.ledgerEntry.create({
+        data: { deviceId, kind, seconds: -charged, balanceAfter: d.balanceSec, ref, note, actor: actor ?? null },
+      })
+      return { charged, balanceSec: d.balanceSec }
+    }
+    const d = await db.device.findUniqueOrThrow({ where: { id: deviceId }, select: { balanceSec: true } })
+    return { charged: 0, balanceSec: d.balanceSec }
   }
   return tx ? run(tx) : prisma.$transaction(run)
 }
@@ -89,10 +97,22 @@ export async function applyWeeklyGrant(device: Device, flags: Flags): Promise<De
   const boundary = weeklyBoundary(flags.weeklyRefillDay, now)
   const due = !device.weeklyGrantAt || device.weeklyGrantAt < boundary
   if (!due || device.balanceSec >= flags.weeklyFreeSec) return device
-  const top = flags.weeklyFreeSec - device.balanceSec
   return prisma.$transaction(async (tx) => {
+    // Claim this week's grant with a guarded update (V-04): a parallel call finds it already claimed.
+    const claim = await tx.device.updateMany({
+      where: {
+        id: device.id,
+        balanceSec: { lt: flags.weeklyFreeSec },
+        OR: [{ weeklyGrantAt: null }, { weeklyGrantAt: { lt: boundary } }],
+      },
+      data: { weeklyGrantAt: now },
+    })
+    const fresh = await tx.device.findUniqueOrThrow({ where: { id: device.id } })
+    if (claim.count === 0) return fresh
+    const top = flags.weeklyFreeSec - fresh.balanceSec
+    if (top <= 0) return fresh
     await credit(device.id, 'grant_weekly', top, null, 'weekly top-up', undefined, tx)
-    return tx.device.update({ where: { id: device.id }, data: { weeklyGrantAt: now } })
+    return tx.device.findUniqueOrThrow({ where: { id: device.id } })
   })
 }
 
