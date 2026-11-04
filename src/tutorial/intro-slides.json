@@ -16,7 +16,7 @@
       {
         "k": "cmd",
         "t": 500,
-        "line": "scene skyblue \"sky over a castle\""
+        "line": "scene skyblue \"sky above a castle\""
       },
       {
         "k": "cmd",
@@ -51,7 +51,7 @@
       {
         "k": "cmd",
         "t": 1130,
-        "line": "ent dragon 600 200 \"purple dragon\" idle=float scale=1"
+        "line": "ent dragon 600 200 \"little purple dragon\" idle=float scale=1"
       },
       {
         "k": "cmd",
@@ -61,22 +61,22 @@
       {
         "k": "cmd",
         "t": 1310,
-        "line": "draw dragon.body purple purple oval 0 -100 110 65"
+        "line": "draw dragon.wings darkgreen lime poly -20 -140 -150 -250 -110 -210 -70 -235 -40 -195 30 -150 mirror"
       },
       {
         "k": "cmd",
         "t": 1400,
-        "line": "draw dragon.wings purple green poly -20 -140 -150 -250 -110 -210 -70 -235 -40 -195 30 -150"
+        "line": "draw dragon.body purple purple oval 0 -100 110 65"
       },
       {
         "k": "cmd",
         "t": 1490,
-        "line": "draw dragon.legs purple purple mirror rect 30 -40 30 40"
+        "line": "draw dragon.head purple purple oval 120 -170 55 40"
       },
       {
         "k": "cmd",
         "t": 1580,
-        "line": "draw dragon.head purple purple oval 120 -170 55 40"
+        "line": "draw dragon.horns purple magenta mirror poly 95 -200 100 -230 115 -198"
       },
       {
         "k": "cmd",

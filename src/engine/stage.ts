@@ -873,7 +873,14 @@ export class Stage {
 
     const wx = this.worldXform()
     this.drawBubbles(now, wx)
+    // Effects stay inside the picture: on a tall paper (phone portrait) the world is letterboxed and a
+    // burst near its top edge would otherwise spill onto the blank paper above the sky.
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(this.offX, this.offY, WORLD_W * this.S, WORLD_H * this.S)
+    ctx.clip()
     this.fx.draw(ctx, this.brush, wx, now)
+    ctx.restore()
 
     // page turn: previous page slides off to the left
     if (this.pageTurn) {
