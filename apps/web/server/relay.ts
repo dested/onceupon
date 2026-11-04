@@ -8,7 +8,7 @@ import { getFlags } from './flags'
 import { ApiError } from './app-api-types'
 import { deviceOf } from './app-api'
 import * as sessions from './sessions'
-import { requireAiConsent } from './device'
+import { drawModelFor, requireAiConsent } from './device'
 import { prisma } from './prisma'
 import { estimateCost, usdToMicros } from './pricing'
 import { maskText } from './mask'
@@ -28,6 +28,13 @@ const CALLS_PER_CHARGED_MINUTE = 12
 const CALL_GRACE = 3
 /** The day's total spend is re-read at most this often for the global stop (V-08). */
 const SPEND_CACHE_MS = 60_000
+
+/**
+ * A whole relayed line that means "nothing fit to draw": `skip ...` or `# nothing`. Copy of
+ * KIT_SKIP_RE in src/llm/kit/dialect.ts (the studio's rule); relay.test.ts fails if they drift.
+ * `wait` is the prompt's no-op, not a skip.
+ */
+export const SKIP_LINE = /^(skip\b|#\s*nothing[\s.!]*$)/i
 
 const drawSchema = z.object({
   sessionId: z.string(),
@@ -170,7 +177,8 @@ async function checkAndStream(res: Response, device: Device, rawBody: unknown): 
     _sum: { costMicros: true },
   })
   const spentMicros = spent._sum.costMicros ?? 0
-  const reserveUsd = estimateCost(flags.model, {
+  const model = drawModelFor(device, flags)
+  const reserveUsd = estimateCost(model, {
     input: 0,
     cacheRead: 0,
     cacheWrite: 0,
@@ -190,7 +198,7 @@ async function checkAndStream(res: Response, device: Device, rawBody: unknown): 
     throw new ApiError(429, 'cap', 'a drawing is already in progress')
   }
   try {
-    await streamDraw(res, device, session.id, body, dialect, flags.model, apiKey)
+    await streamDraw(res, device, session.id, body, dialect, model, apiKey)
   } finally {
     sessions.endDraw(device.id)
   }
@@ -309,12 +317,12 @@ async function streamDraw(
   const costUsd = estimateCost(model, { ...usage, costUsd: null })
   if (errored === null || errored === 'refusal') write({ k: 'usage', usage, costUsd })
 
-  // A relayed line is one non-empty streamed line; `skip` means the model judged the words unfit.
+  // A relayed line is one non-empty streamed line; a skip line means the model judged the words unfit.
   const lines = acc
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => l.length > 0)
-  const skip = lines.some((l) => l === 'skip')
+  const skip = lines.some((l) => SKIP_LINE.test(l))
   const lastText = body.user[body.user.length - 1]?.text ?? ''
 
   // The row lands before the stream ends, so the next beat, typed settle or call count already sees it.

@@ -10,7 +10,10 @@ export const FLAG_DEFAULTS = {
   earsVendor: 'deepgram' as 'deepgram' | 'openai',
   /** iPad shells use the on-device recognizer (free) instead of minting cloud ears. */
   onDeviceEars: true,
+  /** The paid model: devices that bought minutes (pack, gift) or are comped draw with it. */
   model: 'claude-sonnet-5-5',
+  /** Every other device (free minutes) draws with this one. Decision 4b: becomes Haiku 5.5 once it passes safety. */
+  freeModel: 'claude-sonnet-5-5',
   dialect: 'kit' as 'kit' | 'sketch' | 'ops' | 'json' | 'lines',
   purchasesPaused: false,
   relayPaused: false,
@@ -40,6 +43,7 @@ const flagsObject = z.object({
   earsVendor: z.enum(['deepgram', 'openai']),
   onDeviceEars: z.boolean(),
   model: z.string().min(1),
+  freeModel: z.string().min(1),
   dialect: z.enum(['kit', 'sketch', 'ops', 'json', 'lines']),
   purchasesPaused: z.boolean(),
   relayPaused: z.boolean(),

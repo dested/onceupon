@@ -7,8 +7,10 @@ import { FAKE_ANTHROPIC_PORT } from './setup'
  * - error: HTTP 500 (the SDK retries once, then the relay reports upstream)
  * - slow: headers, then nothing for 10 s (the relay's first-token deadline ends it)
  * - drip: a line every 100 ms for 10 s (for the client-abort test)
+ * - nothing: the model's "nothing fit to draw" reply (`# nothing`)
+ * - wait: the prompt's no-op line (`wait`), which is not a skip
  */
-export type FakeMode = 'ok' | 'error' | 'slow' | 'drip'
+export type FakeMode = 'ok' | 'error' | 'slow' | 'drip' | 'nothing' | 'wait'
 
 export const fake = {
   mode: 'ok' as FakeMode,
@@ -16,6 +18,7 @@ export const fake = {
   /** Streams whose client (the relay) hung up before the fake finished. */
   closedEarly: 0,
   lastSystem: '',
+  lastModel: '',
 }
 
 const enc = new TextEncoder()
@@ -58,6 +61,8 @@ export function startFakeAnthropic(): void {
       const body: unknown = await req.json()
       const system = typeof body === 'object' && body !== null ? Reflect.get(body, 'system') : undefined
       fake.lastSystem = JSON.stringify(system ?? '')
+      const model = typeof body === 'object' && body !== null ? Reflect.get(body, 'model') : undefined
+      fake.lastModel = typeof model === 'string' ? model : ''
       const mode = fake.mode
       if (mode === 'error') {
         return Response.json({ type: 'error', error: { type: 'api_error', message: 'boom' } }, { status: 500 })
@@ -88,6 +93,9 @@ export function startFakeAnthropic(): void {
               push(delta(`star s${i} 10 10\n`))
               await sleep(100)
             }
+          } else if (mode === 'nothing' || mode === 'wait') {
+            push(blockStart())
+            push(delta(mode === 'nothing' ? '# nothing\n' : 'wait\n'))
           } else {
             push(blockStart())
             push(delta('place beach\n'))

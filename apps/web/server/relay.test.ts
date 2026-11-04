@@ -6,6 +6,7 @@ import {
   call,
   draw,
   field,
+  kitSystemPrompt,
   newDevice,
   resetDb,
   sleep,
@@ -17,6 +18,13 @@ import { prisma } from './prisma'
 import { resetSpendCacheForTests } from './relay'
 import { drawsInFlight, setTypedSettleMsForTests } from './sessions'
 import { setFlag } from './flags'
+import { fulfillCheckout } from './stripe'
+import { SKIP_LINE } from './relay'
+import { dialectOfSystem, setShippedHashesFileForTests } from './prompt-allowlist'
+import { createHash } from 'node:crypto'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import * as path from 'node:path'
 
 beforeAll(async () => {
   startFakeAnthropic()
@@ -254,5 +262,97 @@ describe('cloud ears', () => {
     const t = await call('ears.token', { sessionId }, d.token)
     expect(t.status).toBe(403)
     expect(errCode(t.body)).toBe('blocked')
+  })
+})
+
+describe('free tier model (decision 4b)', () => {
+  const paidModel = 'claude-sonnet-5-5'
+  const freeModel = 'claude-haiku-5-5'
+
+  const lastLog = async (sessionId: string) =>
+    prisma.callLog.findFirstOrThrow({ where: { sessionId }, orderBy: { createdAt: 'desc' } })
+
+  test('a free device draws with freeModel', async () => {
+    await setFlag('freeModel', freeModel, 'test')
+    const d = await newDevice({ consent: true })
+    const sessionId = await startStory(d.token)
+    expect((await draw(d.token, sessionId)).status).toBe(200)
+    expect(fake.lastModel).toBe(freeModel)
+    expect((await lastLog(sessionId)).model).toBe(freeModel)
+  })
+
+  test('a device with a pack credit draws with model', async () => {
+    await setFlag('freeModel', freeModel, 'test')
+    const d = await newDevice({ consent: true })
+    const code = (await prisma.device.findUniqueOrThrow({ where: { id: d.id } })).code
+    await fulfillCheckout({
+      id: 'cs_model_1',
+      amountTotal: 999,
+      paymentStatus: 'paid',
+      customerEmail: null,
+      metadata: { kind: 'pack', packId: 'pack_40', deviceCode: code },
+    })
+    const sessionId = await startStory(d.token)
+    expect((await draw(d.token, sessionId)).status).toBe(200)
+    expect(fake.lastModel).toBe(paidModel)
+    expect((await lastLog(sessionId)).model).toBe(paidModel)
+  })
+
+  test('a comped device draws with model', async () => {
+    await setFlag('freeModel', freeModel, 'test')
+    const d = await newDevice({ consent: true })
+    await prisma.device.update({ where: { id: d.id }, data: { comped: true } })
+    const sessionId = await startStory(d.token)
+    expect((await draw(d.token, sessionId)).status).toBe(200)
+    expect(fake.lastModel).toBe(paidModel)
+  })
+
+  test('a `# nothing` reply logs a skip; `wait` does not', async () => {
+    const d = await newDevice({ consent: true })
+    const sessionId = await startStory(d.token)
+    fake.mode = 'nothing'
+    await draw(d.token, sessionId)
+    const nothing = await lastLog(sessionId)
+    expect(nothing.skip).toBe(true)
+    expect(nothing.skipWords).not.toBe(null)
+    fake.mode = 'wait'
+    await draw(d.token, sessionId)
+    expect((await lastLog(sessionId)).skip).toBe(false)
+  })
+
+  test("the relay's skip rule is the studio's KIT_SKIP_RE", async () => {
+    const file = path.resolve(import.meta.dir, '../../../src/llm/kit/dialect.ts')
+    const mod: unknown = await import(file)
+    const studio = typeof mod === 'object' && mod !== null ? Reflect.get(mod, 'KIT_SKIP_RE') : undefined
+    expect(studio instanceof RegExp).toBe(true)
+    if (!(studio instanceof RegExp)) return
+    expect(SKIP_LINE.source).toBe(studio.source)
+    expect(SKIP_LINE.flags).toBe(studio.flags)
+  })
+})
+
+describe('shipped prompt hashes', () => {
+  test('a prompt listed in prompt-hashes.json is accepted after the module prompt changed', async () => {
+    const oldPrompt = 'an earlier release of the kit prompt'
+    const dir = mkdtempSync(path.join(tmpdir(), 'prompt-hashes-'))
+    const file = path.join(dir, 'prompt-hashes.json')
+    const sha = createHash('sha256').update(oldPrompt).digest('hex')
+    writeFileSync(file, JSON.stringify([{ dialect: 'kit', sha256: sha, note: 'test release' }]))
+    try {
+      setShippedHashesFileForTests(file)
+      expect(await dialectOfSystem(oldPrompt)).toBe('kit')
+      expect(await dialectOfSystem('a prompt nobody shipped')).toBe(null)
+      const d = await newDevice({ consent: true })
+      const sessionId = await startStory(d.token)
+      expect((await draw(d.token, sessionId, { system: oldPrompt })).status).toBe(200)
+    } finally {
+      setShippedHashesFileForTests(null)
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('the committed prompt-hashes.json parses', async () => {
+    setShippedHashesFileForTests(null)
+    expect(await dialectOfSystem(await kitSystemPrompt())).toBe('kit')
   })
 })

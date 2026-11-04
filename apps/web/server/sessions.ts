@@ -5,7 +5,7 @@ import * as ledger from './ledger'
 import { getFlags, type Flags } from './flags'
 import { log } from './logger'
 import { mintEarsWithFallback } from './ears'
-import { requireAiConsent } from './device'
+import { drawModelFor, requireAiConsent } from './device'
 import type { AppApi, EarsToken, EndReason, SessionStart } from '../../../packages/shared/src/api'
 import { typedChargeSec } from '../../../packages/shared/src/typed'
 
@@ -74,7 +74,7 @@ export async function startSession(
     sessionId: session.id,
     remainingSec,
     ears,
-    model: flags.model,
+    model: drawModelFor(fresh, flags),
     dialect: flags.dialect,
   }
 }

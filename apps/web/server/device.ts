@@ -134,6 +134,15 @@ export function deviceState(d: Device, flags: Flags): DeviceState {
   }
 }
 
+/**
+ * Decision 4b: a device that bought minutes (Apple or Stripe pack, gift code: `paying` is set in the
+ * same transaction as that credit) or is comped draws with the paid model; every other device, the
+ * first free story included, draws with `freeModel`.
+ */
+export function drawModelFor(d: Pick<Device, 'paying' | 'comped'>, flags: Pick<Flags, 'model' | 'freeModel'>): string {
+  return d.paying || d.comped ? flags.model : flags.freeModel
+}
+
 /** The server refuses to send a device's story words to Claude until a grown-up has agreed. */
 export function requireAiConsent(d: Device): void {
   if (d.aiConsentAt === null) {

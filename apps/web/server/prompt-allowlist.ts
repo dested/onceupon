@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { z } from 'zod'
 import { log } from './logger'
 
 /**
@@ -12,7 +14,7 @@ import { log } from './logger'
  * The modules are imported by a computed path on purpose: apps/web's `~/` alias points at apps/web/src,
  * so a static import of the studio's tree would not typecheck here. Bun runs the TS directly and
  * resolves the studio's own `~/` alias from the root tsconfig. Exports are read as `unknown` and
- * narrowed.
+ * narrowed. Hashes of earlier releases' prompts come from prompt-hashes.json and are merged in.
  */
 const here = path.dirname(fileURLToPath(import.meta.url))
 const STUDIO_LLM = path.resolve(here, '../../../src/llm')
@@ -24,10 +26,32 @@ const SOURCES: Array<{ dialect: 'kit' | 'sketch'; file: string; exportName: stri
 
 const sha256 = (s: string): string => createHash('sha256').update(s).digest('hex')
 
+/**
+ * Prompts that shipped in earlier releases stay accepted: installed apps (and the shell's bundled
+ * studio) keep sending them until they update. The lead appends each release's hashes here.
+ */
+const shippedSchema = z.array(
+  z.object({ dialect: z.enum(['kit', 'sketch']), sha256: z.string().regex(/^[0-9a-f]{64}$/), note: z.string() })
+)
+let shippedFile = path.join(here, 'prompt-hashes.json')
+
+/** Tests point the shipped list at a file of their own and drop the cached allow-list. */
+export function setShippedHashesFileForTests(file: string | null): void {
+  shippedFile = file ?? path.join(here, 'prompt-hashes.json')
+  loading = null
+}
+
+function readShipped(): Array<{ dialect: string; sha256: string }> {
+  const parsed = shippedSchema.safeParse(JSON.parse(readFileSync(shippedFile, 'utf8')))
+  if (!parsed.success) throw new Error(`prompt allow-list: ${shippedFile} is malformed`)
+  return parsed.data
+}
+
 let loading: Promise<Map<string, string>> | null = null
 
 async function load(): Promise<Map<string, string>> {
   const byHash = new Map<string, string>()
+  for (const row of readShipped()) byHash.set(row.sha256, row.dialect)
   for (const src of SOURCES) {
     const mod: unknown = await import(path.join(STUDIO_LLM, src.file))
     const value = typeof mod === 'object' && mod !== null ? Reflect.get(mod, src.exportName) : undefined
@@ -36,7 +60,7 @@ async function load(): Promise<Map<string, string>> {
     }
     byHash.set(sha256(value), src.dialect)
   }
-  log.info(`[relay] prompt allow-list: ${[...byHash.values()].join(', ')}`)
+  log.info(`[relay] prompt allow-list: ${byHash.size} prompts (${[...new Set(byHash.values())].join(', ')})`)
   return byHash
 }
 
