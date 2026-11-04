@@ -7,7 +7,7 @@ import { BRAND } from '../../packages/shared/src/brand'
 import '~/styles/consent.css'
 
 /**
- * "Before the first story": the grown-up's one-time yes to sending story words to Claude. Opened by
+ * "Before the first story": the grown-up's one-time yes to sending story words to the AI service. Opened by
  * `askConsent()` (src/backend/consent.ts), always after the parental gate, so the Privacy Policy link
  * goes straight out. A native <dialog>, so it sits above the Grown-ups area when opened from there.
  */
@@ -49,15 +49,15 @@ export function ConsentCard() {
       <h2 id="consent-heading">Before the first story</h2>
       <div className="consent-copy">
         <p>
-          To draw a story, Squiggletale sends the words your child says, as text, to our server, which asks
-          Anthropic's Claude AI to turn them into a drawing.
+          To draw a story, Squiggletale sends the words your child says, as text, to our server, which asks a
+          third-party AI service to turn them into a drawing.
         </p>
         <p>
           {APP_SHELL
             ? "Speech becomes words on this device. Recordings of your child's voice never leave it unless you share a story."
             : 'Your browser turns speech into words.'}
         </p>
-        <p>Anthropic doesn't use these words to train its models and deletes them within 30 days.</p>
+        <p>That AI service doesn't use these words to train its models and deletes them within 30 days.</p>
       </div>
       {error && (
         <p className="consent-error" role="alert">

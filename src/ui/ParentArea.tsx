@@ -197,7 +197,9 @@ export function ParentArea() {
   const sectionDivide = 'mt-6 border-t-2 border-ink/10 pt-5'
   const errorLine = 'mt-1 font-hand text-base text-crayon-red'
   const okLine = 'mt-1 font-hand text-base text-ink-soft'
-  const linkBtn = 'font-hand text-lg text-crayon-blue underline'
+  // The consent card's link look (src/styles/consent.css .consent-link): purple, underlined, 44 px tall.
+  const linkBtn =
+    'inline-flex min-h-[44px] items-center font-hand text-lg text-[#7b5c91] underline underline-offset-[3px]'
 
   return (
     <div className="modal-overlay bg-ink/30 z-30" onClick={close} data-testid="parent-area">
