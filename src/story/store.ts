@@ -181,6 +181,8 @@ export interface AppState {
   consentOpen: boolean
   /** The app could not listen: mic/speech permission off (`denied`) or no on-device engine. */
   micProblem: 'denied' | 'unavailable' | null
+  /** Why the mic stopped, shown once in the dock under its title ("Try again in a moment."); '' for none. */
+  earsNote: string
 }
 
 export interface SttTrace {
@@ -393,6 +395,7 @@ export const appStore = new Store<AppState>({
   consentBlocked: false,
   consentOpen: false,
   micProblem: null,
+  earsNote: '',
 })
 
 export function useApp<S>(selector: (s: AppState) => S): S {

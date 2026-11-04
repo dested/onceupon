@@ -51,16 +51,16 @@ import type { EarsToken, EarsVendor, EndReason, SessionStart } from '../../packa
 let lineCounter = 0
 let traceCounter = 0
 
-/** What the child sees when the shell cannot listen (permission off, or no on-device engine). */
-export const CANT_HEAR_NOTE = "The crayon can't hear you yet. Ask a grown-up to turn on the microphone."
-/** On-device ears stopped and the quiet restart did not bring them back. */
-const KEEP_GOING_NOTE = 'Tap the mic to keep going.'
-/** No `speech.ready` 15 s after the tap: the first-use language model is downloading. */
-const LEARNING_NOTE = 'The crayon is learning to listen. This needs the internet the first time.'
+/*
+ * Ears trouble shows once, in the dock (never as a centre toast): `micProblem` for "can't hear you yet"
+ * (+ Open Settings), `earsNote` for a line under the mic title. The 15 s first-use model download is
+ * just the dock's "Getting ready…".
+ */
+/** On-device ears stopped and the quiet restart did not bring them back: the dock's own hint says it. */
+const KEEP_GOING_NOTE = ''
 const TRY_AGAIN_NOTE = 'Try again in a moment.'
 /** A beat whose drawing failed for good (after the relay's one retry). */
 const SLIPPED_NOTE = 'Oops, the crayon slipped. Say that part again?'
-const LEARNING_AFTER_MS = 15_000
 const GIVE_UP_AFTER_MS = 60_000
 /** Words heard from the coach's own clip (it plays through the speaker into the mic) are dropped until this long after it ends. */
 const COACH_ECHO_MS = 500
@@ -555,7 +555,8 @@ export class LiveSession {
         if (this.wantListening && this.sttKind === 'apple') {
           // The shell stopped listening without us asking (or never started).
           if (this.earsReady) this.appleLost()
-          else this.giveUp(this.appleRetried ? KEEP_GOING_NOTE : CANT_HEAR_NOTE)
+          else if (this.appleRetried) this.giveUp(KEEP_GOING_NOTE)
+          else this.cannotHear('unavailable')
           return
         }
         if (this.wantListening && streaming && !this.earsReady) {
@@ -575,7 +576,6 @@ export class LiveSession {
         this.earsReady = true
         this.appleRestarting = false
         this.clearReadyTimers()
-        if (appStore.get().note === LEARNING_NOTE) appStore.set({ note: '' })
         if (this.wantListening) appStore.set({ listening: true, micStarting: false, micProblem: null })
         this.meter?.setListening(true)
         if (this.appleRec) this.voice.startExternal(this.appleRec, this.now())
@@ -664,7 +664,8 @@ export class LiveSession {
       return
     }
     this.stopListening()
-    this.showNote(HOSTED ? 'the crayon cannot hear right now' : `ears did not start: ${why}`, 7000)
+    if (HOSTED) appStore.set({ earsNote: TRY_AGAIN_NOTE })
+    else this.showNote(`ears did not start: ${why}`, 7000)
   }
 
   /** The relay could not draw a beat. Consent and minutes have their own states; anything else gets a kind note. */
@@ -700,7 +701,7 @@ export class LiveSession {
    */
   startListening(): Promise<void> {
     if (this.starting) return this.starting
-    appStore.set({ micStarting: true, micProblem: null })
+    appStore.set({ micStarting: true, micProblem: null, earsNote: '' })
     const token = ++this.startToken
     const run = this.startListeningNow(token).finally(() => {
       if (this.starting === run) this.starting = null
@@ -876,25 +877,21 @@ export class LiveSession {
     this.armReadyTimers()
   }
 
-  /** Stop listening and say why, kindly. */
+  /** Stop listening and say why, kindly, in the dock. */
   private giveUp(note: string): void {
     this.stopListening()
-    this.showNote(note, 7000)
+    appStore.set({ earsNote: note })
   }
 
   /** The shell cannot listen: permission off (`denied`, with a gated Open Settings) or no engine. */
   private cannotHear(problem: 'denied' | 'unavailable'): void {
     this.stopListening()
     appStore.set({ micProblem: problem })
-    this.showNote(CANT_HEAR_NOTE, 8000)
   }
 
   private armReadyTimers(): void {
     this.clearReadyTimers()
     this.readyTimers = [
-      window.setTimeout(() => {
-        if (this.wantListening && !this.earsReady) this.showNote(LEARNING_NOTE, GIVE_UP_AFTER_MS)
-      }, LEARNING_AFTER_MS),
       window.setTimeout(() => {
         if (this.wantListening && !this.earsReady) this.giveUp(TRY_AGAIN_NOTE)
       }, GIVE_UP_AFTER_MS),
@@ -939,7 +936,8 @@ export class LiveSession {
     // The mic was loud a moment ago: the child is still talking, hold the quiet-window release.
     this.tracker.tick(now, now - this.lastLoudAt < VOICE_HOLD_MS)
     if (!this.coachMuted()) appStore.set({ transcriptInterim: cleanText(this.tracker.interim) })
-    if (!this.wantListening) return
+    // Silence only counts while the ears are actually listening (not during a model download or a restart).
+    if (!this.wantListening || !this.earsReady) return
     const cfg = appStore.get().config
     const nudgeMs = cfg?.silenceNudgeMs ?? 30_000
     const endMs = cfg?.silenceEndMs ?? 60_000

@@ -75,6 +75,7 @@ export function StoryScreen() {
   const balanceSec = useApp((s) => s.balanceSec)
   const consentBlocked = useApp((s) => s.hosted && s.consentBlocked)
   const micProblem = useApp((s) => s.micProblem)
+  const earsNote = useApp((s) => s.earsNote)
   const deviceTrouble = useApp((s) => s.hosted && s.deviceTrouble)
   // Offline, or registered with no server answer yet: no new stories (saved ones still play).
   const offline = hosted && (!online || deviceTrouble)
@@ -206,8 +207,10 @@ export function StoryScreen() {
   const micHint = !micSupported
     ? 'Use the keyboard to tell your story'
     : micStarting
-      ? 'Just a little moment'
-      : listening
+      ? ''
+      : earsNote && !listening
+        ? earsNote
+        : listening
         ? 'I’m listening · tap to pause'
         : hasStory
           ? 'Tap the mic to keep going'
@@ -551,7 +554,6 @@ export function StoryScreen() {
                     {micProblem && !listening && !micStarting ? (
                       <>
                         <strong data-testid="status">The crayon can't hear you yet</strong>
-                        <span data-testid="mic-problem">Ask a grown-up to turn on the microphone.</span>
                         {micProblem === 'denied' && (
                           <button
                             type="button"
