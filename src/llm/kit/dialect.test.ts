@@ -64,3 +64,45 @@ describe('kit dialect crayons in freehand', () => {
     expect(apply('say toaster I love mint')).toBe(true)
   })
 })
+
+describe('kit dialect freehand idle', () => {
+  test('an unknown idle on ent never blanks the drawing that follows', () => {
+    const scene = new Scene()
+    const d = new KitDialect(scene, { moderation: true, clock: new VirtualClock() })
+    const apply = (line: string): boolean => {
+      const r = d.parse(line)
+      if (r.ok) for (const c of r.cmds) scene.apply(c)
+      return r.ok
+    }
+    expect(apply('ent toaster 600 525 "Toaster" idle=bounce')).toBe(true)
+    expect(apply('draw toaster.body black silver rect -100 -170 200 150')).toBe(true)
+    expect(apply('ent jelly 300 300 idle=zoomy')).toBe(true)
+    expect(apply('draw jelly.bell purple purple oval 0 -150 150 110')).toBe(true)
+    expect(apply('ent kite 900 250 idle=float')).toBe(true)
+  })
+})
+
+describe('kit dialect id as kind', () => {
+  test('a named character can be updated by its id alone', () => {
+    const scene = new Scene()
+    const d = new KitDialect(scene, { moderation: true, clock: new VirtualClock() })
+    const apply = (line: string): boolean => {
+      const r = d.parse(line)
+      if (r.ok) for (const c of r.cmds) scene.apply(c)
+      return r.ok
+    }
+    expect(apply('place meadow')).toBe(true)
+    expect(apply('man badguy 1000 black angry left')).toBe(true)
+    expect(apply('badguy 300 surprised')).toBe(true)
+    expect(apply('dinosaur sprinkles 400')).toBe(true)
+    expect(apply('sprinkles 800')).toBe(true)
+    expect(apply('nobody 800')).toBe(false)
+  })
+})
+
+describe('kit aliases', () => {
+  test('a jellyfish kind line draws the nearest kit (octopus) instead of nothing', () => {
+    const d = dialect()
+    expect(d.parse('jellyfish 600 330 pink purple').ok).toBe(true)
+  })
+})

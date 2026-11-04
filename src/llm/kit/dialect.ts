@@ -93,6 +93,22 @@ function opsColors(line: string, verb: string): string {
 }
 
 /**
+ * An `ent` with an idle the ops parser doesn't know (Haiku wrote `idle=bounce`) failed whole, and every
+ * `draw` after it then hit a missing entity: a blank page. Map the near misses, drop the rest.
+ */
+const IDLE_ALIAS: Record<string, string> = { bounce: 'breathe', bob: 'breathe', hop: 'breathe', jump: 'breathe', wobble: 'sway', wiggle: 'sway', swing: 'sway', fly: 'float', hover: 'float', bobbing: 'float' }
+const IDLES = new Set(['none', 'breathe', 'float', 'sway'])
+function opsIdle(line: string, verb: string): string {
+  if (verb !== 'ent') return line
+  return line.replace(/(^|\s)idle=(\S*)/i, (m: string, pre: string, v: string) => {
+    const want = v.toLowerCase()
+    if (IDLES.has(want)) return m
+    const alias = IDLE_ALIAS[want]
+    return alias ? `${pre}idle=${alias}` : pre
+  })
+}
+
+/**
  * A skip line (trimmed): `skip`, or a comment whose whole content is "nothing" (`# nothing`,
  * `#Nothing.`). Not a longer comment that starts with "nothing": "# Nothing is drawn, but ... I'll
  * draw it gently" was followed by a fine drawing. The relay's CallLog uses the same test.
@@ -162,7 +178,11 @@ export class KitDialect implements Dialect {
       const def = findKit(verb)
       if (def) return this.subjectLine(def, toks.slice(1), line)
       // ops verbs; containers carry their front along on move/rm/pose
-      const res = parseOpsLine(opsColors(line, verb))
+      const res = parseOpsLine(opsIdle(opsColors(line, verb), verb))
+      // `sprinkles 800` / `badguy 300 surprised`: the id written where its kind goes. Both models do
+      // it to update a named character; read it as that character's kind line.
+      const named = res.ok ? undefined : this.kits.get(toks[0]?.text ?? '')
+      if (named) return this.subjectLine(named.def, toks, line)
       if (!res.ok) return res
       if (res.op === null) return { ok: true, cmds: [] }
       const pre = verb === 'move' || verb === 'mv' ? this.beforeMove(toks) : []

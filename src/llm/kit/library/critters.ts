@@ -353,7 +353,7 @@ export const CRITTER_KITS: KitDef[] = [
   d('fish', 'fish [body] [fins] (y 450 in water)', 110, (p) => fish(p), { aliases: ['goldfish'], idle: 'float' }),
   d('shark', 'shark [body]', 180, (p) => fish(p, true), { idle: 'float' }),
   d('whale', 'whale [body]', 180, whale, { idle: 'float', aliases: ['dolphin'] }),
-  d('octopus', 'octopus [body]', 235, octopus, { aliases: ['squid'] }),
+  d('octopus', 'octopus [body]', 235, octopus, { aliases: ['squid', 'jellyfish'] }),
   d('turtle', 'turtle [shell] [skin]', 140, turtle, { aliases: ['tortoise'] }),
   d('crab', 'crab [shell]', 165, crab),
   d('frog', 'frog [skin]', 220, frog, { aliases: ['toad'] }),
