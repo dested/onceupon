@@ -188,6 +188,8 @@ export class TranscriptTracker {
   private releasedTail: string[] = []
   /** Original-cased words released per result index, for detecting and reporting corrections. */
   private releasedByIndex = new Map<number, string[]>()
+  /** While true, words are used up without being emitted or remembered (the coach's voice). */
+  private muted = false
   private cb: TrackerCallbacks
 
   constructor(
@@ -217,6 +219,22 @@ export class TranscriptTracker {
     return this.finalText
   }
 
+  /**
+   * Mark every word heard so far as used without emitting it (the coach's own voice came through the
+   * speaker). Later words of the same results still release. The released-tail memory is left alone,
+   * so a child who answers "The End" right after is still heard.
+   */
+  setMuted(on: boolean): void {
+    this.muted = on
+  }
+
+  discardPending(): void {
+    this.latest.forEach((r, i) => {
+      this.consumed.set(i, r.transcript.trim().split(/\s+/).filter(Boolean).length)
+      this.lastChange.delete(i)
+    })
+  }
+
   /** The words the child is saying right now that have not been drawn yet. */
   get interim(): string {
     const parts: string[] = []
@@ -235,6 +253,7 @@ export class TranscriptTracker {
    * the tail of what was already released, and emit only the genuinely new remainder.
    */
   private release(chunkWords: string[], index: number | null): void {
+    if (this.muted) return
     const pairs = chunkWords.map((w) => ({ raw: w, n: normWord(w) })).filter((p) => p.n !== '')
     if (pairs.length === 0) return
     const tail = this.releasedTail

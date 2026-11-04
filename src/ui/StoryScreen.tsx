@@ -33,7 +33,7 @@ import { SpendChip } from './SpendChip'
 import { StoryWelcome } from './StoryWelcome'
 import { VideoExportButton } from './VideoExport'
 import { MinutesChip } from './MinutesChip'
-import { formatMinutes, gate, openParentArea, startFreshStory } from './hosted'
+import { formatMinutes, gate, openAppSettings, openParentArea, startFreshStory } from './hosted'
 import { openShareCard } from './ShareCard'
 
 export function StoryScreen() {
@@ -64,6 +64,7 @@ export function StoryScreen() {
   const remainingSec = useApp((s) => s.remainingSec)
   const balanceSec = useApp((s) => s.balanceSec)
   const consentBlocked = useApp((s) => s.hosted && s.consentBlocked)
+  const micProblem = useApp((s) => s.micProblem)
   const offline = hosted && !online
   const [typed, setTyped] = useState('')
   const [typing, setTyping] = useState(false)
@@ -489,7 +490,7 @@ export function StoryScreen() {
                   <strong data-testid="status">A grown-up needs to say yes first</strong>
                   <button
                     type="button"
-                    className="studio-button consent-ask"
+                    className="studio-button grown-up-button"
                     onClick={askGrownUp}
                     data-testid="ask-grown-up">
                     <Users size={21} />
@@ -526,8 +527,27 @@ export function StoryScreen() {
                   </div>
                 ) : (
                   <div className="mic-copy">
-                    <strong data-testid="status">{micTitle}</strong>
-                    <span>{micHint}</span>
+                    {micProblem && !listening && !micStarting ? (
+                      <>
+                        <strong data-testid="status">The crayon can't hear you yet</strong>
+                        <span data-testid="mic-problem">Ask a grown-up to turn on the microphone.</span>
+                        {micProblem === 'denied' && (
+                          <button
+                            type="button"
+                            className="studio-button grown-up-button"
+                            onClick={openAppSettings}
+                            data-testid="open-phone-settings">
+                            <Settings size={20} />
+                            Open Settings
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <strong data-testid="status">{micTitle}</strong>
+                        <span>{micHint}</span>
+                      </>
+                    )}
                     {listening && (
                       <div
                         className="voice-wave"

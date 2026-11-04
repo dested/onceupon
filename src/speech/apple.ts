@@ -6,7 +6,7 @@
  * after `stop()` (the studio's VoiceRecorder collects it through ExternalClipSource).
  */
 import { z } from 'zod'
-import { SPEECH_ENGINES } from '../../packages/shared/src/bridge'
+import { SPEECH_ENGINES, type SpeechErrorCode } from '../../packages/shared/src/bridge'
 import { base64ToBlob, bridgeCall, hasBridge, onBridgeEvent } from '~/backend/bridge'
 import type { ExternalClipSource } from '~/story/voice'
 import type { RecResult, Recognizer, RecognizerHandlers } from './recognition'
@@ -16,6 +16,14 @@ const resultSchema = z.object({
 })
 const levelSchema = z.object({ level: z.number() })
 const errorSchema = z.object({ code: z.string(), message: z.string() })
+const SPEECH_ERROR_CODES = [
+  'not-allowed',
+  'interrupted',
+  'model',
+  'unsupported-locale',
+  'transcriber',
+  'failed',
+] as const satisfies readonly SpeechErrorCode[]
 const availableSchema = z.object({
   engine: z.enum(SPEECH_ENGINES).nullable(),
   engines: z.array(z.enum(SPEECH_ENGINES)).optional(),
@@ -33,26 +41,39 @@ export interface AppleEarsOffer {
   engine: AppleEngine | null
   /** Every engine the shell can run; one of these can be asked for by name. */
   engines: AppleEngine[]
+  /** Mic + speech permission as the shell reports it ('undetermined' when it could not be asked). */
+  permission: 'granted' | 'denied' | 'undetermined'
 }
 
 /** The on-device engines this shell offers for `locale`. Never throws. */
 export async function appleEars(locale: string): Promise<AppleEarsOffer> {
-  const none: AppleEarsOffer = { engine: null, engines: [] }
+  const none: AppleEarsOffer = { engine: null, engines: [], permission: 'undetermined' }
   if (!hasBridge()) return none
   try {
     const out = availableSchema.safeParse(await bridgeCall('speech.available', { locale }))
-    if (!out.success || out.data.permission === 'denied') return none
-    const { engine } = out.data
+    if (!out.success) return none
+    const { engine, permission } = out.data
+    if (permission === 'denied') return { engine: null, engines: [], permission }
     // Shells from before the list offer only their own pick.
-    return { engine, engines: out.data.engines ?? (engine ? [engine] : []) }
+    return { engine, engines: out.data.engines ?? (engine ? [engine] : []), permission }
   } catch {
     // shells from before speech.available (or no shell): not offered
     return none
   }
 }
 
-/** Message prefix the session reads to fall back to cloud ears. */
+/** Message prefix for "the shell could not start on-device ears at all" (no engine, old shell). */
 export const APPLE_UNAVAILABLE = 'apple-unavailable'
+
+/**
+ * The SpeechErrorCode at the front of an on-device ears error (`"<code>: <message>"`), or null.
+ * `apple-unavailable` maps to `failed`.
+ */
+export function appleErrorCode(err: string): SpeechErrorCode | null {
+  if (err.startsWith(APPLE_UNAVAILABLE)) return 'failed'
+  const head = err.split(':', 1)[0] ?? ''
+  return SPEECH_ERROR_CODES.find((c) => c === head) ?? null
+}
 
 export interface AppleRecognizer extends Recognizer, ExternalClipSource {
   readonly engine: AppleEngine | null
@@ -111,40 +132,60 @@ export function createAppleRecognizer(
     ]
   }
 
+  /** A start() that arrived while a stop was still finishing: run it once that stop resolves. */
+  let restartAfterStop = false
+
+  const begin = (): void => {
+    running = true
+    ready = false
+    ended = false
+    stopping = null
+    subscribe()
+    void bridgeCall('speech.start', {
+      locale: opts.locale,
+      onDevice: true,
+      record: opts.record,
+      ...(opts.engine ? { engine: opts.engine } : {}),
+    })
+      .then(async (raw) => {
+        const out = startSchema.safeParse(raw)
+        if (!out.success || !out.data.available) {
+          // `available: false` is also how shells say "permission denied": ask which it was.
+          const offer = await appleEars(opts.locale)
+          handlers.onError(
+            offer.permission === 'denied'
+              ? 'not-allowed: microphone or speech permission denied'
+              : `${APPLE_UNAVAILABLE}: the shell could not start on-device ears`
+          )
+          finish()
+          return
+        }
+        engine = out.data.engine ?? 'sfspeech'
+        // Shells that predate speech.ready are listening once start resolves.
+        if (!out.data.engine) markReady()
+      })
+      .catch((e: unknown) => {
+        handlers.onError(`${APPLE_UNAVAILABLE}: ${e instanceof Error ? e.message : String(e)}`)
+        finish()
+      })
+  }
+
   const rec: AppleRecognizer = {
     get engine() {
       return engine
     },
     start: () => {
+      // Pause then a quick tap again: chain the start after the stop instead of dropping it (the
+      // dropped start used to end with "the crayon cannot hear right now").
+      if (stopping) {
+        restartAfterStop = true
+        return
+      }
       if (running) return
-      running = true
-      ready = false
-      ended = false
-      stopping = null
-      subscribe()
-      void bridgeCall('speech.start', {
-        locale: opts.locale,
-        onDevice: true,
-        record: opts.record,
-        ...(opts.engine ? { engine: opts.engine } : {}),
-      })
-        .then((raw) => {
-          const out = startSchema.safeParse(raw)
-          if (!out.success || !out.data.available) {
-            handlers.onError(`${APPLE_UNAVAILABLE}: the shell could not start on-device ears`)
-            finish()
-            return
-          }
-          engine = out.data.engine ?? 'sfspeech'
-          // Shells that predate speech.ready are listening once start resolves.
-          if (!out.data.engine) markReady()
-        })
-        .catch((e: unknown) => {
-          handlers.onError(`${APPLE_UNAVAILABLE}: ${e instanceof Error ? e.message : String(e)}`)
-          finish()
-        })
+      begin()
     },
     stop: () => {
+      restartAfterStop = false
       if (!running || stopping) return
       stopping = bridgeCall('speech.stop', {})
         .then((raw) => {
@@ -153,15 +194,28 @@ export function createAppleRecognizer(
           return clip ? { blob: base64ToBlob(clip.base64, clip.mime), ms: clip.ms } : null
         })
         .catch(() => null)
-        .finally(() => finish())
+        .finally(() => {
+          if (!restartAfterStop) {
+            finish()
+            return
+          }
+          // Quietly end this span (no onEnd: the session already wants to listen) and start again.
+          restartAfterStop = false
+          for (const u of unsubs) u()
+          unsubs = []
+          running = false
+          ended = true
+          begin()
+        })
     },
     abort: () => {
       rec.stop()
     },
-    takeClip: () => (stopping ?? Promise.resolve(null)).then((c) => {
-      stopping = null
-      return c
-    }),
+    takeClip: () =>
+      (stopping ?? Promise.resolve(null)).then((c) => {
+        stopping = null
+        return c
+      }),
   }
   return rec
 }

@@ -1,3 +1,5 @@
+// Dev only, and first: a fake shell (`?shell=native&fakeshell=1`) must exist before NATIVE is decided below.
+import './dev-shell'
 import { z } from 'zod'
 import { SHELL_QUERY } from '../../packages/shared/src/bridge'
 import { hasBridge } from './bridge'

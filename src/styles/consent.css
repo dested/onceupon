@@ -77,7 +77,12 @@
   align-items: flex-start;
   gap: 8px;
 }
-.consent-dock .consent-ask {
+/* "Ask a grown-up" / "Open Settings" in the dock. */
+.mic-copy .grown-up-button {
+  align-self: flex-start;
+  margin-top: 6px;
+  min-height: 44px;
+  font-size: 18px;
   background: var(--studio-lilac);
   transform: rotate(-1.5deg);
 }

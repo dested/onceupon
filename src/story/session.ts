@@ -21,7 +21,7 @@ import { buildDebugReport } from './debug-report'
 import { appStore, resolveStt, type Settings, type SttKind } from './store'
 import { createOpenAiRealtimeRecognizer, isLiveModel } from '~/speech/openai-realtime'
 import { createDeepgramRecognizer } from '~/speech/deepgram'
-import { APPLE_UNAVAILABLE, appleEars, createAppleRecognizer, type AppleEngine, type AppleRecognizer } from '~/speech/apple'
+import { appleEars, appleErrorCode, createAppleRecognizer, type AppleEngine, type AppleRecognizer } from '~/speech/apple'
 import { currentMicStream, warmMic } from '~/speech/pcm-mic'
 import {
   getStory,
@@ -38,7 +38,7 @@ import { exposeDebugHandle, type DebugHandle } from '~/debug-handle'
 import { isDialectId, makeDialect } from '~/llm/dialect'
 import { cleanText, setModeration } from './clean'
 import { splitTheEnd } from './the-end'
-import { HOSTED } from '~/backend/config'
+import { APP_SHELL, HOSTED } from '~/backend/config'
 import { ApiError } from '~/backend/api'
 import { consentRequired } from '~/backend/consent'
 import { StoryMeter, type MeterHandlers } from '~/backend/meter'
@@ -49,6 +49,18 @@ import type { EarsToken, EarsVendor, EndReason, SessionStart } from '../../packa
 
 let lineCounter = 0
 let traceCounter = 0
+
+/** What the child sees when the shell cannot listen (permission off, or no on-device engine). */
+export const CANT_HEAR_NOTE = "The crayon can't hear you yet. Ask a grown-up to turn on the microphone."
+/** On-device ears stopped and the quiet restart did not bring them back. */
+const KEEP_GOING_NOTE = 'Tap the mic to keep going.'
+/** No `speech.ready` 15 s after the tap: the first-use language model is downloading. */
+const LEARNING_NOTE = 'The crayon is learning to listen. This needs the internet the first time.'
+const TRY_AGAIN_NOTE = 'Try again in a moment.'
+const LEARNING_AFTER_MS = 15_000
+const GIVE_UP_AFTER_MS = 60_000
+/** Words heard from the coach's own clip (it plays through the speaker into the mic) are dropped until this long after it ends. */
+const COACH_ECHO_MS = 500
 
 /** Stands in for words the model skipped, so a replay is honest about the gap. */
 export const SKIPPED_MARK = '(the crayon skipped a part)'
@@ -137,10 +149,18 @@ export class LiveSession {
   private recognizer: Recognizer | null = null
   /** The on-device (shell) recognizer when that is the one listening; it also records the voice clip. */
   private appleRec: AppleRecognizer | null = null
-  /** On-device ears failed to start this story: use the cloud vendor from now on. */
-  private appleFailed = false
-  /** The engine the current on-device recognizer was asked to use (undefined = the shell's pick). */
-  private appleForced: AppleEngine | undefined
+  /** On-device ears already restarted once this listening span (after an interruption or engine error). */
+  private appleRetried = false
+  /** That restart is under way: late errors from the old span are ignored. */
+  private appleRestarting = false
+  /** The 15 s "learning to listen" note and the 60 s give-up, while on-device ears are not ready yet. */
+  private readyTimers: number[] = []
+  /** Bumped by every tap and every stop, so a start still awaiting the shell or server can tell it was cancelled. */
+  private startToken = 0
+  /** The start in flight (one at a time: a second tap while it runs does not start twice). */
+  private starting: Promise<void> | null = null
+  /** Recognizer results are the coach's own voice until then (performance.now ms). */
+  private coachMuteUntil = 0
   /** The current recognizer reported ready since the last mic tap. */
   private earsReady = false
   /** Cloud ears that died before ever listening this story (no credits, bad key, blocked socket). */
@@ -211,7 +231,10 @@ export class LiveSession {
     })
     this.tracker = new TranscriptTracker(
       {
-        emit: (words) => this.feed(words),
+        // The coach line plays through the speaker into the open mic: those words are not the child's.
+        emit: (words) => {
+          if (!this.coachMuted()) this.feed(words)
+        },
         correct: (released, actual) => this.correct(released, actual),
       },
       CHROME_TRACKER
@@ -491,10 +514,16 @@ export class LiveSession {
     return {
       onResult: (results) => {
         this.tracker.onResult(results, performance.now())
-        appStore.set({ transcriptInterim: cleanText(this.tracker.interim) })
+        if (!this.coachMuted()) appStore.set({ transcriptInterim: cleanText(this.tracker.interim) })
       },
       onEnd: () => {
         if (stale()) return
+        if (this.wantListening && this.sttKind === 'apple') {
+          // The shell stopped listening without us asking (or never started).
+          if (this.earsReady) this.appleLost()
+          else this.giveUp(this.appleRetried ? KEEP_GOING_NOTE : CANT_HEAR_NOTE)
+          return
+        }
         if (this.wantListening && streaming && !this.earsReady) {
           this.earsFailed()
         } else if (this.wantListening) {
@@ -510,7 +539,10 @@ export class LiveSession {
       onReady: () => {
         if (stale()) return
         this.earsReady = true
-        if (this.wantListening) appStore.set({ listening: true, micStarting: false })
+        this.appleRestarting = false
+        this.clearReadyTimers()
+        if (appStore.get().note === LEARNING_NOTE) appStore.set({ note: '' })
+        if (this.wantListening) appStore.set({ listening: true, micStarting: false, micProblem: null })
         this.meter?.setListening(true)
         if (this.appleRec) this.voice.startExternal(this.appleRec, this.now())
         else {
@@ -536,13 +568,8 @@ export class LiveSession {
       onError: (err) => {
         if (stale()) return
         this.lastEarsError = err
-        if (err.startsWith(APPLE_UNAVAILABLE)) {
-          // The iPad could not listen on-device (old OS, model download failed): cloud ears instead.
-          this.appleFailed = true
-          this.recognizer = null
-          this.appleRec = null
-          appStore.set((s) => ({ warnings: [...s.warnings.slice(-9), err] }))
-          if (this.wantListening) void this.startListening()
+        if (this.sttKind === 'apple') {
+          this.appleError(err)
           return
         }
         if (
@@ -625,57 +652,47 @@ export class LiveSession {
     }
   }
 
-  async startListening(): Promise<void> {
+  /**
+   * Tap → listening. One start at a time (a second tap while the shell or server is still answering is
+   * ignored), and `micStarting` shows from the first moment. A stop in the meantime cancels it.
+   */
+  startListening(): Promise<void> {
+    if (this.starting) return this.starting
+    appStore.set({ micStarting: true, micProblem: null })
+    const token = ++this.startToken
+    const run = this.startListeningNow(token).finally(() => {
+      if (this.starting === run) this.starting = null
+      // Nothing started (cancelled, refused, no ears): the mic goes back to idle.
+      if (!this.wantListening) appStore.set({ micStarting: false })
+    })
+    this.starting = run
+    return run
+  }
+
+  private async startListeningNow(token: number): Promise<void> {
     void this.audio.start()
     const settings = appStore.get().settings
+    if (HOSTED && this.meter && APP_SHELL) {
+      await this.startShellEars(this.meter, token)
+      return
+    }
     if (HOSTED && this.meter) {
+      // The website: the server's cloud ears, else the browser's own recognizer.
       const cfg = appStore.get().config
-      const pref = settings.earsEngine
-      let apple: AppleEngine | null = null
-      // A named engine was asked for in Grown-ups: start that one, not the shell's own pick.
-      let forced: AppleEngine | undefined
-      if (!this.appleFailed && pref !== 'cloud' && (cfg?.onDeviceEars || pref !== 'auto')) {
-        const offer = await appleEars(EARS_LOCALE)
-        if (pref !== 'auto' && offer.engines.includes(pref)) {
-          apple = pref
-          forced = pref
-        } else {
-          apple = cfg?.onDeviceEars ? offer.engine : null
-          if (pref !== 'auto') this.showNote(`${pref} ears are not available here, using ${apple ?? 'cloud'}`, 6000)
-        }
-      }
       let start: SessionStart
       try {
-        start = await this.meter.ensureStarted(apple ? 'apple' : (cfg?.earsVendor ?? 'browser'))
+        start = await this.meter.ensureStarted(cfg?.earsVendor ?? 'browser')
       } catch (e) {
         this.handleStartError(e)
         return
       }
-      let ears = start.ears
-      // The session was opened for on-device ears that then failed: mint cloud ears for it now.
-      if (!apple && !ears && this.appleFailed) {
-        try {
-          ears = await this.meter.refreshEars()
-        } catch {
-          ears = null
-        }
-      }
-      const kind: SttKind = apple ? 'apple' : ears ? ears.vendor : 'browser'
-      // The ears setting changed mid-story: the recognizer is still `apple`, but for another engine.
-      if (kind === 'apple' && this.recognizer && this.sttKind === 'apple' && this.appleForced !== forced) {
-        this.recognizer.abort()
-        this.recognizer = null
-      }
-      this.appleForced = forced
+      if (token !== this.startToken) return
+      const ears = start.ears
+      const kind: SttKind = ears ? ears.vendor : 'browser'
       this.setRecognizer(
         kind,
         () => {
           const handlers = this.recognizerHandlers(kind !== 'browser')
-          if (kind === 'apple') {
-            const rec = createAppleRecognizer(handlers, { locale: EARS_LOCALE, record: true, engine: forced })
-            this.appleRec = rec
-            return rec
-          }
           this.appleRec = null
           if (kind === 'openai')
             return createOpenAiRealtimeRecognizer(handlers, {
@@ -694,7 +711,7 @@ export class LiveSession {
             })
           return createRecognizer(handlers)
         },
-        apple ? appleTrackerOptions(apple) : hostedTrackerOptions(ears)
+        hostedTrackerOptions(ears)
       )
       if (!this.recognizer) {
         appStore.set((s) => ({ warnings: [...s.warnings, 'speech recognition needs Chrome'] }))
@@ -740,6 +757,130 @@ export class LiveSession {
     this.beginListening()
   }
 
+  /**
+   * The app (Kids Category): only the shell's on-device ears, never cloud or browser recognizers, so
+   * no child audio leaves the device. Permission off or no engine → the grown-up message; typing
+   * still works. The server's `onDeviceEars` flag and the old Grown-ups ears setting do not apply here.
+   */
+  private async startShellEars(meter: StoryMeter, token: number): Promise<void> {
+    const offer = await appleEars(EARS_LOCALE)
+    if (token !== this.startToken) return
+    if (offer.permission === 'denied') {
+      this.cannotHear('denied')
+      return
+    }
+    const engine = offer.engine
+    if (!engine) {
+      this.cannotHear('unavailable')
+      return
+    }
+    try {
+      await meter.ensureStarted('apple')
+    } catch (e) {
+      this.handleStartError(e)
+      return
+    }
+    if (token !== this.startToken) return
+    this.setRecognizer(
+      'apple',
+      () => {
+        const rec = createAppleRecognizer(this.recognizerHandlers(true), { locale: EARS_LOCALE, record: true })
+        this.appleRec = rec
+        return rec
+      },
+      appleTrackerOptions(engine)
+    )
+    this.appleRetried = false
+    this.appleRestarting = false
+    this.beginListening()
+    this.armReadyTimers()
+  }
+
+  /** On-device ears reported an error (`"<code>: <message>"`, see SpeechErrorCode). */
+  private appleError(err: string): void {
+    appStore.set((s) => ({ warnings: [...s.warnings.slice(-9), `ears: ${err}`] }))
+    if (!this.wantListening) return
+    const code = appleErrorCode(err) ?? 'failed'
+    if (code === 'not-allowed') this.cannotHear('denied')
+    else if (code === 'interrupted' || code === 'transcriber') {
+      if (this.earsReady) this.appleLost()
+      // The old span reporting after its own speech.end already started the restart.
+      else if (!this.appleRestarting) this.giveUp(KEEP_GOING_NOTE)
+    } else if (this.appleRetried) this.giveUp(KEEP_GOING_NOTE)
+    else if (code === 'model') this.giveUp(TRY_AGAIN_NOTE)
+    else this.cannotHear('unavailable')
+  }
+
+  /**
+   * A call, Siri, an alarm, a route change or an engine reset stopped the ears after they were
+   * listening. Restart once, quietly (no minutes while it comes back); a second loss stops listening.
+   */
+  private appleLost(): void {
+    const rec = this.recognizer
+    if (this.appleRetried || !rec) {
+      this.giveUp(KEEP_GOING_NOTE)
+      return
+    }
+    this.appleRetried = true
+    this.appleRestarting = true
+    this.earsReady = false
+    this.meter?.setListening(false)
+    appStore.set({ listening: false, micStarting: true, micLevel: 0 })
+    // stop() then start() chains: the new span starts once the shell has let go of the old one.
+    rec.stop()
+    void this.captureVoice()
+    this.tracker.reset()
+    rec.start()
+    this.armReadyTimers()
+  }
+
+  /** Stop listening and say why, kindly. */
+  private giveUp(note: string): void {
+    this.stopListening()
+    this.showNote(note, 7000)
+  }
+
+  /** The shell cannot listen: permission off (`denied`, with a gated Open Settings) or no engine. */
+  private cannotHear(problem: 'denied' | 'unavailable'): void {
+    this.stopListening()
+    appStore.set({ micProblem: problem })
+    this.showNote(CANT_HEAR_NOTE, 8000)
+  }
+
+  private armReadyTimers(): void {
+    this.clearReadyTimers()
+    this.readyTimers = [
+      window.setTimeout(() => {
+        if (this.wantListening && !this.earsReady) this.showNote(LEARNING_NOTE, GIVE_UP_AFTER_MS)
+      }, LEARNING_AFTER_MS),
+      window.setTimeout(() => {
+        if (this.wantListening && !this.earsReady) this.giveUp(TRY_AGAIN_NOTE)
+      }, GIVE_UP_AFTER_MS),
+    ]
+  }
+
+  private clearReadyTimers(): void {
+    for (const t of this.readyTimers) clearTimeout(t)
+    this.readyTimers = []
+  }
+
+  private coachMuted(): boolean {
+    return performance.now() < this.coachMuteUntil
+  }
+
+  /** Play a coach line and ignore what the open mic hears of it, until COACH_ECHO_MS after it ends. */
+  private playCoach(n: 1 | 2 | 3 | 4): void {
+    this.coachMuteUntil = Number.POSITIVE_INFINITY
+    this.tracker.setMuted(true)
+    void playCoachLine(n).then(() => {
+      this.coachMuteUntil = performance.now() + COACH_ECHO_MS
+      window.setTimeout(() => {
+        this.tracker.discardPending()
+        this.tracker.setMuted(false)
+      }, COACH_ECHO_MS)
+    })
+  }
+
   private beginListening(): void {
     this.wantListening = true
     this.earsReady = false
@@ -755,16 +896,16 @@ export class LiveSession {
     const now = performance.now()
     // The mic was loud a moment ago: the child is still talking, hold the quiet-window release.
     this.tracker.tick(now, now - this.lastLoudAt < VOICE_HOLD_MS)
-    appStore.set({ transcriptInterim: cleanText(this.tracker.interim) })
+    if (!this.coachMuted()) appStore.set({ transcriptInterim: cleanText(this.tracker.interim) })
     if (!this.wantListening) return
     const cfg = appStore.get().config
-    const nudgeMs = cfg?.silenceNudgeMs ?? 90000
-    const endMs = cfg?.silenceEndMs ?? 210000
+    const nudgeMs = cfg?.silenceNudgeMs ?? 30_000
+    const endMs = cfg?.silenceEndMs ?? 60_000
     const silent = now - this.lastWordsAt
     if (!this.nudged && silent > nudgeMs) {
       this.nudged = true
       this.showNote('all done? just say "The End"', 8000)
-      void playCoachLine(4)
+      this.playCoach(4)
     }
     if (silent > endMs) this.endStory('silence')
   }
@@ -779,6 +920,9 @@ export class LiveSession {
 
   stopListening(): void {
     this.wantListening = false
+    // Cancels a start still waiting on the shell or the server.
+    this.startToken++
+    this.clearReadyTimers()
     clearInterval(this.tickTimer)
     this.recognizer?.stop()
     this.meter?.setListening(false)

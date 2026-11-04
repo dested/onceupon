@@ -1,4 +1,5 @@
 import { appStore } from '~/story/store'
+import { bridgeCall } from '~/backend/bridge'
 
 /**
  * Small helpers shared by the hosted-mode surfaces (the grown-up gate, the paywall, the parent area).
@@ -80,4 +81,12 @@ export function startFreshStory(): void {
     calls: [],
     endReason: null,
   }))
+}
+
+// --- The phone's Settings page for this app (mic and speech switches), behind the gate ---
+
+export function openAppSettings(): void {
+  void gate().then((ok) => {
+    if (ok) void bridgeCall('settings.open', {}).catch(() => undefined)
+  })
 }

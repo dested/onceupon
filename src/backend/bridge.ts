@@ -27,8 +27,16 @@ const INTERACTIVE: ReadonlySet<BridgeName> = new Set<BridgeName>([
   'share.url',
   'share.file',
   'media.saveVideo',
-  'speech.start',
 ])
+/**
+ * Calls with their own budget. `speech.start` covers the permission prompt and a first-use model
+ * download; the studio tells the child what is happening at 15 s and gives up at 60 s, so 70 s is a
+ * backstop, not the 10-minute interactive wait. `speech.prepare` downloads in the background.
+ */
+const TIMEOUT_MS: Partial<Record<BridgeName, number>> = {
+  'speech.start': 70_000,
+  'speech.prepare': 5 * 60_000,
+}
 /** How long a request waits for `window.ReactNativeWebView` if the shell flagged itself but the handler is late. */
 const HANDLER_WAIT_MS = 3_000
 
@@ -143,7 +151,7 @@ export async function bridgeCall<K extends BridgeName>(type: K, input: BridgeInp
   installBridge()
   const id = `${Date.now().toString(36)}-${++counter}`
   const req: BridgeRequest = { v: 1, id, type, input }
-  const timeoutMs = INTERACTIVE.has(type) ? INTERACTIVE_TIMEOUT_MS : REQUEST_TIMEOUT_MS
+  const timeoutMs = TIMEOUT_MS[type] ?? (INTERACTIVE.has(type) ? INTERACTIVE_TIMEOUT_MS : REQUEST_TIMEOUT_MS)
   return new Promise<BridgeOutput<K>>((resolve, reject) => {
     const timer = window.setTimeout(() => {
       pending.delete(id)

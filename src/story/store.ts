@@ -170,6 +170,8 @@ export interface AppState {
   consentBlocked: boolean
   /** The consent card is showing. */
   consentOpen: boolean
+  /** The app could not listen: mic/speech permission off (`denied`) or no on-device engine. */
+  micProblem: 'denied' | 'unavailable' | null
 }
 
 export interface SttTrace {
@@ -376,6 +378,7 @@ export const appStore = new Store<AppState>({
   aiConsent: false,
   consentBlocked: false,
   consentOpen: false,
+  micProblem: null,
 })
 
 export function useApp<S>(selector: (s: AppState) => S): S {
