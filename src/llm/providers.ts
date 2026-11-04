@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { Provider, Usage } from './models'
 import { RelayProvider } from '~/backend/relay-provider'
 import { fastThinking } from './anthropic-thinking'
+import { BRAND } from '../../packages/shared/src/brand'
 
 /** One text block of the user message. `cache: true` marks a prompt-cache breakpoint (Anthropic). */
 export interface PromptBlock {
@@ -130,7 +131,8 @@ class OpenAiCompatProvider implements LlmProvider {
       'Content-Type': 'application/json',
     }
     if (this.kind === 'openrouter') {
-      headers['HTTP-Referer'] = 'http://localhost:7710'
+      // OpenRouter's app attribution. Never a localhost literal: sync-studio refuses bundles that carry one.
+      headers['HTTP-Referer'] = typeof location === 'undefined' ? BRAND.origin : location.origin
       headers['X-Title'] = 'Squiggletale'
     }
     const body: Record<string, unknown> = {
