@@ -1,10 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Check, X } from 'lucide-react'
 import { useApp, appStore } from '~/story/store'
-import { buyPack, loadPrices, restorePurchases, type PriceInfo } from '~/backend/purchases'
+import { APP_SHELL } from '~/backend/config'
+import { buyPack, loadPrices, openExternal, restorePurchases, type PriceInfo } from '~/backend/purchases'
 import { centsPerMinute, packById, PACKS, type PackId } from '../../packages/shared/src/packs'
+import { BRAND } from '../../packages/shared/src/brand'
+import pairFree from '~/assets/paywall/free.jpg'
+import pairMinutes from '~/assets/paywall/with-minutes.jpg'
 import { IconButton, PaperCard, StickerButton } from './bits'
 import { gate, openParentArea, startFreshStory } from './hosted'
+
+/**
+ * The smarter-crayon pair: the same words drawn with free minutes (the quick crayon) and with bought
+ * minutes (the smarter one). Real renders, sized for the tile; never name a model or vendor here.
+ */
+const PAIR = {
+  words: 'a bear sits in a boat on the lake',
+  free: pairFree,
+  minutes: pairMinutes,
+} as const
 
 const FEATURED = PACKS.find((p) => p.featured) ?? PACKS[0]
 
@@ -35,6 +49,17 @@ export function Paywall() {
   useEffect(() => {
     void loadPrices().then(setPrices)
   }, [])
+  // Escape closes the paywall, unless a dialog on top of it (the grown-up gate) has the key.
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      if (document.querySelector('dialog[open]')) return
+      appStore.set({ paywallOpen: false })
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
   useEffect(() => {
     if (!open) return
     setSelected(appStore.get().lastPack ?? FEATURED?.id ?? 'pack_120')
@@ -52,6 +77,8 @@ export function Paywall() {
   const priceFor = (id: PackId): string | null => prices?.find((p) => p.packId === id)?.localizedPrice ?? null
 
   const close = (): void => appStore.set({ paywallOpen: false })
+  const privacyUrl = config?.privacyUrl || `${BRAND.origin}/privacy`
+  const termsUrl = config?.termsUrl || `${BRAND.origin}/terms`
 
   const buy = (id: PackId): void => {
     setNotice(null)
@@ -101,6 +128,12 @@ export function Paywall() {
     })
   }
 
+  const openLink = (url: string): void => {
+    void gate().then((ok) => {
+      if (ok) void openExternal(url)
+    })
+  }
+
   const openRedeem = (): void => {
     void gate().then((ok) => {
       if (ok) openParentArea('redeem')
@@ -108,7 +141,7 @@ export function Paywall() {
   }
 
   return (
-    <div className="paywall-overlay" data-testid="paywall">
+    <div className="paywall-overlay" data-testid="paywall" role="dialog" aria-modal="true" aria-label="Story minutes">
       <PaperCard className="modal-card paywall-card">
         <IconButton label="Close" className="paywall-close" onClick={close} data-testid="paywall-close">
           <X size={22} strokeWidth={3} />
@@ -129,7 +162,19 @@ export function Paywall() {
             <h2 className="font-scrawl paywall-heading">
               {sleepyContext ? 'The crayon needs more minutes' : 'More story minutes'}
             </h2>
-            <p className="paywall-sub">Every minute you buy is yours forever, no subscription</p>
+            <figure className="paywall-pair" data-testid="paywall-pair">
+              <figcaption className="paywall-pair-words">“{PAIR.words}”</figcaption>
+              <div className="paywall-pair-row">
+                <div className="paywall-pair-shot">
+                  <img src={PAIR.free} alt={`${PAIR.words}, drawn with free minutes`} width={600} height={375} />
+                  <span>Free</span>
+                </div>
+                <div className="paywall-pair-shot is-minutes">
+                  <img src={PAIR.minutes} alt={`${PAIR.words}, drawn with minutes`} width={600} height={375} />
+                  <span>With minutes</span>
+                </div>
+              </div>
+            </figure>
 
             <div className="paywall-tiles" role="radiogroup" aria-label="Minute packs">
               {PACKS.map((pack) => {
@@ -144,7 +189,6 @@ export function Paywall() {
                     className={`paywall-tile ${isSelected ? 'is-selected' : ''}`}
                     onClick={() => setSelected(pack.id)}
                     data-testid={`pack-${pack.id}`}>
-                    {pack.featured && <span className="paywall-popular">Most popular</span>}
                     <span className="paywall-tile-name font-scrawl">{pack.name}</span>
                     <span className="paywall-tile-minutes">{pack.minutes} minutes</span>
                     <span className="paywall-tile-price">
@@ -180,9 +224,17 @@ export function Paywall() {
               <button type="button" className="paywall-link" onClick={restore} disabled={restoreBusy}>
                 {restoreBusy ? 'Restoring…' : 'Restore purchases'}
               </button>
-              <button type="button" className="paywall-link" onClick={openRedeem}>
-                Redeem a gift code
+              <button type="button" className="paywall-link" onClick={() => openLink(privacyUrl)}>
+                Privacy
               </button>
+              <button type="button" className="paywall-link" onClick={() => openLink(termsUrl)}>
+                Terms
+              </button>
+              {!APP_SHELL && (
+                <button type="button" className="paywall-link" onClick={openRedeem}>
+                  Redeem a gift code
+                </button>
+              )}
             </div>
           </>
         )}

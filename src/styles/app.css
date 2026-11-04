@@ -27,6 +27,13 @@
   --vv-top: 0px;
   /* Visible bottom edge: the keyboard when it is up, else the home indicator. */
   --safe-bottom: max(var(--sab), var(--kb));
+  /* Studio accents, also on :root so top-layer dialogs (the grown-up gate) outside .story-studio match. */
+  --studio-lilac: #e6ddec;
+  --studio-purple: #7b5c91;
+  --studio-sage: #dce7d5;
+  --studio-coral: #d9937e;
+  --studio-muted: #796d60;
+  --studio-line: #d9cbb7;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
@@ -1213,12 +1220,44 @@ button {
 }
 .paywall-heading {
   font-size: 30px;
-  margin: 4px 30px 6px;
+  margin: 4px 44px 12px;
 }
-.paywall-sub {
-  color: var(--studio-muted);
+/* The same words drawn with free minutes and with bought ones. */
+.paywall-pair {
+  margin: 0 0 18px;
+}
+.paywall-pair-words {
+  font-size: 19px;
+  margin-bottom: 8px;
+}
+.paywall-pair-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.paywall-pair-shot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
   font-size: 18px;
-  margin-bottom: 20px;
+}
+.paywall-pair-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  border: 2px solid var(--color-ink);
+  border-radius: 10px 12px 9px 11px;
+  background: var(--color-paper-deep);
+  transform: rotate(-1.2deg);
+}
+.paywall-pair-shot.is-minutes img {
+  border-width: 3px;
+  transform: rotate(1.2deg);
+}
+.paywall-pair-shot.is-minutes span {
+  color: var(--studio-purple);
 }
 .paywall-tiles {
   display: grid;
@@ -1243,18 +1282,6 @@ button {
   border-width: 3px;
   background: #fdf1cf;
   transform: rotate(-1deg);
-}
-.paywall-popular {
-  position: absolute;
-  top: -12px;
-  left: 50%;
-  transform: translateX(-50%) rotate(-3deg);
-  padding: 2px 10px;
-  border: 2px solid var(--color-ink);
-  border-radius: 9px;
-  background: var(--color-crayon-yellow);
-  font: 14px var(--font-hand);
-  white-space: nowrap;
 }
 .paywall-tile-name {
   font-size: 23px;
@@ -1299,18 +1326,24 @@ button {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px 22px;
-  margin-top: 18px;
+  gap: 0 10px;
+  margin-top: 8px;
 }
+/* 44px hit area around a small text link; the look stays a plain underlined word. */
 .paywall-link {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 6px;
   background: none;
   border: none;
   font: 18px var(--font-hand);
-  color: var(--color-crayon-blue);
+  color: var(--studio-purple);
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .paywall-link:disabled {
   opacity: 0.5;
@@ -1440,5 +1473,67 @@ button {
 @media (max-width: 640px) {
   .paywall-tiles {
     grid-template-columns: 1fr;
+  }
+}
+/* Phones: one-row pack tiles so Buy and Restore sit above the fold at 375x667. */
+@media (max-width: 499px) {
+  .paywall-heading {
+    font-size: 21px;
+    margin: 4px 40px 8px;
+  }
+  .paywall-close {
+    top: 10px;
+    right: 10px;
+    width: 44px;
+    height: 44px;
+  }
+  .paywall-pair {
+    margin-bottom: 12px;
+  }
+  .paywall-pair-words {
+    font-size: 17px;
+    margin-bottom: 5px;
+  }
+  .paywall-pair-row {
+    gap: 10px;
+  }
+  .paywall-pair-shot {
+    font-size: 16px;
+    gap: 3px;
+  }
+  .paywall-tiles {
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .paywall-tile {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: 'name price' 'minutes rate';
+    align-items: baseline;
+    column-gap: 10px;
+    row-gap: 0;
+    padding: 7px 14px;
+    text-align: left;
+  }
+  .paywall-tile-name {
+    grid-area: name;
+    font-size: 19px;
+  }
+  .paywall-tile-minutes {
+    grid-area: minutes;
+    font-size: 15px;
+  }
+  .paywall-tile-price {
+    grid-area: price;
+    font-size: 21px;
+    text-align: right;
+  }
+  .paywall-tile-rate {
+    grid-area: rate;
+    font-size: 13px;
+    text-align: right;
+  }
+  .paywall-buy {
+    font-size: 20px;
   }
 }
