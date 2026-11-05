@@ -1,6 +1,6 @@
 import { BufferTarget, EncodedAudioPacketSource, Mp4OutputFormat, Output } from 'mediabunny'
 import { EXPORT_SAMPLE_RATE, playbackContext, primePlayback } from '~/engine/audio'
-import { encodeAac } from '~/export/aac'
+import { encodeAac, muxedAacProblem } from '~/export/aac'
 import type { VoiceTrack } from '~/export/mp4'
 import { APP_SHELL } from '~/backend/config'
 import { getVoiceClip } from '~/story/storage'
@@ -409,5 +409,11 @@ export async function renderVoiceFile(
   }
   const buffer = target.buffer
   if (!buffer) return null
+  // A share page would play a broken AAC config as silence; share without the voice instead.
+  const problem = muxedAacProblem(new Uint8Array(buffer))
+  if (problem) {
+    console.warn(`share voice file: the AAC track's AudioSpecificConfig is broken (${problem}); not shared`)
+    return null
+  }
   return { blob: new Blob([buffer], { type: 'audio/mp4' }), mime: 'audio/mp4' }
 }

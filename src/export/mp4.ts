@@ -16,7 +16,7 @@ import { replayPlan } from '~/story/replay'
 import type { StoryRecord } from '~/story/storage'
 import type { KeptSpan, Span } from '~/story/story-time'
 import { makeVoiceTrack } from '~/story/voice'
-import { encodeAac } from './aac'
+import { encodeAac, muxedAacProblem } from './aac'
 import { BookFrame, CPU, loadVideoAssets, PAPER, VIDEO_H, VIDEO_W } from './frame'
 import { EncoderWatch, ExportStalledError, throwIfAborted, yieldToUi } from './watch'
 
@@ -76,7 +76,7 @@ export interface ExportResult {
   blob: Blob
   seconds: number
   frames: number
-  /** 'aac', or null when no AAC encoder can run here (the video then has no sound). */
+  /** 'aac', or null when no AAC encoder can run here or the AAC config read back broken (see notes). */
   audioCodec: string | null
   /** The AAC encoder used: the browser's own, or the wasm fallback. */
   audioEncoder: 'native' | 'wasm' | null
@@ -332,12 +332,16 @@ export async function exportStoryVideo(
     }
     const buffer = target.buffer
     if (!buffer) throw new Error('muxer produced no file')
+    // Never claim sound we did not write: read the AAC track's config back out of the file.
+    const aacProblem = audioPackets ? muxedAacProblem(new Uint8Array(buffer)) : null
+    if (aacProblem)
+      notes.push(`video export: the AAC track's AudioSpecificConfig is broken (${aacProblem}); the video may play silent`)
     report('mux', 1, true)
     return {
       blob: new Blob([buffer], { type: 'video/mp4' }),
       seconds,
       frames,
-      audioCodec: audioPackets ? 'aac' : null,
+      audioCodec: audioPackets && !aacProblem ? 'aac' : null,
       audioEncoder: aac?.encoder ?? null,
       notes,
     }
