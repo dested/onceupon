@@ -37,7 +37,7 @@ function clip(parts: readonly (readonly [number, number, 'tone' | 'noise'])[]): 
 }
 
 const near = (got: number, want: number, tol = 25): void => {
-  expect(Math.abs(got - want)).toBeLessThanOrEqual(tol)
+  expect(Math.abs(got - want) <= tol).toBe(true)
 }
 
 describe('findSpeech', () => {
@@ -116,7 +116,7 @@ describe('pulledTimes', () => {
   test('order holds and nothing lands before its words', () => {
     const events = [words(0), cmd(2000), cmd(2600), words(3000), cmd(7000), cmd(7001), words(7100), end(7100)]
     const t = pulledTimes(events)
-    for (let i = 1; i < t.length; i++) expect(t[i] ?? 0).toBeGreaterThanOrEqual(t[i - 1] ?? 0)
+    for (let i = 1; i < t.length; i++) expect((t[i] ?? 0) >= (t[i - 1] ?? 0)).toBe(true)
     expect(t[1]).toBe(PULL_TO_MS)
     expect(t[4]).toBe(3000 + PULL_TO_MS)
   })
@@ -152,15 +152,15 @@ describe('storyTime', () => {
     const tl = storyTime([words(4_200), cmd(6_000), words(12_700), cmd(15_000), words(31_100), end(31_100)], speech)
     for (const s of speech) {
       const holder = tl.spans.find((k) => k.from <= s.from && k.to >= s.to)
-      expect(holder).toBeDefined()
+      expect(holder !== undefined).toBe(true)
     }
     // Spans are back to back in story time.
     tl.spans.forEach((s, i) => {
       const prev = tl.spans[i - 1]
       if (prev) expect(s.at).toBe(prev.at + (prev.to - prev.from))
     })
-    for (let i = 1; i < tl.eventAt.length; i++) expect(tl.eventAt[i] ?? 0).toBeGreaterThanOrEqual(tl.eventAt[i - 1] ?? 0)
-    expect(tl.lengthMs).toBeLessThan(31_400 - 700)
+    for (let i = 1; i < tl.eventAt.length; i++) expect((tl.eventAt[i] ?? 0) >= (tl.eventAt[i - 1] ?? 0)).toBe(true)
+    expect(tl.lengthMs < 31_400 - 700).toBe(true)
   })
 
   test('a slow beat: drawing pulled under the words, dead air squeezed', () => {
@@ -175,7 +175,7 @@ describe('storyTime', () => {
     const at = (i: number): number => tl.eventAt[i] ?? 0
     expect(at(1) - at(0)).toBe(PULL_TO_MS)
     expect(at(2) - at(1)).toBe(100)
-    expect(tl.lengthMs).toBeLessThan(26_300 - 4_700 - 3_000)
+    expect(tl.lengthMs < 26_300 - 4_700 - 3_000).toBe(true)
     // Every event sits inside a kept span.
     for (const r of pulledTimes(events)) expect(tl.spans.some((s) => s.from <= r && r <= s.to)).toBe(true)
   })
