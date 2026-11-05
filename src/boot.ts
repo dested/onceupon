@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { bridgeCall, installBridge, onBridgeEvent } from '~/backend/bridge'
 import { HOSTED, NATIVE } from '~/backend/config'
-import { initDevice } from '~/backend/device'
+import { initDevice, retryDeviceNow } from '~/backend/device'
 import { loadConsent } from '~/backend/consent'
 import { initStorage } from '~/story/storage'
 import { appStore } from '~/story/store'
@@ -23,11 +23,20 @@ export async function boot(): Promise<void> {
     void initDevice()
   }
 
-  window.addEventListener('online', () => appStore.set({ online: true }))
+  window.addEventListener('online', () => {
+    appStore.set({ online: true })
+    retryDeviceNow()
+  })
   window.addEventListener('offline', () => appStore.set({ online: false }))
   onBridgeEvent('net', (d) => {
     const parsed = netSchema.safeParse(d)
-    if (parsed.success) appStore.set({ online: parsed.data.online })
+    if (!parsed.success) return
+    appStore.set({ online: parsed.data.online })
+    if (parsed.data.online) retryDeviceNow()
+  })
+  onBridgeEvent('foreground', () => retryDeviceNow())
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') retryDeviceNow()
   })
   // Keep the screen on while the mic is open or a replay is playing (a child watching should not see
   // the iPad dim). One place, driven by state, so every path that stops listening also releases it.

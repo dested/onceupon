@@ -18,8 +18,10 @@ import type { DeviceState, Platform } from '../../packages/shared/src/api'
 
 const INSTALL_ID_KEY = 'onceupon.installId'
 const INIT_TIMEOUT_MS = 8000
-const RETRY_DELAYS_MS = [1000, 3000, 10_000]
-const RETRY_EVERY_MS = 30_000
+// A cold-booted phone can take ~15 s to get a network: keep the early retries close together, and
+// retryDeviceNow() runs one at once when the network or the app comes back.
+const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000]
+const RETRY_EVERY_MS = 10_000
 
 let deviceToken: string | null = null
 let tokenStep: Promise<void> = Promise.resolve()
@@ -128,19 +130,34 @@ function failed(e: unknown): void {
   appStore.set(offline ? { online: false } : { deviceTrouble: true })
 }
 
+/** One attempt at a time: two overlapping registrations would make two devices. */
+let attemptInFlight = false
+
 function scheduleRetry(attempt: number): void {
   window.clearTimeout(retryTimer)
   retryTimer = window.setTimeout(
     () => {
+      if (attemptInFlight) return
+      attemptInFlight = true
       ensureToken()
         .then(pull)
         .then(connected, (e: unknown) => {
           failed(e)
           scheduleRetry(attempt + 1)
         })
+        .finally(() => {
+          attemptInFlight = false
+        })
     },
     RETRY_DELAYS_MS[attempt] ?? RETRY_EVERY_MS
   )
+}
+
+/** Retry now if the last attempt failed (network back, app foregrounded). No-op when connected. */
+export function retryDeviceNow(): void {
+  const s = appStore.get()
+  if (!s.hosted || (s.online && !s.deviceTrouble)) return
+  scheduleRetry(0)
 }
 
 /**
@@ -150,13 +167,18 @@ function scheduleRetry(attempt: number): void {
  */
 export async function initDevice(): Promise<void> {
   const timeout = new Promise<void>((resolve) => window.setTimeout(resolve, INIT_TIMEOUT_MS))
+  attemptInFlight = true
   const token = ensureToken()
   tokenStep = Promise.race([token.catch(() => undefined), timeout])
   const full = token.then(pull)
-  full.then(connected, (e: unknown) => {
-    failed(e)
-    scheduleRetry(0)
-  })
+  full
+    .then(connected, (e: unknown) => {
+      failed(e)
+      scheduleRetry(0)
+    })
+    .finally(() => {
+      attemptInFlight = false
+    })
   await Promise.race([full.catch(() => undefined), timeout])
 }
 

@@ -34,7 +34,10 @@ const studioDir = path.resolve(__dirname, env.STUDIO_DIST)
 // Studio <-> server calls arrive from the studio's own origin(s); reflect only the allow-listed ones.
 function appCors(req: Request, res: Response, next: NextFunction) {
   const origin = req.headers.origin
-  if (typeof origin === 'string' && corsOrigins.includes(origin)) {
+  // `null` is the app's bundled studio copy (a file:// page in the WebView, used when the hosted one
+  // can't load at launch). Auth is the x-device-token header, never a cookie, and credentials are
+  // never allowed, so a null-origin page gets nothing it couldn't get with curl.
+  if (typeof origin === 'string' && (corsOrigins.includes(origin) || origin === 'null')) {
     res.setHeader('Access-Control-Allow-Origin', origin)
     res.setHeader('Vary', 'Origin')
     res.setHeader('Access-Control-Allow-Headers', 'content-type, x-device-token')
