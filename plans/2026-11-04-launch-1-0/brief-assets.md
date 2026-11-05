@@ -30,3 +30,4 @@
 **Report** (≤ 10 lines): `ready assets <step> <sha>`, absolute file paths, the voice used, doubts.
 
 ## Standing answers
+- (2026-11-04, lead) Both 429s fixed in 96921b8 (deploying): a new draw replaces the one in flight instead of a 429, and 8 grace calls before the first charged beat. Restart your local API to pick it up. Keep reporting server findings like these: they're exactly what this capture should shake out. Applies to: assets.
