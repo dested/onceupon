@@ -1074,6 +1074,8 @@ export class LiveSession {
     this.stopListening()
     this.director.stop()
     this.stage.stop()
+    // Stop this session's scratch loop: it is on the shared playback context and would outlive the screen.
+    this.audio.dispose()
     clearTimeout(this.saveTimer)
     this.save()
     if (!this.ended) void this.meter?.stop(null)

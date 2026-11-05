@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowLeft, Play, Trash2 } from 'lucide-react'
 import { appStore, useApp } from '~/story/store'
 import { deleteStory, listStories } from '~/story/storage'
+import { primeAudio } from '~/story/voice'
 import { IconButton, StickerButton } from './bits'
 import { MinutesChip } from './MinutesChip'
 import { Offline } from './Offline'
@@ -18,7 +19,11 @@ export function Bookshelf() {
     appStore.set({ stories: listStories() })
   }, [])
 
-  const open = (id: string): void => appStore.set({ screen: 'replay', replayId: id })
+  const open = (id: string): void => {
+    // Unlock the playback context inside this tap: iOS Safari keeps a replay silent otherwise.
+    primeAudio()
+    appStore.set({ screen: 'replay', replayId: id })
+  }
   const back = (): void => appStore.set({ screen: 'story' })
   const remove = (id: string): void => {
     if (confirmId !== id) {
