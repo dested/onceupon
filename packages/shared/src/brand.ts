@@ -16,7 +16,7 @@ export const BRAND = {
   legalName: 'QuickGame World Inc.',
   /** Required before App Store submission (COPPA operator notice); empty strings are left out of the page. */
   postalAddress: '11201 N Tatum Blvd Ste 300, Phoenix, AZ 85028',
-  phone: '',
+  phone: '+1 (623) 341-0751',
   /** Decision 7: forwarded to Sal's inbox by Namecheap email forwarding on squiggletale.com. */
   supportEmail: 'support@squiggletale.com',
   bundleId: 'com.quickgame.squiggletale',
