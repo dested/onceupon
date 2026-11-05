@@ -7,6 +7,7 @@
  *   bun store/asc/apply.ts status                 read back everything this script owns (phone never printed)
  *   bun store/asc/apply.ts settings               version string, copyright, release type, URLs, content rights,
  *                                                 age rating, free price, availability, IAP prices, review contact
+ *   bun store/asc/apply.ts territories            app + IAP availability from store/asc/territories.json
  *   bun store/asc/apply.ts categories             primary + secondary category (needs the lead's OK)
  *   bun store/asc/apply.ts copy                   listing copy from store/asc/listing.json (after `pass listing`)
  *   bun store/asc/apply.ts iap-screenshot <png>   App Review screenshot on all three IAPs
@@ -151,7 +152,7 @@ async function settings(): Promise<void> {
   await freePrice()
   await availability()
   for (const iap of l.iaps) await iapPrice(iap.id, iap.usd)
-  await iapAvailabilityCheck()
+  await iapAvailability()
   await reviewContact()
 }
 
@@ -184,42 +185,60 @@ async function freePrice(): Promise<void> {
   say('✓ app price: free (USA base)')
 }
 
-/** Territory ids Store Brand Puzzles is available in. */
-async function referenceTerritories(): Promise<string[]> {
-  const rows = await getAll(`/v2/appAvailabilities/${REFERENCE_APP}/territoryAvailabilities?limit=200&include=territory`)
-  const ids: string[] = []
-  for (const r of rows) {
-    const t = z.object({ relationships: z.object({ territory: z.object({ data: z.object({ id: z.string() }) }) }) }).parse(r)
-    if (r.attributes?.available === true) ids.push(t.relationships.territory.data.id)
-  }
-  return ids.sort()
-}
+/**
+ * The territory list: store/asc/territories.json (Store Brand Puzzles' 175 minus China mainland and every region
+ * Anthropic doesn't serve, lead 2026-11-04). The same list goes on the app and all three IAPs.
+ */
+const Territories = z.object({ availableInNewTerritories: z.boolean(), territories: z.array(z.string()), dropped: z.record(z.string()) })
+const territoryPlan = () => Territories.parse(JSON.parse(readFileSync(join(ROOT, 'store/asc/territories.json'), 'utf8')))
+
+const TerritoryRow = z.object({
+  id: z.string(),
+  attributes: z.object({ available: z.boolean().nullable().optional() }).passthrough(),
+  relationships: z.object({ territory: z.object({ data: z.object({ id: z.string() }) }) }),
+})
 
 async function availability(): Promise<void> {
-  const want = await referenceTerritories()
+  const plan = territoryPlan()
+  const want = new Set(plan.territories)
   const mine = await asc('GET', `/v1/apps/${APP}/appAvailabilityV2`)
-  if (mine.status === 200) {
-    const rows = await getAll(`/v2/appAvailabilities/${APP}/territoryAvailabilities?limit=200&include=territory`)
-    const on = rows.filter((r) => r.attributes?.available === true).length
-    return say(`= app availability exists: ${on}/${rows.length} territories on (reference has ${want.length}); not rewritten`)
-  }
-  await call('POST', '/v2/appAvailabilities', {
-    data: {
-      type: 'appAvailabilities',
-      attributes: { availableInNewTerritories: true },
-      relationships: {
-        app: { data: { type: 'apps', id: APP } },
-        territoryAvailabilities: { data: want.map((t) => ({ type: 'territoryAvailabilities', id: `\${${t}}` })) },
+  if (mine.status !== 200) {
+    await call('POST', '/v2/appAvailabilities', {
+      data: {
+        type: 'appAvailabilities',
+        attributes: { availableInNewTerritories: plan.availableInNewTerritories },
+        relationships: {
+          app: { data: { type: 'apps', id: APP } },
+          territoryAvailabilities: { data: plan.territories.map((t) => ({ type: 'territoryAvailabilities', id: `\${${t}}` })) },
+        },
       },
-    },
-    included: want.map((t) => ({
-      type: 'territoryAvailabilities',
-      id: `\${${t}}`,
-      attributes: { available: true },
-      relationships: { territory: { data: { type: 'territories', id: t } } },
-    })),
-  })
-  say(`✓ app availability: ${want.length} territories, new territories on`)
+      included: plan.territories.map((t) => ({
+        type: 'territoryAvailabilities',
+        id: `\${${t}}`,
+        attributes: { available: true },
+        relationships: { territory: { data: { type: 'territories', id: t } } },
+      })),
+    })
+    return say(`✓ app availability: ${want.size} territories, new territories ${plan.availableInNewTerritories ? 'on' : 'off'}`)
+  }
+  const avail = z.object({ data: z.object({ attributes: z.object({ availableInNewTerritories: z.boolean() }) }) }).parse(mine.json)
+  if (avail.data.attributes.availableInNewTerritories !== plan.availableInNewTerritories) {
+    say(`! app availableInNewTerritories is ${String(avail.data.attributes.availableInNewTerritories)}; the API has no update for it (set it in App Store Connect → Pricing and Availability)`)
+  }
+  const rows = (await getAll(`/v2/appAvailabilities/${APP}/territoryAvailabilities?limit=200&include=territory`)).map((r) => TerritoryRow.parse(r))
+  let changed = 0
+  for (const r of rows) {
+    const t = r.relationships.territory.data.id
+    const on = want.has(t)
+    if ((r.attributes.available === true) === on) continue
+    await call('PATCH', `/v1/territoryAvailabilities/${r.id}`, { data: { type: 'territoryAvailabilities', id: r.id, attributes: { available: on } } })
+    say(`✓ app ${t}: ${on ? 'on' : 'off'}${on ? '' : ` (${plan.dropped[t] ?? 'not in the list'})`}`)
+    changed++
+  }
+  const missing = plan.territories.filter((t) => !rows.some((r) => r.relationships.territory.data.id === t))
+  if (missing.length > 0) say(`! app availability has no row for: ${missing.join(',')}`)
+  const onNow = rows.filter((r) => want.has(r.relationships.territory.data.id)).length
+  say(`${changed === 0 ? '=' : '✓'} app availability: ${onNow} territories on, ${changed} changed`)
 }
 
 async function iapPrice(iapId: string, usd: string): Promise<void> {
@@ -249,14 +268,30 @@ async function iapPrice(iapId: string, usd: string): Promise<void> {
   say(`✓ IAP ${iapId}: $${usd} USA base, other territories equalized`)
 }
 
-async function iapAvailabilityCheck(): Promise<void> {
-  const want = new Set(await referenceTerritories())
+async function iapAvailability(): Promise<void> {
+  const plan = territoryPlan()
+  const want = new Set(plan.territories)
   for (const id of IAPS) {
+    const cur = z.object({ data: z.object({ attributes: z.object({ availableInNewTerritories: z.boolean() }) }) })
+      .parse(await call('GET', `/v2/inAppPurchases/${id}/inAppPurchaseAvailability`))
     const have = new Set((await getAll(`/v1/inAppPurchaseAvailabilities/${id}/availableTerritories?limit=200`)).map((t) => t.id))
-    const missing = [...want].filter((t) => !have.has(t))
-    const extra = [...have].filter((t) => !want.has(t))
-    if (missing.length === 0 && extra.length === 0) say(`= IAP ${id} availability: ${have.size} territories, same as the app`)
-    else say(`! IAP ${id} availability differs: missing ${missing.join(',') || 'none'}, extra ${extra.join(',') || 'none'}`)
+    const same = have.size === want.size && [...want].every((t) => have.has(t))
+    if (same && cur.data.attributes.availableInNewTerritories === plan.availableInNewTerritories) {
+      say(`= IAP ${id} availability: ${have.size} territories, same as the app`)
+      continue
+    }
+    await call('POST', '/v1/inAppPurchaseAvailabilities', {
+      data: {
+        type: 'inAppPurchaseAvailabilities',
+        attributes: { availableInNewTerritories: plan.availableInNewTerritories },
+        relationships: {
+          inAppPurchase: { data: { type: 'inAppPurchases', id } },
+          availableTerritories: { data: plan.territories.map((t) => ({ type: 'territories', id: t })) },
+        },
+      },
+    })
+    const dropped = [...have].filter((t) => !want.has(t))
+    say(`✓ IAP ${id} availability: ${want.size} territories, new territories ${plan.availableInNewTerritories ? 'on' : 'off'}; dropped ${dropped.join(',') || 'none'}`)
   }
 }
 
@@ -478,13 +513,17 @@ async function main(): Promise<number> {
   try {
     if (step === 'status') await status()
     else if (step === 'settings') await settings()
+    else if (step === 'territories') {
+      await availability()
+      await iapAvailability()
+    }
     else if (step === 'categories') await categories()
     else if (step === 'copy') await copy()
     else if (step === 'iap-screenshot' && arg) await iapScreenshot(arg)
     else if (step === 'screenshots') await screenshots()
     else if (step === 'notes' && arg) await notes(arg)
     else {
-      console.log('usage: bun store/asc/apply.ts status|settings|categories|copy|iap-screenshot <png>|screenshots|notes <file>')
+      console.log('usage: bun store/asc/apply.ts status|settings|territories|categories|copy|iap-screenshot <png>|screenshots|notes <file>')
       return 2
     }
     return 0

@@ -62,8 +62,8 @@ storytelling,bedtime story,drawing,crayon,picture book,storybook,draw,imaginatio
 | com.quickgame.squiggletale.pack120 (6815031238) | Big pack, 120 minutes | 120 minutes of story time, about 24 stories | $19.99 | Consumable: adds 120 minutes of story time to this device; shown on the paywall in Grown-ups → Buy minutes |
 | com.quickgame.squiggletale.pack400 (6815032143) | Family pack, 400 minutes | 400 minutes of story time for the family | $39.99 | Consumable: adds 400 minutes of story time to this device; shown on the paywall in Grown-ups → Buy minutes |
 
-Other territories: Apple's equalization from the USA base price. Availability: the same 175 territories as the
-app. Family Sharing: off (consumables can't use it).
+Other territories: Apple's equalization from the USA base price. Availability: the same 165 territories as the
+app (`store/asc/territories.json`), new territories off. Family Sharing: off (consumables can't use it).
 
 ## Version and app info
 
@@ -77,7 +77,7 @@ app. Family Sharing: off (consumables can't use it).
 | Kids Category | Made for Kids, age band 6–8 (`kidsAgeBand` SIX_TO_EIGHT on the age rating declaration) |
 | Content rights | Does not use third-party content |
 | Price | Free |
-| Availability | The same 175 territories as Store Brand Puzzles (6819053321), new territories on |
+| Availability | 165 territories (`store/asc/territories.json`): Store Brand Puzzles' 175 minus China mainland (ICP + generative-AI licence) and the regions Anthropic doesn't serve: HKG, MAC, AFG, BLR, MMR, RUS, VEN, XKS, YEM. New territories: off on the IAPs; the app's switch is still on (no API for it: App Store Connect → Pricing and Availability) |
 
 ### Kids Category
 
