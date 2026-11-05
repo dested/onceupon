@@ -16,15 +16,22 @@ OUT=~/scratch/squiggletale
 ARCHIVE=$OUT/Squiggletale-$BUILD.xcarchive
 mkdir -p $OUT
 
-# The lock first: sim-build.sh shares this checkout and its ios/.
-if ! mkdir ~/code/.mac-build.lock 2>/dev/null; then echo "LOCK_HELD: $(cat ~/code/.mac-build.lock/owner)"; exit 1; fi
-echo "squiggletale ($BUILD) App Store archive (${OWNER:-agent}) $(date)" > ~/code/.mac-build.lock/owner
+# The lock first: sim-build.sh shares this checkout and its ios/. ARCHIVE_LOCK_HELD=1 means the run that
+# re-exec'd us (below) already holds it.
+if [[ -z ${ARCHIVE_LOCK_HELD:-} ]]; then
+  if ! mkdir ~/code/.mac-build.lock 2>/dev/null; then echo "LOCK_HELD: $(cat ~/code/.mac-build.lock/owner)"; exit 1; fi
+  echo "squiggletale ($BUILD) App Store archive (${OWNER:-agent}) $(date)" > ~/code/.mac-build.lock/owner
+fi
 trap 'rm -rf ~/code/.mac-build.lock; echo LOCK_RELEASED' EXIT
 
 cd $REPO
 if [[ -z ${NO_SYNC:-} ]]; then
   git fetch -q origin
   git checkout -q -f --detach origin/master
+  # The checkout can replace this very script, and zsh keeps running the copy it started (build 4 ran 580d0bf's
+  # CHECKs). Hand the lock to the synced copy and run that one instead.
+  trap - EXIT
+  exec env NO_SYNC=1 ARCHIVE_LOCK_HELD=1 zsh $REPO/apps/mobile/scripts/mini/archive.sh
 fi
 head=$(git rev-parse HEAD)
 if [[ -n ${SHA:-} && $head != ${SHA}* ]]; then echo "WRONG_SHA HEAD is ${head:0:12}, wanted $SHA (push it as master first)"; exit 1; fi
