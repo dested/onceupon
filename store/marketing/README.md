@@ -8,10 +8,12 @@ Every frame is the real studio (hosted mode, fake native shell, local API with a
 | `preview-iphone-6.9-sheet.png` | 3x3 contact sheet of the preview | `scripts/marketing/edit.mjs` |
 | `hero-1080p.mp4` | 16:9 hero ad: 1920x1080, 42.8 s, H.264 High@4.0 30 fps CRF 17 (≤ 12 Mbps), AAC-LC 48 kHz stereo, -16 LUFS | ocean export `W:\junk\onceupon-f\assets\hero\x2-ocean.mp4`, owl take `W:\junk\onceupon-f\assets\h3-bedtime`, share take `W:\junk\onceupon-f\assets\h-share4`, grandma's phone `W:\junk\onceupon-f\assets\h-grandma4` (all after d679400, so captions show as the words are said); cut by `edl/hero-1080p.json` |
 | `hero-1080p-sheet.png` | 4x3 contact sheet of the hero | `scripts/marketing/hero.mjs` |
+| `vertical-bedtime.mp4` | 9:16 vertical, owl story: 1080x1920, 16.7 s, H.264 High@4.0 30 fps CRF 17 (≤ 12 Mbps), AAC-LC 48 kHz stereo, -16 LUFS | the hero's owl take `W:\junk\onceupon-f\assets\h3-bedtime`; cut by `edl/vertical-bedtime.json` |
+| `vertical-bedtime-sheet.png` | 6x2 contact sheet of the bedtime vertical | `scripts/marketing/hero.mjs` |
 | `brand/app-store-badge-black.svg` | Apple's "Download on the App Store" badge (US-UK, black), unmodified | toolbox.marketingtools.apple.com, 2026-11-05 |
 | `stories.md` | the three theme stories, voice, takes | `scripts/marketing/stories.ts` |
 | `voice/<theme>-<n>.mp3`, `voice/<theme>.json` | kid voice lines (Teddy, eleven_v4) + word timings | `scripts/marketing/voice.ts` |
-| `edl/*.json` | edit lists for each cut | hand-written, run by `scripts/marketing/edit.mjs` (portrait previews) or `hero.mjs` (16:9) |
+| `edl/*.json` | edit lists for each cut | hand-written, run by `scripts/marketing/edit.mjs` (portrait previews) or `hero.mjs` (16:9 hero, 9:16 verticals) |
 
 Apple's preview spec (checked 2026-11-04, App Store Connect help "App preview specifications"): 886x1920 for 6.9"/6.5" iPhones, 15–30 s, ≤ 30 fps, H.264 10–12 Mbps High ≤ 4.0, 256 kbps AAC stereo 44.1/48 kHz, ≤ 500 MB, .mov/.m4v/.mp4.
 
@@ -38,6 +40,16 @@ Sells in the first 2 seconds: a child's voice and the crayon already drawing, no
 
 Grandma's phone is the local API's real `/s/<id>` page; its player frame points at the studio dev server (same player code) because the built studio in `dist-hosted` calls the production API. Share links read `https://squiggletale.com/s/…` because the API runs with `PUBLIC_ORIGIN=https://squiggletale.com` for the share take.
 
+## Verticals (1080x1920)
+
+One per story, cut from the hero's takes with the same pipeline (`hero.mjs`, size [1080, 1920]): one big phone (zoom 1.55) under a sticker, then the name and Apple's badge. Voice and the app's sounds only.
+
+| Cut | Time | Scene | Overlay | Sound |
+| --- | --- | --- | --- | --- |
+| bedtime | 0–4.95 | the crayon draws the trees and the owl as the child talks | "Tell it out loud" | "At night the moon came out and the stars were twinkling", crayon scratch |
+| bedtime | 4.75–13.9 | closing card, tap "Play it again": the replay at night, "The owl said goodnight and went to sleep", "The End" | "In their own voice" | the replay playing the child's recording |
+| bedtime | 13.7–16.7 | app icon, Squiggletale, App Store badge | none | none |
+
 ## Pipeline (`scripts/marketing/`)
 
 ```
@@ -56,6 +68,7 @@ node scripts/marketing/export-story.mjs ocean <out.mp4> #   1280x800, voice in s
 AFTER=share node scripts/marketing/capture-live.mjs dragons <take>   # ends on Send to grandma -> Make a link (events.shareUrl)
 node scripts/marketing/capture-player.mjs <shareId> <take> 20        # grandma's phone: the /s/<id> page, tap Play
 node scripts/marketing/hero.mjs store/marketing/edl/hero-1080p.json  # 16:9 cut: export, phones, touches, end card
+node scripts/marketing/hero.mjs store/marketing/edl/vertical-bedtime.json  # 9:16 vertical (same script, size [1080, 1920])
 node scripts/marketing/cdp.mjs quit
 ```
 

@@ -1,0 +1,38 @@
+{
+  "out": "store/marketing/vertical-bedtime.mp4",
+  "work": "/w/junk/onceupon-f/assets/vertical/bedtime",
+  "size": [1080, 1920],
+  "bg": "#eee5d5",
+  "xfade": 0.2,
+  "statusbar": "store/screenshots/iphone-6.9/01-story-drawing.png",
+  "statusbarCrop": 186,
+  "scenes": [
+    {
+      "phones": [
+        {
+          "take": "/w/junk/onceupon-f/assets/h3-bedtime",
+          "x": 540, "zoom": 1.55, "top": 314,
+          "items": [{ "from": 7.85, "to": 12.8, "audio": ["voice", "ctx@2"] }]
+        }
+      ],
+      "overlay": { "text": "Tell it out loud", "x": 540, "y": 150, "at": 0.2, "to": 4.8, "size": 36, "tilt": -2 }
+    },
+    {
+      "phones": [
+        {
+          "take": "/w/junk/onceupon-f/assets/h3-bedtime",
+          "x": 540, "zoom": 1.55, "top": 314,
+          "items": [
+            { "from": 27.03, "to": 28.13, "audio": ["ctx@2"] },
+            { "from": 38.85, "to": 46.9, "audio": ["ctx@2"] }
+          ],
+          "taps": [{ "at": 27.68, "x": 268, "y": 1676 }]
+        }
+      ],
+      "overlay": { "text": "In their own voice", "x": 540, "y": 150, "at": 0.9, "to": 8.9, "size": 36, "tilt": 2 }
+    },
+    {
+      "end": { "dur": 3.0, "scale": 1.15, "icon": "apps/web/public/icon.png", "badge": "store/marketing/brand/app-store-badge-black.svg" }
+    }
+  ]
+}

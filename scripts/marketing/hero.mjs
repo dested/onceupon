@@ -1,6 +1,7 @@
 /**
- * Cuts the 16:9 hero ad from an edit list: full-picture moments (the app's mp4 export render), phones
- * showing captured takes, a closing card with the name and Apple's App Store badge.
+ * Cuts the 16:9 hero ad (and the 9:16 verticals, size [1080, 1920]) from an edit list: full-picture moments
+ * (the app's mp4 export render), phones showing captured takes, a closing card with the name and Apple's
+ * App Store badge.
  *   node scripts/marketing/hero.mjs <edl.json>
  *
  * EDL: {
@@ -12,7 +13,7 @@
  *     { phones: [{ take, x: 960, zoom?: 1.7, top?: -650, bezel?: "#2a2321", padTop?: 124, padColor?: "#ebe3d2",
  *                  taps?: [{ at, x, y }],               // touches: take time, capture px
  *                  items: [{ from, to, audio: ["voice" | "ctx", …] } | { hold: t, dur }] }] },
- *     { end: { dur, icon, badge } },
+ *     { end: { dur, icon, badge, scale?: 1.2 } },
  *   ]
  *   and on any scene: overlay: { text, x, y, at, to, size, tilt }       // seconds within the scene
  * }
@@ -215,13 +216,15 @@ async function renderScene(scene, n) {
     D = scene.end.dur
     const png = join(work, `end-${n}.png`)
     const e = scene.end
+    const k = e.scale ?? 1
+    const px = (v) => Math.round(v * k)
     await renderHtml(
       `<div style="position:absolute; inset:0; background:${BG}; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-         <img src="${dataUrl(repo(e.icon))}" style="width:240px; height:240px; border-radius:54px; box-shadow:0 14px 34px rgba(59,47,47,.25);">
-         <div style="position:relative; margin-top:34px; font-family:Scrawl; font-size:150px; line-height:1.1; color:#7b5c91;">
-           <span style="position:absolute; left:-62px; top:58px; color:#d9937e; font:52px Hand;">✦</span>Squiggletale<span style="position:absolute; right:-58px; top:6px; color:#d9937e; font:52px Hand;">✦</span>
+         <img src="${dataUrl(repo(e.icon))}" style="width:${px(240)}px; height:${px(240)}px; border-radius:${px(54)}px; box-shadow:0 14px 34px rgba(59,47,47,.25);">
+         <div style="position:relative; margin-top:${px(34)}px; font-family:Scrawl; font-size:${px(150)}px; line-height:1.1; color:#7b5c91;">
+           <span style="position:absolute; left:${px(-62)}px; top:${px(58)}px; color:#d9937e; font:${px(52)}px Hand;">✦</span>Squiggletale<span style="position:absolute; right:${px(-58)}px; top:${px(6)}px; color:#d9937e; font:${px(52)}px Hand;">✦</span>
          </div>
-         <img src="${dataUrl(repo(e.badge))}" style="height:112px; margin-top:96px;">
+         <img src="${dataUrl(repo(e.badge))}" style="height:${px(112)}px; margin-top:${px(96)}px;">
        </div>`,
       { width: W, height: H, out: png }
     )
@@ -297,5 +300,6 @@ ff([
 ])
 const sheet = out.replace(/\.mp4$/, '-sheet.png')
 const step = total / 12
-ff(['-i', out, '-vf', `fps=1/${step.toFixed(4)},scale=640:-1,tile=4x3`, '-frames:v', '1', sheet])
+const tile = H > W ? 'scale=360:-1,tile=6x2' : 'scale=640:-1,tile=4x3'
+ff(['-i', out, '-vf', `fps=1/${step.toFixed(4)},${tile}`, '-frames:v', '1', sheet])
 console.log(`${out} ${total.toFixed(2)} s, scenes at ${offsets.map((o) => o.toFixed(2)).join(' ')}\n${sheet}`)
