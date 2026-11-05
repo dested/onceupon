@@ -20,7 +20,7 @@ const PAPER = '#fbf6ea'
 // Info.plist usage strings (parents read these in the iOS permission prompts).
 const MIC_USAGE = `${BRAND.name} listens while your child tells a story so the crayon can draw it. Speech is turned into words on this device, and the recording stays on this device unless a grown-up shares the story.`
 const PHOTOS_USAGE = `${BRAND.name} never opens your photo library.`
-const SPEECH_USAGE =`${BRAND.name} turns your child's spoken story into words on this device so the crayon can draw it.`
+const SPEECH_USAGE = `${BRAND.name} turns your child's spoken story into words on this device so the crayon can draw it.`
 // The splash image's paper tone (sampled from the generated icon) so the letterbox matches the art.
 const SPLASH_PAPER = '#f9f0d0'
 
