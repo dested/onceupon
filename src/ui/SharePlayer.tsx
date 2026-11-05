@@ -33,29 +33,12 @@ interface Ready {
   childName: string | null
   record: StoryRecord
   hasVoice: boolean
-  /** A blob: URL of the whole voice track (see loadVoice), or null without voice. */
-  voiceSrc: string | null
+  voiceUrl: string | null
   voiceMime: string | null
   totalMs: number
 }
 
 type LoadState = { k: 'loading' } | { k: 'gone' } | { k: 'ready'; data: Ready }
-
-/**
- * Fetch the share's voice into a blob: URL before Play shows. The voice route answers without byte
- * ranges, so an <audio> pointed at it can't seek (pause/resume and every resync snapped the voice back
- * to 0), and iOS Safari wants ranges for media at all; a blob is always seekable. Null on failure: the
- * story still plays, silent but for the crayon.
- */
-async function loadVoice(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url)
-    if (!res.ok) return null
-    return URL.createObjectURL(await res.blob())
-  } catch {
-    return null
-  }
-}
 
 function voiceTotalMs(record: StoryRecord): number {
   return record.voice ? record.voice.clips.reduce((m, c) => Math.max(m, c.t + c.ms), 0) : 0
@@ -201,7 +184,7 @@ export function SharePlayer({ shareId }: { shareId: string }) {
         record
           ? {
               k: 'ready',
-              data: { childName: null, record, hasVoice: false, voiceSrc: null, voiceMime: null, totalMs: 0 },
+              data: { childName: null, record, hasVoice: false, voiceUrl: null, voiceMime: null, totalMs: 0 },
             }
           : { k: 'gone' }
       )
@@ -212,17 +195,11 @@ export function SharePlayer({ shareId }: { shareId: string }) {
         if (!res.ok) throw new Error(`share ${res.status}`)
         return publicShareSchema.parse(await res.json())
       })
-      .then(async (share) => {
+      .then((share) => {
         if (cancelled) return
         const record = parseStoryRecord(share.record)
         if (!record) {
           setState({ k: 'gone' })
-          return
-        }
-        const voiceSrc =
-          share.hasVoice && share.voiceUrl ? await loadVoice(API_ORIGIN + share.voiceUrl) : null
-        if (cancelled) {
-          if (voiceSrc) URL.revokeObjectURL(voiceSrc)
           return
         }
         setState({
@@ -230,8 +207,8 @@ export function SharePlayer({ shareId }: { shareId: string }) {
           data: {
             childName: share.childName,
             record,
-            hasVoice: voiceSrc !== null,
-            voiceSrc,
+            hasVoice: share.hasVoice,
+            voiceUrl: share.voiceUrl,
             voiceMime: share.voiceMime,
             totalMs: voiceTotalMs(record),
           },
@@ -249,9 +226,10 @@ export function SharePlayer({ shareId }: { shareId: string }) {
   const record = ready?.record ?? null
 
   const voice = useMemo(() => {
-    if (!ready || !ready.hasVoice || !ready.voiceSrc || !ready.voiceMime) return null
-    // dispose() revokes the blob URL with the player.
-    return VoicePlayer.fromUrl(ready.voiceSrc, ready.voiceMime, ready.totalMs)
+    if (!ready || !ready.hasVoice || !ready.voiceUrl || !ready.voiceMime) return null
+    // fromUrl fetches and decodes the whole file (Web Audio), so the route's lack of byte ranges
+    // doesn't matter; Replayer.play() waits for it to be decoded.
+    return VoicePlayer.fromUrl(API_ORIGIN + ready.voiceUrl, ready.voiceMime, ready.totalMs)
   }, [ready])
 
   const player = useRecordPlayer(record, voice)
