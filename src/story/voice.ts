@@ -344,20 +344,11 @@ export class VoicePlayer {
  * the speech found in it, and `mix` placing the story-time pieces exactly as replay does. Decoding is
  * offline (no audio hardware) and deterministic: the same file decodes to the same samples.
  */
-export async function makeVoiceTrack(record: StoryRecord): Promise<VoiceTrack | null> {
-  const voice = record.voice
-  if (!voice || voice.clips.length === 0) return null
+async function voiceTrackOf(
+  sources: readonly { t: number; bytes: ArrayBuffer | null }[]
+): Promise<VoiceTrack | null> {
   if (typeof OfflineAudioContext === 'undefined') return null
-  const decoder = new OfflineAudioContext(1, 1, EXPORT_SAMPLE_RATE)
-  const clips = await decodeClips(
-    decoder,
-    await Promise.all(
-      voice.clips.map(async (c) => {
-        const blob = await getVoiceClip(c.file)
-        return { t: c.t, bytes: blob ? await blob.arrayBuffer() : null }
-      })
-    )
-  )
+  const clips = await decodeClips(new OfflineAudioContext(1, 1, EXPORT_SAMPLE_RATE), sources)
   if (clips.length === 0) return null
   return {
     speech: speechOf(clips),
@@ -365,6 +356,28 @@ export async function makeVoiceTrack(record: StoryRecord): Promise<VoiceTrack | 
       startPieces(ctx, ctx.destination, clips, voicePieces(clips, spans), 0, 0)
     },
   }
+}
+
+/** The mp4's voice from the record's own clips (local storage). Null when none decode. */
+export async function makeVoiceTrack(record: StoryRecord): Promise<VoiceTrack | null> {
+  const clips = record.voice?.clips ?? []
+  if (clips.length === 0) return null
+  return voiceTrackOf(
+    await Promise.all(
+      clips.map(async (c) => {
+        const blob = await getVoiceClip(c.file)
+        return { t: c.t, bytes: blob ? await blob.arrayBuffer() : null }
+      })
+    )
+  )
+}
+
+/**
+ * The mp4's voice from one file of the whole record timeline starting at record t = 0 (the share
+ * page's voice file, `renderVoiceFile`): story time and the mix then work exactly as for local clips.
+ */
+export async function makeVoiceTrackFromBlob(blob: Blob): Promise<VoiceTrack | null> {
+  return voiceTrackOf([{ t: 0, bytes: await blob.arrayBuffer() }])
 }
 
 const VOICE_BITRATE = 96_000

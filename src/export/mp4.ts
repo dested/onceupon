@@ -15,7 +15,7 @@ import { isDialectId, makeDialect } from '~/llm/dialect'
 import { replayPlan } from '~/story/replay'
 import type { StoryRecord } from '~/story/storage'
 import type { KeptSpan, Span } from '~/story/story-time'
-import { makeVoiceTrack } from '~/story/voice'
+import { makeVoiceTrack, makeVoiceTrackFromBlob } from '~/story/voice'
 import { encodeAac, muxedAacProblem } from './aac'
 import { BookFrame, CPU, loadVideoAssets, PAPER, VIDEO_H, VIDEO_W } from './frame'
 import { EncoderWatch, ExportStalledError, throwIfAborted, yieldToUi } from './watch'
@@ -70,6 +70,11 @@ export interface ExportOptions {
   /** Same as the replay screen: the `say` text masker follows the kid-safe setting. */
   moderation: boolean
   voice?: VoiceTrack | null
+  /**
+   * The share page's one voice file (the whole record timeline from record t = 0), used instead of
+   * the record's local clips, which a share page does not have.
+   */
+  voiceFile?: Blob | null
 }
 
 export interface ExportResult {
@@ -153,6 +158,7 @@ export async function exportStoryVideo(
   // squeezed. Voice decode is deterministic for the same file, so the export stays deterministic.
   const hasVoice = record.voice !== undefined && record.voice.clips.length > 0
   let voice = opts.voice
+  if (voice === undefined && opts.voiceFile) voice = await makeVoiceTrackFromBlob(opts.voiceFile)
   if (voice === undefined && hasVoice) voice = await makeVoiceTrack(record)
   throwIfAborted(signal)
 

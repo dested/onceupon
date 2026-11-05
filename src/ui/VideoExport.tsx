@@ -34,11 +34,14 @@ const PHASE_WORDS = {
  */
 export function VideoExportButton({
   getRecord,
+  getVoiceFile,
   variant,
   onExported,
 }: {
   /** Called on click; the caller saves the live story first if needed. Null = nothing to export. */
   getRecord: () => StoryRecord | null
+  /** The share page's one voice file (record t = 0); without it the voice comes from the record's own clips. */
+  getVoiceFile?: () => Promise<Blob | null>
   variant: 'icon' | 'studio' | 'player'
   /** After the video is shared or downloaded (share page counts a download). */
   onExported?: () => void
@@ -67,8 +70,10 @@ export function VideoExportButton({
     abortRef.current = abort
     setState({ k: 'running', fraction: 0, phase: 'frames' })
     try {
+      const voiceFile = getVoiceFile ? await getVoiceFile().catch(() => null) : null
       const res = await exportStoryVideo(record, {
         signal: abort.signal,
+        voiceFile,
         moderation: appStore.get().settings.moderation,
         onProgress: (p) => {
           if (!abort.signal.aborted) setState({ k: 'running', fraction: p.fraction, phase: p.phase })
