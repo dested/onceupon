@@ -6,6 +6,7 @@
  *
  *   node scripts/marketing/cdp.mjs launch                  # once: headless Windows Chrome on :9333
  *   node scripts/marketing/capture-live.mjs <theme> <outDir> [studioUrl]
+ *   AFTER=share node …   # end on "Send to grandma" → Make a link (events.shareUrl) instead of Play it again
  *
  * Needs the local studio (hosted mode) and API (local DATABASE_URL), a device that already passed the
  * grown-up gate and consent in this Chrome profile, and `scripts/marketing/voice.ts` output.
@@ -17,6 +18,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { page } from './cdp.mjs'
+import { READ_TAPS, TAP } from './tap.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const [theme, outDir, studioArg] = process.argv.slice(2)
@@ -61,55 +63,6 @@ execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', join(outDir, 'voice.wav'), '-
 const clipB64 = readFileSync(join(outDir, 'clip.m4a')).toString('base64')
 
 // --- in-page instruments -----------------------------------------------------------------------------
-// Taps every AudioContext the app makes (and media elements, routed through one tap context) into
-// MediaRecorders, timestamped with the page's Date.now().
-const TAP = `(() => {
-  const Orig = window.AudioContext
-  if (!Orig || window.__taps) return
-  const taps = (window.__taps = [])
-  // Every gain ramp the app asks for (the crayon scratch follows the reveal), epoch ms.
-  window.__gainLog = []
-  const stt = AudioParam.prototype.setTargetAtTime
-  AudioParam.prototype.setTargetAtTime = function (v, t, c) { window.__gainLog.push([Date.now(), Math.round(v * 1000) / 1000]); return stt.call(this, v, t, c) }
-  const connect = AudioNode.prototype.connect
-  class Tapped extends Orig {
-    constructor(...a) {
-      super(...a)
-      try {
-        const dest = this.createMediaStreamDestination()
-        const rec = new MediaRecorder(dest.stream, { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 256000 })
-        const tap = { kind: 'ctx', dest, rec, chunks: [], start: Date.now(), ctx: this }
-        rec.ondataavailable = (e) => { if (e.data.size) tap.chunks.push(e.data) }
-        rec.start(500)
-        tap.start = Date.now()
-        this.__tap = tap
-        taps.push(tap)
-      } catch (e) { console.warn('tap failed', e) }
-    }
-  }
-  window.AudioContext = Tapped
-  window.webkitAudioContext = Tapped
-  AudioNode.prototype.connect = function (dest, ...rest) {
-    const r = connect.call(this, dest, ...rest)
-    if (dest instanceof AudioDestinationNode && dest.context.__tap) {
-      try { connect.call(this, dest.context.__tap.dest, ...rest) } catch {}
-    }
-    return r
-  }
-  const play = HTMLMediaElement.prototype.play
-  HTMLMediaElement.prototype.play = function (...a) {
-    if (!this.__tapped) {
-      this.__tapped = true
-      try {
-        if (!window.__mediaCtx) { window.__mediaCtx = new Tapped(); window.__mediaCtx.__tap.kind = 'media' }
-        const src = window.__mediaCtx.createMediaElementSource(this)
-        src.connect(window.__mediaCtx.destination)
-      } catch (e) { console.warn('media tap', e) }
-    }
-    return play.apply(this, a)
-  }
-})()`
-
 // Answers speech.start by playing the schedule into __fakeShell.say, and speech.stop with the clip.
 const SPEAKER = (sched, clip) => `(() => {
   const sched = ${JSON.stringify(sched)}
@@ -189,14 +142,49 @@ writeFileSync(join(outDir, 'debug-report.txt'), String(await cdp.eval(`(() => { 
 if (notes.size > 0) console.log(`NOTES (retake?): ${[...notes].join(' | ')}`)
 await mark('endCard')
 await sleep(3000)
-await mark('replayTap')
-const pa = await cdp.eval(`(() => { const b = ${playAgainJs}; if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
-if (!pa) throw new Error('no Play it again button')
-await cdp.tap(pa.x, pa.y)
-await sleep(Math.round(schedule.total * 1000) + 6000)
-await mark('shelfTap')
-await cdp.click('[data-testid=replay-back]')
-await sleep(3500)
+if (process.env.AFTER === 'share') {
+  // "Send to grandma": the share card, "Make a link" (with the voice), then the ready link.
+  const btn = (re) => `(() => { const b = [...document.querySelectorAll('button')].find((b) => ${re}.test(b.textContent) && b.offsetParent); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`
+  await mark('shareTap')
+  const sg = await cdp.eval(btn('/send to grandma/i'))
+  if (!sg) throw new Error('no Send to grandma button')
+  await cdp.tap(sg.x, sg.y)
+  await sleep(1200)
+  // Sharing sits behind the grown-up gate: solve it (the edit cuts it out).
+  if (await cdp.eval(`!!document.querySelector('[data-testid=gate-question]')`)) {
+    await mark('gate')
+    const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve']
+    const q = await cdp.eval(`document.querySelector('[data-testid=gate-question]').textContent`)
+    const m = /what is (\w+) times (\w+)/i.exec(q)
+    if (!m) throw new Error(`gate question not understood: ${q}`)
+    await sleep(1000)
+    await cdp.eval(`document.querySelector('[data-testid=gate-answer]').focus(); 1`)
+    await cdp.send('Input.insertText', { text: String(WORDS.indexOf(m[1].toLowerCase()) * WORDS.indexOf(m[2].toLowerCase())) })
+    await sleep(500)
+    await mark('gateGo')
+    await cdp.click('[data-testid=gate-go]')
+    await sleep(1800)
+  }
+  if (!(await cdp.eval(`!!document.querySelector('[data-testid=share-voice-toggle]')?.checked`))) throw new Error('share card has no voice (consent off?)')
+  await mark('makeTap')
+  const mk = await cdp.eval(`(() => { const r = document.querySelector('[data-testid=share-make]').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
+  await cdp.tap(mk.x, mk.y)
+  for (let i = 0; i < 80 && !(await cdp.eval(`!!document.querySelector('[data-testid=share-url]')`)); i++) await sleep(250)
+  await mark('linkReady')
+  events.shareUrl = await cdp.eval(`document.querySelector('[data-testid=share-url]')?.textContent ?? ''`)
+  if (!events.shareUrl) throw new Error('no share link')
+  console.log('shareUrl', events.shareUrl)
+  await sleep(4000)
+} else {
+  await mark('replayTap')
+  const pa = await cdp.eval(`(() => { const b = ${playAgainJs}; if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
+  if (!pa) throw new Error('no Play it again button')
+  await cdp.tap(pa.x, pa.y)
+  await sleep(Math.round(schedule.total * 1000) + 6000)
+  await mark('shelfTap')
+  await cdp.click('[data-testid=replay-back]')
+  await sleep(3500)
+}
 await mark('done')
 await mark('stop')
 await cdp.send('Page.stopScreencast')
@@ -209,14 +197,11 @@ events.speakT0 = speak.t0
 events.speechStop = speak.stopAt
 writeFileSync(join(outDir, 'events.json'), JSON.stringify({ ...events, said: speak.said, gain: await cdp.eval('window.__gainLog') }, null, 2))
 
-const taps = await cdp.eval(`Promise.all(window.__taps.map((t) => new Promise((res) => {
-  const done = () => { const fr = new FileReader(); fr.onload = () => res({ kind: t.kind, start: t.start, state: t.ctx.state, b64: String(fr.result).split(',')[1] ?? '' }); fr.readAsDataURL(new Blob(t.chunks, { type: 'audio/webm' })) }
-  if (t.rec.state === 'inactive') done(); else { t.rec.onstop = done; t.rec.stop() }
-})))`)
+const taps = await cdp.eval(READ_TAPS)
 const tapMeta = taps.map((t, i) => {
   const file = `tap-${i}-${t.kind}.webm`
   writeFileSync(join(outDir, file), Buffer.from(t.b64, 'base64'))
-  return { file, kind: t.kind, start: t.start, state: t.state }
+  return { file, kind: t.kind, start: t.start, runAt: t.runAt, state: t.state }
 })
 writeFileSync(join(outDir, 'taps.json'), JSON.stringify(tapMeta, null, 2))
 console.log(`frames ${frames.length} over ${(frames.at(-1).ts - frames[0].ts).toFixed(1)} s; taps ${tapMeta.map((t) => `${t.file}@${t.start}`).join(', ')}`)
