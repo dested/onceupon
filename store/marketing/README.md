@@ -6,7 +6,7 @@ Every frame is the real studio (hosted mode, fake native shell, local API with a
 | --- | --- | --- |
 | `preview-iphone-6.9.mp4` | App Store app preview, iPhone 6.9": 886x1920 portrait, 29.7 s, H.264 High@4.0 30 fps ~11 Mbps CBR, AAC-LC 48 kHz stereo 256k target, -16 LUFS | dragons take `W:\junk\onceupon-f\assets\n-dragons` + shelf `W:\junk\onceupon-f\assets\n-shelf`; cut by `edl/preview-iphone-6.9.json` |
 | `preview-iphone-6.9-sheet.png` | 3x3 contact sheet of the preview | `scripts/marketing/edit.mjs` |
-| `hero-1080p.mp4` | 16:9 hero ad: 1920x1080, 40.6 s, H.264 High@4.0 30 fps CRF 17 (≤ 12 Mbps), AAC-LC 48 kHz stereo, -16 LUFS | ocean export `W:\junk\onceupon-f\assets\hero\x-ocean.mp4`, owl take `W:\junk\onceupon-f\assets\h2-bedtime`, share take `W:\junk\onceupon-f\assets\h-share3`, grandma's phone `W:\junk\onceupon-f\assets\h-grandma3`; cut by `edl/hero-1080p.json` |
+| `hero-1080p.mp4` | 16:9 hero ad: 1920x1080, 42.8 s, H.264 High@4.0 30 fps CRF 17 (≤ 12 Mbps), AAC-LC 48 kHz stereo, -16 LUFS | ocean export `W:\junk\onceupon-f\assets\hero\x2-ocean.mp4`, owl take `W:\junk\onceupon-f\assets\h3-bedtime`, share take `W:\junk\onceupon-f\assets\h-share4`, grandma's phone `W:\junk\onceupon-f\assets\h-grandma4` (all after d679400, so captions show as the words are said); cut by `edl/hero-1080p.json` |
 | `hero-1080p-sheet.png` | 4x3 contact sheet of the hero | `scripts/marketing/hero.mjs` |
 | `brand/app-store-badge-black.svg` | Apple's "Download on the App Store" badge (US-UK, black), unmodified | toolbox.marketingtools.apple.com, 2026-11-05 |
 | `stories.md` | the three theme stories, voice, takes | `scripts/marketing/stories.ts` |
@@ -31,10 +31,10 @@ Sells in the first 2 seconds: a child's voice and the crayon already drawing, no
 | --- | --- | --- | --- |
 | 0–8.7 | the turtle story full-frame (the app's mp4 export render): turtle, fish and chest drawn, "The End" | "Kids tell the story" | "She swam with a happy pink fish and they found a treasure chest", "The End!" |
 | 8.5–13.85 | close-up: mic tap, "Your story starts with you", the words appear as the child talks | "Just tap and talk" | "Once upon a time a sleepy owl lived in a tree" |
-| 13.65–18.35 | the phone: the crayon draws the owl in its tree | "A crayon draws it" | "At night the moon came out and the stars were twinkling", crayon scratch |
-| 18.15–26.05 | closing card, tap "Play it again": the replay redraws the night, "in their own voice" | "In their own voice" | the replay playing the child's recording |
-| 25.85–37.0 | kid's phone: "Send to grandma", "Make a link", "Your link is ready"; grandma's phone: the share page, tap Play, the dragon story in the child's voice | "Send it to grandma" | the share page playing the recording |
-| 36.8–40.6 | app icon, Squiggletale, App Store badge | none | none |
+| 13.65–18.53 | the phone: the crayon draws the trees and the owl | "A crayon draws it" | "At night the moon came out and the stars were twinkling", crayon scratch |
+| 18.33–27.48 | closing card, tap "Play it again": the replay redraws the night, "The owl said goodnight and went to sleep", "The End", "in their own voice" | "In their own voice" | the replay playing the child's recording |
+| 27.28–39.23 | kid's phone: "Send to grandma", the share card over the finished picture, "Make a link", "Your link is ready"; grandma's phone: the share page, tap Play, the dragon story in the child's voice | "Send it to grandma" | the share page playing the recording |
+| 39.03–42.8 | app icon, Squiggletale, App Store badge | none | none |
 
 Grandma's phone is the local API's real `/s/<id>` page; its player frame points at the studio dev server (same player code) because the built studio in `dist-hosted` calls the production API. Share links read `https://squiggletale.com/s/…` because the API runs with `PUBLIC_ORIGIN=https://squiggletale.com` for the share take.
 
