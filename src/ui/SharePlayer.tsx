@@ -277,7 +277,8 @@ export function SharePlayer({ shareId }: { shareId: string }) {
   // The website draws its own storybook around the iframe: embed mode is just the paper and the controls.
   const embed = new URLSearchParams(window.location.search).get('embed') === '1'
 
-  const caption = started ? player.caption : ''
+  // Once the story has ended, a bare "The End" subtitle repeats the drawn finale title: drop it.
+  const caption = started && !(atEnd && /^\s*the end[\s.!]*$/i.test(player.caption)) ? player.caption : ''
 
   const paper = (
     <div className="story-paper">
