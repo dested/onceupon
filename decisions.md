@@ -233,3 +233,8 @@ Amends "Minutes are talking time": opening the mic no longer starts the meter. I
 ## 2026-11-04 — Store categories
 
 Primary Education, secondary Entertainment, Made for Kids 6–8 (`kidsAgeBand` on the age rating). App Store Connect has no Kids primary category: the Kids section comes from the age band.
+
+## 2026-11-04 — 1.0 territories: 165, where the drawing API is offered
+
+The app and the three packs ship in 165 territories: Store Brand Puzzles' 175 minus China mainland (ICP filing; Apple pulls AI apps there without a generative-AI licence) and the territories missing from Anthropic's supported regions (HKG, MAC, AFG, BLR, MMR, RUS, VEN, XKS, YEM). List and reasons: `store/asc/territories.json`; `bun store/asc/apply.ts territories` re-applies it.
+**Why:** every story is drawn through that API, so a territory it doesn't serve can't be sold the product.
