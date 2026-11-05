@@ -17,7 +17,8 @@ export const BRAND = {
   /** Required before App Store submission (COPPA operator notice); empty strings are left out of the page. */
   postalAddress: '',
   phone: '',
-  supportEmail: 'sal@quickga.me',
+  /** Decision 7: forwarded to Sal's inbox by Namecheap email forwarding on squiggletale.com. */
+  supportEmail: 'support@squiggletale.com',
   bundleId: 'com.quickgame.squiggletale',
   /** Deep-link scheme of the native shell. */
   scheme: 'squiggletale',

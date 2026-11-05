@@ -90,12 +90,14 @@ export async function debit(
 /**
  * Weekly free top-up. If the device has not been granted since the most recent refill boundary AND
  * its balance is below the weekly allowance, top it up to the allowance (never accumulating). Returns
- * the fresh device (unchanged when not due).
+ * the fresh device (unchanged when not due). A device never granted counts from its registration, so
+ * its first top-up is the first refill day after it arrived, not day one (decision 1: the free first
+ * story, then a Saturday story each week).
  */
 export async function applyWeeklyGrant(device: Device, flags: Flags): Promise<Device> {
   const now = new Date()
   const boundary = weeklyBoundary(flags.weeklyRefillDay, now)
-  const due = !device.weeklyGrantAt || device.weeklyGrantAt < boundary
+  const due = (device.weeklyGrantAt ?? device.createdAt) < boundary
   if (!due || device.balanceSec >= flags.weeklyFreeSec) return device
   return prisma.$transaction(async (tx) => {
     // Claim this week's grant with a guarded update (V-04): a parallel call finds it already claimed.
@@ -103,7 +105,7 @@ export async function applyWeeklyGrant(device: Device, flags: Flags): Promise<De
       where: {
         id: device.id,
         balanceSec: { lt: flags.weeklyFreeSec },
-        OR: [{ weeklyGrantAt: null }, { weeklyGrantAt: { lt: boundary } }],
+        OR: [{ weeklyGrantAt: null, createdAt: { lt: boundary } }, { weeklyGrantAt: { lt: boundary } }],
       },
       data: { weeklyGrantAt: now },
     })

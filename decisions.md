@@ -194,3 +194,13 @@ Sal: "haiku for free and one of the upsells is a smarter model and show them sid
 The meter stops counting after 8 s of quiet and resumes when the child is heard again (final words, interim words or mic level); the 30 s nudge and 60 s end stay. A story where nothing got drawn is not saved and its closing card offers no replay, share or video.
 **Why:** a child who stops to think lost a minute of paid time to silence that costs us nothing (the ears run on the device).
 
+## 2026-11-04 — The weekly free story starts on the first refill day after install
+
+A device that has never had the weekly top-up counts from its registration (`applyWeeklyGrant` in apps/web/server/ledger.ts), so a new device gets the 5-minute first story and its first 3-minute top-up on the next Saturday 00:00 UTC, not on day one.
+**Why:** sim-verify found a null `weeklyGrantAt` counted as due, so a new device got 5 + 3 minutes in its first session; decision 1 (phase 3) is "the free first story, then a Saturday story each week".
+
+## 2026-11-04 — On-device ears fall back to the next engine
+
+When the on-device engine the shell picked fails to start or breaks (not a permission, interruption or model problem), the studio drops it for the story and asks for the next engine the shell offered, by name. Only when every offered engine has failed does the child see "The crayon can't hear you yet".
+**Why:** the simulator offers sfspeech, which fails at once ("Failed to initialize recognizer"), and the studio had no way back since the Grown-ups ears picker was removed; a real device could hit the same with a broken engine.
+

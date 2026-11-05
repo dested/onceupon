@@ -148,6 +148,8 @@ function currentProvider(): LlmProvider | null {
 
 /** The on-device recognizers speak en-US for now (the app ships in English). */
 const EARS_LOCALE = 'en-US'
+/** After a failed on-device engine is let go, wait this long for the shell to finish with it before the next one starts. */
+const ENGINE_SWITCH_MS = 300
 
 /**
  * SpeechAnalyzer finalizes a segment at each pause and streams the tail like the live cloud models;
@@ -156,6 +158,17 @@ const EARS_LOCALE = 'en-US'
  */
 function appleTrackerOptions(engine: AppleEngine): TrackerOptions {
   return engine === 'analyzer' ? DEEPGRAM_TRACKER : CHROME_TRACKER
+}
+
+/**
+ * The story's last server reading as the device balance, when it is the fresher of the two (the chip
+ * shows balanceSec once a new story clears remainingSec; without this it went back to the boot value).
+ */
+function carriedBalance(s: { remainingSec: number | null; remainingAt: number; balanceAt: number }): {
+  balanceSec?: number
+  balanceAt?: number
+} {
+  return s.remainingSec !== null && s.remainingAt >= s.balanceAt ? { balanceSec: s.remainingSec, balanceAt: s.remainingAt } : {}
 }
 
 /** Tracker rules for the ears the relay handed us (hosted mode; the vendor is not in settings). */
@@ -178,6 +191,12 @@ export class LiveSession {
   private appleRetried = false
   /** That restart is under way: late errors from the old span are ignored. */
   private appleRestarting = false
+  /** The engine the on-device ears run (the shell's pick, or the next one after a failed start). */
+  private appleEngine: AppleEngine | null = null
+  /** Every engine the shell offered for this story, in its order. */
+  private appleEngines: AppleEngine[] = []
+  /** On-device engines that failed to start or broke this story; the next tap skips them. */
+  private readonly failedAppleEngines = new Set<AppleEngine>()
   /** The 15 s "learning to listen" note and the 60 s give-up, while on-device ears are not ready yet. */
   private readyTimers: number[] = []
   /** Bumped by every tap and every stop, so a start still awaiting the shell or server can tell it was cancelled. */
@@ -286,6 +305,8 @@ export class LiveSession {
       warnings: [],
       endReason: null,
       remainingSec: null,
+      // The chip falls back to balanceSec once remainingSec clears: carry the story's last reading over.
+      ...carriedBalance(appStore.get()),
       sleepy: false,
       sceneLabel: '',
       drawn: false,
@@ -561,6 +582,7 @@ export class LiveSession {
         if (this.wantListening && this.sttKind === 'apple') {
           // The shell stopped listening without us asking (or never started).
           if (this.earsReady) this.appleLost()
+          else if (this.tryNextAppleEngine()) return
           else if (this.appleRetried) this.giveUp(KEEP_GOING_NOTE)
           else this.cannotHear('unavailable')
           return
@@ -692,6 +714,7 @@ export class LiveSession {
     if (e instanceof ApiError && e.code === 'consent_required') {
       this.consentLost()
     } else if (e instanceof ApiError && e.code === 'exhausted') {
+      appStore.set({ balanceSec: 0, balanceAt: Date.now() })
       openPaywall(false)
     } else if (e instanceof ApiError && (e.code === 'paused' || e.code === 'read_only')) {
       this.showNote('the crayon is taking a nap, try again soon', 5000)
@@ -818,7 +841,8 @@ export class LiveSession {
       this.cannotHear('denied')
       return
     }
-    const engine = offer.engine
+    this.appleEngines = offer.engines.length ? offer.engines : offer.engine ? [offer.engine] : []
+    const engine = this.nextAppleEngine(offer.engine)
     if (!engine) {
       this.cannotHear('unavailable')
       return
@@ -830,10 +854,36 @@ export class LiveSession {
       return
     }
     if (token !== this.startToken) return
+    this.listenWithApple(engine, engine !== offer.engine)
+  }
+
+  /** The shell's pick unless it failed this story, else the first offered engine that hasn't. */
+  private nextAppleEngine(preferred: AppleEngine | null): AppleEngine | null {
+    if (preferred && !this.failedAppleEngines.has(preferred)) return preferred
+    return this.appleEngines.find((e) => !this.failedAppleEngines.has(e)) ?? null
+  }
+
+  /**
+   * Listen with on-device `engine`. `named`: ask the shell for it by name (a fallback); otherwise the
+   * shell runs its own pick. A recognizer built for another engine is dropped first.
+   */
+  private listenWithApple(engine: AppleEngine, named: boolean): void {
+    if (this.appleRec && this.appleEngine !== engine) {
+      // Stale the old recognizer's callbacks before it ends, so its speech.end isn't read as a loss.
+      this.earsGen++
+      this.recognizer?.abort()
+      this.recognizer = null
+      this.appleRec = null
+    }
+    this.appleEngine = engine
     this.setRecognizer(
       'apple',
       () => {
-        const rec = createAppleRecognizer(this.recognizerHandlers(true), { locale: EARS_LOCALE, record: true })
+        const rec = createAppleRecognizer(this.recognizerHandlers(true), {
+          locale: EARS_LOCALE,
+          record: true,
+          ...(named ? { engine } : {}),
+        })
         this.appleRec = rec
         return rec
       },
@@ -843,6 +893,37 @@ export class LiveSession {
     this.appleRestarting = false
     this.beginListening()
     this.armReadyTimers()
+  }
+
+  /**
+   * The current engine failed to start or broke (not a permission, interruption or model problem):
+   * drop it for this story and listen with the next offered engine. False when none is left.
+   * (The simulator offers sfspeech, which fails at once with "Failed to initialize recognizer".)
+   */
+  private tryNextAppleEngine(): boolean {
+    const failed = this.appleEngine
+    if (!failed || !this.wantListening) return false
+    this.failedAppleEngines.add(failed)
+    const next = this.nextAppleEngine(null)
+    if (!next) return false
+    appStore.set((s) => ({ warnings: [...s.warnings.slice(-9), `ears: ${failed} failed, trying ${next}`] }))
+    // Stale the failed span's callbacks and let go of it; its late speech.end must not reach the new span.
+    this.earsGen++
+    this.recognizer?.abort()
+    this.recognizer = null
+    this.appleRec = null
+    this.earsReady = false
+    this.meter?.setListening(false)
+    appStore.set({ listening: false, micStarting: true, micLevel: 0 })
+    const token = this.startToken
+    void this.captureVoice()
+      .catch(() => undefined)
+      .then(() => {
+        window.setTimeout(() => {
+          if (token === this.startToken && this.wantListening) this.listenWithApple(next, true)
+        }, ENGINE_SWITCH_MS)
+      })
+    return true
   }
 
   /** On-device ears reported an error (`"<code>: <message>"`, see SpeechErrorCode). */
@@ -855,8 +936,9 @@ export class LiveSession {
       if (this.earsReady) this.appleLost()
       // The old span reporting after its own speech.end already started the restart.
       else if (!this.appleRestarting) this.giveUp(KEEP_GOING_NOTE)
-    } else if (this.appleRetried) this.giveUp(KEEP_GOING_NOTE)
-    else if (code === 'model') this.giveUp(TRY_AGAIN_NOTE)
+    } else if (code === 'model') this.giveUp(this.appleRetried ? KEEP_GOING_NOTE : TRY_AGAIN_NOTE)
+    else if (this.tryNextAppleEngine()) return
+    else if (this.appleRetried) this.giveUp(KEEP_GOING_NOTE)
     else this.cannotHear('unavailable')
   }
 

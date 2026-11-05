@@ -139,6 +139,10 @@ bun run dev:hosted                                   # studio in hosted mode on 
 
 Click-path: open 7711 in hosted mode → the tutorial plays (skip with ×) → tap the mic (grown-up gate, then the browser mic prompt) or type a sentence → the minutes chip counts down → Grown-ups (gate) shows the family code and balance → "Send to grandma" after The End makes a `/s/<id>` link that opens on 7720.
 
+### On-device ears fallback [cheap, needs Postgres]
+
+With the API on 7720 (a local `DATABASE_URL`) and `bun run dev:hosted`, open `http://localhost:7711/?shell=native&fakeshell=1`, then `__fakeShell.cfg.engine='sfspeech'; __fakeShell.cfg.engines=['sfspeech','whistle']; __fakeShell.cfg.failEngines=['sfspeech']`. Tap the mic (gate, consent): `__fakeShell.calls` shows `speech.start` (no engine), `speech.stop`, `speech.start {engine:'whistle'}` and the dock says listening; a second tap asks for whistle straight away. With both engines in `failEngines`, a new story ends on "The crayon can't hear you yet" after one try each. The chip after New story matches `device.balance_sec`.
+
 ## Website [cheap]
 
 `/`, `/pricing`, `/gift`, `/s/<bad id>` render at 390 px and 1280 px; `curl -s localhost:7720/s/abc | grep og:title` shows the tag in raw SSR. `/shop` with a wrong family code shows the not-found message.

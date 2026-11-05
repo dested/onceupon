@@ -114,12 +114,24 @@ describe('Ledger races (V-04)', () => {
 
   test('parallel weekly grants apply once', async () => {
     const d = await newDevice()
-    await prisma.device.update({ where: { id: d.id }, data: { balanceSec: 0, weeklyGrantAt: null } })
+    // Registered and never granted a fortnight ago: the top-up is due.
+    const longAgo = new Date(Date.now() - 14 * 24 * 3600_000)
+    await prisma.device.update({ where: { id: d.id }, data: { balanceSec: 0, weeklyGrantAt: null, createdAt: longAgo } })
     const device = await prisma.device.findUniqueOrThrow({ where: { id: d.id } })
     const flags = await getFlags()
     await Promise.all(Array.from({ length: 4 }, () => applyWeeklyGrant(device, flags)))
     expect(await balanceOf(d.id)).toBe(flags.weeklyFreeSec)
     expect(await prisma.ledgerEntry.count({ where: { deviceId: d.id, kind: 'grant_weekly' } })).toBe(1)
+  })
+
+  test('a new device waits for its first refill day (no weekly top-up on day one)', async () => {
+    const d = await newDevice()
+    await prisma.device.update({ where: { id: d.id }, data: { balanceSec: 0, weeklyGrantAt: null } })
+    const device = await prisma.device.findUniqueOrThrow({ where: { id: d.id } })
+    const flags = await getFlags()
+    await applyWeeklyGrant(device, flags)
+    expect(await balanceOf(d.id)).toBe(0)
+    expect(await prisma.ledgerEntry.count({ where: { deviceId: d.id, kind: 'grant_weekly' } })).toBe(0)
   })
 
   test('a gift code redeemed twice at once credits once', async () => {

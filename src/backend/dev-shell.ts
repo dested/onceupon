@@ -12,6 +12,7 @@ import type { BridgeEventName, SpeechEngine } from '../../packages/shared/src/br
  *   __fakeShell.say('a big red dog', true)     // a speech.result (final), as the shell would send it
  *   __fakeShell.emit('speech.error', { code: 'interrupted', message: 'call' }); __fakeShell.emit('speech.end', {})
  *   __fakeShell.cfg.stopMs = 1500             // speech.stop answers late (pause, then a quick tap again)
+ *   __fakeShell.cfg.failEngines = ['sfspeech'] // those engines start, then fail at once (ready, error failed, end), like sfspeech on the simulator
  *   __fakeShell.cfg.pending = [{ jws, transactionId, productId }]   // iap.pending at boot
  *   __fakeShell.calls                          // every request the studio made: [{ type, input }]
  *
@@ -28,6 +29,8 @@ interface FakeShellConfig {
   startUnavailable: boolean
   /** How long speech.stop takes to answer (the analyzer finalizing), ms. */
   stopMs: number
+  /** Engines that report ready and then fail within a few ms ("Failed to initialize recognizer"). */
+  failEngines: SpeechEngine[]
   pending: Array<{ jws: string; transactionId: string; productId: string }>
 }
 
@@ -76,6 +79,7 @@ function install(w: FakeShellWindow): void {
       readyMs: 300,
       startUnavailable: false,
       stopMs: 5,
+      failEngines: [],
       pending: [],
     },
     calls: [],
@@ -150,11 +154,22 @@ function install(w: FakeShellWindow): void {
           return { available: false }
         }
         if (shell.cfg.startUnavailable || !shell.cfg.engine) return { available: false }
+        const asked = shell.cfg.engines.find((e) => e === field('engine'))
+        const engine = asked ?? shell.cfg.engine
+        window.clearTimeout(readyTimer)
+        if (shell.cfg.failEngines.includes(engine)) {
+          // The simulator's sfspeech: start answers, then ready, error and end arrive together.
+          readyTimer = window.setTimeout(() => {
+            shell.emit('speech.ready', {})
+            shell.emit('speech.error', { code: 'failed', message: 'Failed to initialize recognizer' })
+            shell.emit('speech.end', {})
+          }, 20)
+          return { available: true, engine }
+        }
         shell.listening = true
         const ms = shell.cfg.readyMs
-        window.clearTimeout(readyTimer)
         if (ms !== null) readyTimer = window.setTimeout(() => shell.emit('speech.ready', {}), ms)
-        return { available: true, engine: shell.cfg.engine }
+        return { available: true, engine }
       }
       case 'speech.stop':
         shell.listening = false
