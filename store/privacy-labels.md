@@ -61,7 +61,7 @@ none.
   (Stripe), not in the app; the app hides gift codes in 1.0.
 - **Diagnostics.** No crash reporter or analytics SDK. Request timings are measured on our server.
 - **User ID.** No accounts.
-- **Photos or Videos.** "Save video" writes to Photos with add-only access; nothing is read or uploaded.
+- **Photos or Videos.** The app neither reads nor writes Photos in 1.0 (Save video was dropped 2026-11-05).
 
 ## What the privacy page must keep saying (it does today)
 

@@ -24,7 +24,6 @@ Permissions and data:
 - Microphone and Speech Recognition are requested only when the child first taps the microphone, after a grown-up has agreed on the "Before the first story" card.
 - Speech is turned into words on the device by Apple's on-device speech recognition. The voice recording stays on the device, with the story, so it can play back.
 - Only the text of the story's words is sent to our server, which asks a third-party AI service to turn them into a drawing. That service does not train on the words and deletes them within 30 days. We do not keep the words on our server.
-- "Save video" asks for permission to add a video to Photos (add only) when the grown-up taps it.
 - No ads, no third-party analytics, no tracking, no chat, and no content from other users.
 
 Account and safety controls:

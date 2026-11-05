@@ -32,7 +32,6 @@ const STEPS = [
 
 const THEN = [
   'Replay the story, drawn again in their own voice',
-  'Download it as a video to keep or post',
   'Send a share link to family',
 ]
 

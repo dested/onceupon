@@ -5,7 +5,7 @@ import { Section } from './site-parts'
 const FAQ: { q: string; a: string }[] = [
   {
     q: `What is ${BRAND.name}?`,
-    a: 'An iPhone and iPad app where your child tells a story out loud and a crayon draws it on the screen as they talk. When they say “The End”, the story is saved as a little picture book you can replay, download or share.',
+    a: 'An iPhone and iPad app where your child tells a story out loud and a crayon draws it on the screen as they talk. When they say “The End”, the story is saved as a little picture book you can replay or share.',
   },
   {
     q: 'What ages is it for?',

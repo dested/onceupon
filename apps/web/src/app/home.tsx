@@ -98,7 +98,6 @@ export function HomePage() {
               <li>• A link she can open anywhere, no app needed</li>
               <li>• The story replays in your child’s own voice</li>
               <li>• The link stays live for 90 days</li>
-              <li>• Download it as a video to keep or post</li>
             </ul>
           </div>
           <PhoneMockup />

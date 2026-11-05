@@ -22,7 +22,7 @@ Your child tells a story out loud, and the crayon draws what your child says. Th
 HOW IT WORKS
 • Tap the microphone and tell a story. The crayon draws along.
 • Finished stories go to My stories. Play one back, page by page, with the voice that told it.
-• Save a story as a video to Photos, or make a link to send to family.
+• Make a link to send to family. The story plays in their browser, no app needed.
 • No reading needed. Stories can be typed too.
 
 FREE TO START
