@@ -12,6 +12,7 @@
  *   bun store/asc/apply.ts copy                   listing copy from store/asc/listing.json (after `pass listing`)
  *   bun store/asc/apply.ts iap-screenshot <png>   App Review screenshot on all three IAPs
  *   bun store/asc/apply.ts screenshots            store/screenshots/iphone-6.9/* and ipad-13/*, file order
+ *   bun store/asc/apply.ts demo <mp4>             App Review attachment (after the lead's `demo ready`)
  *   bun store/asc/apply.ts notes <file>           App Review notes text (after the lead's `notes ready`)
  *
  * Exit 0 = done, 1 = an API refusal (printed), 2 = usage.
@@ -458,6 +459,20 @@ async function screenshots(): Promise<void> {
   }
 }
 
+/** The review attachment (demo video): replaces any earlier attachment, then reads the delivery state back. */
+async function demo(file: string): Promise<void> {
+  const mine = await reviewDetailOf(VERSION)
+  if (!mine) throw new AscError('no review detail yet: run settings first')
+  for (const old of await getAll(`/v1/appStoreReviewDetails/${mine.id}/appStoreReviewAttachments`)) {
+    await call('DELETE', `/v1/appStoreReviewAttachments/${old.id}`)
+    say(`- removed earlier attachment ${str(old, 'fileName') ?? old.id}`)
+  }
+  const id = await uploadAsset('/v1/appStoreReviewAttachments', 'appStoreReviewAttachments', {
+    appStoreReviewDetail: { data: { type: 'appStoreReviewDetails', id: mine.id } },
+  }, file)
+  say(`✓ review attachment ${basename(file)} (${id})`)
+}
+
 async function notes(file: string): Promise<void> {
   const text = readFileSync(file, 'utf8').trim()
   if (text.length > 4000) throw new AscError(`notes: ${text.length} > 4000`)
@@ -522,8 +537,9 @@ async function main(): Promise<number> {
     else if (step === 'iap-screenshot' && arg) await iapScreenshot(arg)
     else if (step === 'screenshots') await screenshots()
     else if (step === 'notes' && arg) await notes(arg)
+    else if (step === 'demo' && arg) await demo(arg)
     else {
-      console.log('usage: bun store/asc/apply.ts status|settings|territories|categories|copy|iap-screenshot <png>|screenshots|notes <file>')
+      console.log('usage: bun store/asc/apply.ts status|settings|territories|categories|copy|iap-screenshot <png>|screenshots|notes <file>|demo <mp4>')
       return 2
     }
     return 0
