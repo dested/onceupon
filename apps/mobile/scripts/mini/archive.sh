@@ -58,13 +58,25 @@ plist() { plutil -extract "$1" raw "$2" 2>/dev/null || echo none; }
 echo "CHECK app $NAME version $(plist CFBundleShortVersionString $APP/Info.plist) build $(plist CFBundleVersion $APP/Info.plist) id $(plist CFBundleIdentifier $APP/Info.plist)"
 echo "CHECK updates enabled $(plist EXUpdatesEnabled $APP/Expo.plist) check $(plist EXUpdatesCheckOnLaunch $APP/Expo.plist) channel $(plutil -extract EXUpdatesRequestHeaders json -o - "$APP/Expo.plist" 2>/dev/null || echo none) runtime $(plist EXUpdatesRuntimeVersion $APP/Expo.plist) url $(plist EXUpdatesURL $APP/Expo.plist)"
 echo "CHECK orientations iphone $(plutil -extract UISupportedInterfaceOrientations json -o - $APP/Info.plist) ipad $(plutil -extract 'UISupportedInterfaceOrientations~ipad' json -o - $APP/Info.plist | tr -d '\n')"
-# App Store processing fails (ITMS-90683) when linked code references an API whose purpose string is missing,
-# even if the app never calls it (expo-media-library needs NSPhotoLibraryUsageDescription).
-for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription NSPhotoLibraryUsageDescription NSPhotoLibraryAddUsageDescription; do
-  plutil -extract $k raw $APP/Info.plist >/dev/null 2>&1 && echo "CHECK purpose $k ok" || echo "CHECK purpose $k MISSING"
+# Purpose strings: mic + speech must be there; Photos must not (Save video left 1.0, so no
+# expo-media-library; a photo key without the API reads as an unused permission in review). If a linked
+# module ever needs one back, App Store processing says so (ITMS-90683, builds 1 and 2).
+for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription; do
+  plutil -extract $k raw $APP/Info.plist >/dev/null 2>&1 && echo "CHECK purpose $k ok" \
+    || { echo "ARCHIVE_UNFIT $k missing from Info.plist"; exit 1; }
 done
-plutil -extract NSPhotoLibraryUsageDescription raw $APP/Info.plist >/dev/null 2>&1 \
-  || { echo "ARCHIVE_UNFIT NSPhotoLibraryUsageDescription missing: App Store processing rejects it (ITMS-90683); set expo-media-library photosPermission"; exit 1; }
+for k in NSPhotoLibraryUsageDescription NSPhotoLibraryAddUsageDescription; do
+  plutil -extract $k raw $APP/Info.plist >/dev/null 2>&1 \
+    && { echo "ARCHIVE_UNFIT $k is in Info.plist: Photos is not in 1.0 (drop the plugin that adds it)"; exit 1; } \
+    || echo "CHECK purpose $k absent (ok)"
+done
+# The origin: squiggletale.com only (onceupon.dested.com is gone, so a build that names it is dead on arrival).
+STUDIO=$(find $APP -name 'studio*.html' -print -quit)
+for f in "$STUDIO" "$APP/main.jsbundle"; do
+  good=$(grep -a -c 'https://squiggletale.com' "$f" || true); bad=$(grep -a -c 'onceupon.dested.com' "$f" || true)
+  echo "CHECK origin ${f:t} squiggletale.com $good, onceupon.dested.com $bad"
+  [[ $good -gt 0 && $bad -eq 0 ]] || { echo "ARCHIVE_UNFIT ${f:t} must name https://squiggletale.com and never onceupon.dested.com"; exit 1; }
+done
 echo "CHECK frameworks $(ls $APP/Frameworks 2>/dev/null | tr '\n' ' ')"
 echo "CHECK whistle/needle in binary: $(ls $APP/Frameworks 2>/dev/null | grep -ci needle || true) frameworks, $(grep -a -c -i 'whistle' "$APP/$NAME" || true) symbol hits"
 echo "CHECK webview debug flag in bundle: $(grep -a -c 'EXPO_PUBLIC_WEBVIEW_DEBUG' "$APP/main.jsbundle" || true)"

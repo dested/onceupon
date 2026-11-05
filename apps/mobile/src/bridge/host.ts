@@ -37,7 +37,17 @@ export interface HandlerContext extends HostContext {
  */
 export type Handler<K extends BridgeName> = (input: unknown, ctx: HandlerContext) => Promise<BridgeOutput<K>>
 
-export type Handlers = { [K in BridgeName]: Handler<K> }
+/**
+ * Bridge methods in the shared contract that this shell deliberately does not implement; the host
+ * answers them `unsupported`. `media.saveVideo`: Save video left 1.0 (d78bc47), and with it Photos
+ * (no expo-media-library, no photo-library purpose strings). Marketing renders still call it from Chrome.
+ */
+export const OMITTED_NAMES = ['media.saveVideo'] as const satisfies readonly BridgeName[]
+export type OmittedName = (typeof OMITTED_NAMES)[number]
+/** The bridge methods this shell answers. */
+export type ShellName = Exclude<BridgeName, OmittedName>
+
+export type Handlers = { [K in ShellName]: Handler<K> }
 
 /** Thrown by handlers to control the error code reported to the studio. */
 export class BridgeHostError extends Error {
@@ -50,7 +60,7 @@ export class BridgeHostError extends Error {
   }
 }
 
-/** Every bridge method name, kept in sync with BridgeName by the compile-time check below. */
+/** Every bridge method the shell answers, kept in sync with ShellName by the compile-time check below. */
 export const BRIDGE_NAMES = [
   'ready',
   'device.info',
@@ -74,22 +84,22 @@ export const BRIDGE_NAMES = [
   'haptic',
   'attribution.token',
   'net.state',
-  'media.saveVideo',
   'awake.set',
   'speech.available',
   'speech.start',
   'speech.prepare',
   'speech.stop',
-] as const satisfies readonly BridgeName[]
+] as const satisfies readonly ShellName[]
 
-// Fails to compile if bridge.ts adds a method that is missing from BRIDGE_NAMES.
-type MissingName = Exclude<BridgeName, (typeof BRIDGE_NAMES)[number]>
+// Fails to compile if bridge.ts adds a method that is neither in BRIDGE_NAMES nor in OMITTED_NAMES.
+type MissingName = Exclude<ShellName, (typeof BRIDGE_NAMES)[number]>
 const _allNamesCovered: MissingName extends never ? true : never = true
 void _allNamesCovered
 
 const NAME_SET: ReadonlySet<string> = new Set(BRIDGE_NAMES)
+const OMITTED_SET: ReadonlySet<string> = new Set(OMITTED_NAMES)
 
-function isBridgeName(type: string): type is BridgeName {
+function isShellName(type: string): type is ShellName {
   return NAME_SET.has(type)
 }
 
@@ -150,6 +160,10 @@ export class BridgeHost {
   }
 
   private async dispatch(id: string, type: string, input: unknown): Promise<void> {
+    if (OMITTED_SET.has(type)) {
+      this.reply({ v: 1, id, ok: false, error: { code: 'unsupported', message: `${type} is not in this app` } })
+      return
+    }
     const handler = this.lookup(type)
     if (!handler) {
       this.reply({ v: 1, id, ok: false, error: { code: 'bad_request', message: `unknown bridge type: ${type}` } })
@@ -163,8 +177,8 @@ export class BridgeHost {
     }
   }
 
-  private lookup(type: string): Handler<BridgeName> | undefined {
-    if (!isBridgeName(type)) return undefined
+  private lookup(type: string): Handler<ShellName> | undefined {
+    if (!isShellName(type)) return undefined
     return this.handlers[type]
   }
 

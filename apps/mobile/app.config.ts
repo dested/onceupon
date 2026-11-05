@@ -19,7 +19,6 @@ const PAPER = '#fbf6ea'
 
 // Info.plist usage strings (parents read these in the iOS permission prompts).
 const MIC_USAGE = `${BRAND.name} listens while your child tells a story so the crayon can draw it. Speech is turned into words on this device, and the recording stays on this device unless a grown-up shares the story.`
-const PHOTOS_ADD_USAGE = `${BRAND.name} saves your story videos to your Photos.`
 const SPEECH_USAGE = `${BRAND.name} turns your child's spoken story into words on this device so the crayon can draw it.`
 // The splash image's paper tone (sampled from the generated icon) so the letterbox matches the art.
 const SPLASH_PAPER = '#f9f0d0'
@@ -128,17 +127,8 @@ export default ({ config }: ConfigContext): ExpoConfig =>
       // Stays up until the studio's `ready` (StudioWebView has a 20 s backstop).
       ['expo-splash-screen', { image: './assets/splash.png', backgroundColor: SPLASH_PAPER, imageWidth: 220 }],
       'expo-dev-client',
-      // Add-only Photos access for saving exported videos; the app never asks for the full-library read
-      // permission. NSPhotoLibraryUsageDescription still has to exist: expo-media-library links the full
-      // photo-library API, and App Store Connect rejects a build without the key (ITMS-90683, build 1).
-      [
-        'expo-media-library',
-        {
-          photosPermission: PHOTOS_ADD_USAGE,
-          savePhotosPermission: PHOTOS_ADD_USAGE,
-          granularPermissions: ['video'],
-        },
-      ],
+      // No Photos: Save video left 1.0 (d78bc47), so no expo-media-library and no photo-library purpose
+      // strings (archive.sh fails the archive if either NSPhotoLibrary key reappears).
       // Audio session control only; the WebView records, so no background audio modes.
       [
         'expo-audio',

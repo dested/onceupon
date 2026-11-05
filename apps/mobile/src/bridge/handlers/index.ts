@@ -4,7 +4,6 @@ import { attributionToken } from './attribution'
 import { deviceInfo } from './device'
 import { iapFinish, iapPending, iapProducts, iapPurchase, iapRestore } from './iap'
 import { kvGet, kvSet } from './kv'
-import { saveVideo } from './media'
 import { netState } from './net'
 import { blobDelete, blobGet, blobPut, storiesDelete, storiesList, storiesPut } from './storage'
 import { haptic, openUrl, shareFile, shareUrl } from './share'
@@ -42,7 +41,6 @@ export function createHandlers(): Handlers {
     haptic,
     'attribution.token': attributionToken,
     'net.state': netState,
-    'media.saveVideo': saveVideo,
     'awake.set': awakeSet,
     'speech.available': speechAvailable,
     'speech.start': speechStart,
