@@ -29,3 +29,5 @@
 **Report** (≤ 10 lines): `ready store <step> <result>`, what is set, what is left, absolute paths.
 
 ## Standing answers
+- (2026-11-04, lead) Notes ready: paste store/review/notes.md (fc67c70) verbatim into appStoreReviewDetail.notes. Upload the demo attachment only after `demo ready`. Applies to: store.
+- (2026-11-04, lead) `pass listing` (store/listing.md as drafted). Categories OK: primary EDUCATION, secondary ENTERTAINMENT, kidsAgeBand SIX_TO_EIGHT. EAS Update is off from 8912f86 (build 2); no Expo line needed on the privacy page or labels. Applies to: store.
