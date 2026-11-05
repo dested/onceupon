@@ -15,7 +15,11 @@ import { isDialectId, makeDialect } from '~/llm/dialect'
 import { recordClockOffset, replaySchedule, voiceLeadMs } from '~/story/replay'
 import type { StoryRecord } from '~/story/storage'
 import { makeVoiceTrack } from '~/story/voice'
+import { encodeAac } from './aac'
 import { BookFrame, CPU, loadVideoAssets, PAPER, VIDEO_H, VIDEO_W } from './frame'
+import { EncoderWatch, ExportStalledError, throwIfAborted, yieldToUi } from './watch'
+
+export { ExportStalledError }
 
 /**
  * A saved story → an .mp4, in the browser. The record is replayed on a VirtualClock through the
@@ -41,8 +45,6 @@ const VIDEO_BITRATE = 3_000_000
 const CURSOR_REST = { x: 124, y: 94 }
 /** Longest the exporter holds the main thread before yielding. */
 const SLICE_MS = 12
-/** An encoder holding work with no output for this long is stuck (seen: WKWebView in the iOS simulator). */
-const STALL_MS = 10_000
 
 /**
  * The seam for the child's recorded voice (built separately). `videoSecondsOf` maps a time on the
@@ -70,15 +72,15 @@ export interface ExportResult {
   blob: Blob
   seconds: number
   frames: number
-  /** 'aac', or null when the browser has no AAC encoder (the video then has no sound). */
+  /** 'aac', or null when no AAC encoder can run here (the video then has no sound). */
   audioCodec: string | null
+  /** The AAC encoder used: the browser's own, or the wasm fallback. */
+  audioEncoder: 'native' | 'wasm' | null
   /** Things worth a line in the debug report (e.g. no AAC encoder). */
   notes: string[]
 }
 
 export class ExportUnsupportedError extends Error {}
-/** An encoder stopped producing output (no packet for STALL_MS while it held work). */
-export class ExportStalledError extends Error {}
 
 const H264_CODECS = ['avc1.640028', 'avc1.4d0028', 'avc1.42e028']
 
@@ -110,92 +112,6 @@ async function pickVideoConfig(): Promise<VideoEncoderConfig> {
   throw new ExportUnsupportedError('This browser cannot encode H.264 video')
 }
 
-/** Give the UI thread a turn. MessageChannel is not throttled in background tabs, unlike setTimeout. */
-function yieldToUi(): Promise<void> {
-  return new Promise((resolve) => {
-    const ch = new MessageChannel()
-    ch.port1.onmessage = () => resolve()
-    ch.port2.postMessage(null)
-  })
-}
-
-function throwIfAborted(signal: AbortSignal | undefined): void {
-  if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError')
-}
-
-/**
- * Watches one encoder: every wait checks Cancel, and an encoder that holds work but has produced no
- * output for STALL_MS fails the export instead of hanging it. `fed`/`out` count inputs and outputs.
- */
-class EncoderWatch {
-  private lastOutputAt = performance.now()
-  private fed = 0
-  private out = 0
-  constructor(
-    private readonly signal: AbortSignal | undefined,
-    private readonly what: string
-  ) {}
-
-  input(): void {
-    if (this.fed === this.out) this.lastOutputAt = performance.now()
-    this.fed++
-  }
-
-  output(): void {
-    this.out++
-    this.lastOutputAt = performance.now()
-  }
-
-  check(): void {
-    throwIfAborted(this.signal)
-    if (this.fed > this.out && performance.now() - this.lastOutputAt > STALL_MS)
-      throw new ExportStalledError(`${this.what} encoder produced nothing for ${STALL_MS / 1000}s`)
-  }
-
-  /** Yield until `ready()`, checking Cancel and the stall clock every turn. */
-  async until(ready: () => boolean): Promise<void> {
-    while (!ready()) {
-      this.check()
-      await yieldToUi()
-    }
-    this.check()
-  }
-
-  /** Await an encoder promise (flush) while still honouring Cancel and the stall clock. */
-  race<T>(p: Promise<T>): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      let settled = false
-      const finish = (): void => {
-        settled = true
-        clearInterval(timer)
-        this.signal?.removeEventListener('abort', onAbort)
-      }
-      const fail = (e: unknown): void => {
-        if (settled) return
-        finish()
-        reject(e)
-      }
-      const onAbort = (): void => fail(new DOMException('Export cancelled', 'AbortError'))
-      const timer = setInterval(() => {
-        try {
-          this.check()
-        } catch (e) {
-          fail(e)
-        }
-      }, 250)
-      this.signal?.addEventListener('abort', onAbort)
-      p.then(
-        (v) => {
-          if (settled) return
-          finish()
-          resolve(v)
-        },
-        (e: unknown) => fail(e)
-      )
-    })
-  }
-}
-
 function makeCanvas(w: number, h: number): { c: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
   const c = document.createElement('canvas')
   c.width = w
@@ -208,70 +124,7 @@ function makeCanvas(w: number, h: number): { c: HTMLCanvasElement; ctx: CanvasRe
 type Packet<M> = { packet: EncodedPacket; meta: M | undefined }
 
 /** AAC only: Photos and most players refuse Opus-in-mp4, so without AAC the video has no sound. */
-const AAC = 'mp4a.40.2'
 const AUDIO_BITRATE = 128_000
-/** Samples per AudioData handed to the encoder. */
-const AUDIO_BLOCK = 4800
-
-/**
- * Encode the rendered mix to AAC packets up front, like the video. (Mediabunny's AudioBufferSource
- * encodes asynchronously, which made the file's chunk layout vary run to run.) Null when the browser
- * has no AAC encoder.
- */
-async function encodeAudio(
-  audio: AudioBuffer,
-  signal: AbortSignal | undefined
-): Promise<Packet<EncodedAudioChunkMetadata>[] | null> {
-  if (typeof AudioEncoder === 'undefined') return null
-  const config: AudioEncoderConfig = {
-    codec: AAC,
-    sampleRate: audio.sampleRate,
-    numberOfChannels: audio.numberOfChannels,
-    bitrate: AUDIO_BITRATE,
-  }
-  if (!(await AudioEncoder.isConfigSupported(config).catch(() => ({ supported: false }))).supported)
-    return null
-  const watch = new EncoderWatch(signal, 'audio')
-  const packets: Packet<EncodedAudioChunkMetadata>[] = []
-  let failed: unknown = null
-  const encoder = new AudioEncoder({
-    output: (chunk, meta) => {
-      watch.output()
-      packets.push({ packet: EncodedPacket.fromEncodedChunk(chunk), meta })
-    },
-    error: (e) => {
-      failed = e
-    },
-  })
-  try {
-    encoder.configure(config)
-    const channels = audio.numberOfChannels
-    for (let from = 0; from < audio.length; from += AUDIO_BLOCK) {
-      const n = Math.min(AUDIO_BLOCK, audio.length - from)
-      const planar = new Float32Array(n * channels)
-      for (let ch = 0; ch < channels; ch++)
-        planar.set(audio.getChannelData(ch).subarray(from, from + n), ch * n)
-      const data = new AudioData({
-        format: 'f32-planar',
-        sampleRate: audio.sampleRate,
-        numberOfFrames: n,
-        numberOfChannels: channels,
-        timestamp: Math.round((from / audio.sampleRate) * 1e6),
-        data: planar,
-      })
-      watch.input()
-      encoder.encode(data)
-      data.close()
-      if (failed) throw failed
-      await watch.until(() => encoder.encodeQueueSize <= 8)
-    }
-    await watch.race(encoder.flush())
-    if (failed) throw failed
-    return packets
-  } finally {
-    if (encoder.state !== 'closed') encoder.close()
-  }
-}
 
 export async function exportStoryVideo(
   record: StoryRecord,
@@ -434,9 +287,11 @@ export async function exportStoryVideo(
     )
     throwIfAborted(signal)
 
-    const audioPackets = await encodeAudio(audio, signal)
+    const aac = await encodeAac(audio, { bitrate: AUDIO_BITRATE, signal })
     throwIfAborted(signal)
-    if (!audioPackets) notes.push('video export: no AAC AudioEncoder in this browser; the video has no sound')
+    const audioPackets = aac?.packets ?? null
+    if (!aac) notes.push('video export: no AAC encoder (native or wasm) in this browser; the video has no sound')
+    else if (aac.encoder === 'wasm') notes.push('video export: no native AAC encoder, used the wasm one')
 
     report('mux', 0.96, true)
     const target = new BufferTarget()
@@ -489,6 +344,7 @@ export async function exportStoryVideo(
       seconds,
       frames,
       audioCodec: audioPackets ? 'aac' : null,
+      audioEncoder: aac?.encoder ?? null,
       notes,
     }
   } finally {

@@ -1,11 +1,6 @@
-import {
-  BufferTarget,
-  EncodedAudioPacketSource,
-  EncodedPacket,
-  Mp4OutputFormat,
-  Output,
-} from 'mediabunny'
+import { BufferTarget, EncodedAudioPacketSource, Mp4OutputFormat, Output } from 'mediabunny'
 import { EXPORT_SAMPLE_RATE, primePlayback } from '~/engine/audio'
+import { encodeAac } from '~/export/aac'
 import type { VoiceTrack } from '~/export/mp4'
 import { APP_SHELL } from '~/backend/config'
 import { getVoiceClip } from '~/story/storage'
@@ -305,27 +300,19 @@ export async function makeVoiceTrack(record: StoryRecord): Promise<VoiceTrack | 
   }
 }
 
-const VOICE_AAC: AudioEncoderConfig = {
-  codec: 'mp4a.40.2',
-  sampleRate: EXPORT_SAMPLE_RATE,
-  numberOfChannels: 1,
-  bitrate: 96_000,
-}
-/** Samples per AudioData handed to the encoder (matches src/export/mp4.ts). */
-const AUDIO_BLOCK = 4800
+const VOICE_BITRATE = 96_000
 
 /**
  * One AAC file of the whole record timeline (silence between clips), for the share page's single
- * voice track. Null without WebCodecs AudioEncoder or AAC support. Muxed exactly like the audio track
- * in src/export/mp4.ts, minus the video.
+ * voice track: the share page finds the speech in it and plays it in story time. Null when no AAC
+ * encoder (native or wasm, see src/export/aac.ts) can run here. Muxed like the mp4's audio track.
  */
 export async function renderVoiceFile(
   record: StoryRecord
 ): Promise<{ blob: Blob; mime: string } | null> {
   const voice = record.voice
   if (!voice || voice.clips.length === 0) return null
-  if (typeof AudioEncoder === 'undefined' || typeof OfflineAudioContext === 'undefined') return null
-  if (!(await AudioEncoder.isConfigSupported(VOICE_AAC)).supported) return null
+  if (typeof OfflineAudioContext === 'undefined') return null
 
   const track = await makeVoiceTrack(record)
   if (!track) return null
@@ -336,35 +323,8 @@ export async function renderVoiceFile(
   track.mix(ctx, (recordMs) => recordMs / 1000)
   const rendered = await ctx.startRendering()
 
-  const packets: { packet: EncodedPacket; meta: EncodedAudioChunkMetadata | undefined }[] = []
-  let failed: unknown = null
-  const encoder = new AudioEncoder({
-    output: (chunk, meta) =>
-      packets.push({ packet: EncodedPacket.fromEncodedChunk(chunk), meta }),
-    error: (e) => {
-      failed = e
-    },
-  })
-  encoder.configure(VOICE_AAC)
-  const data = rendered.getChannelData(0)
-  for (let from = 0; from < rendered.length; from += AUDIO_BLOCK) {
-    const n = Math.min(AUDIO_BLOCK, rendered.length - from)
-    const planar = new Float32Array(n)
-    planar.set(data.subarray(from, from + n))
-    const ad = new AudioData({
-      format: 'f32-planar',
-      sampleRate: EXPORT_SAMPLE_RATE,
-      numberOfFrames: n,
-      numberOfChannels: 1,
-      timestamp: Math.round((from / EXPORT_SAMPLE_RATE) * 1e6),
-      data: planar,
-    })
-    encoder.encode(ad)
-    ad.close()
-  }
-  await encoder.flush()
-  encoder.close()
-  if (failed) throw failed
+  const aac = await encodeAac(rendered, { bitrate: VOICE_BITRATE })
+  if (!aac) return null
 
   const target = new BufferTarget()
   const output = new Output({ format: new Mp4OutputFormat({ fastStart: 'in-memory' }), target })
@@ -372,7 +332,7 @@ export async function renderVoiceFile(
   output.addAudioTrack(audioTrack)
   await output.start()
   try {
-    for (const p of packets) await audioTrack.add(p.packet, p.meta)
+    for (const p of aac.packets) await audioTrack.add(p.packet, p.meta)
     await output.finalize()
   } catch (e) {
     await output.cancel()
