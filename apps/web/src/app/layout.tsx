@@ -45,7 +45,9 @@ export function Layout() {
           <Wordmark className="text-[28px]" />
         </Link>
 
-        <nav className="ml-auto hidden items-center gap-3 md:flex">
+        {/* The full nav needs ~1000 px on one line (the site's rem is 18 px): below lg it is the Menu
+            button, so landscape phones keep a one-line header. */}
+        <nav className="ml-auto hidden items-center gap-3 lg:flex">
           {NAV.map((n) => (
             <StickerLink key={n.to} to={n.to} tilt={n.tilt}>
               {n.label}
@@ -56,7 +58,7 @@ export function Layout() {
           </StickerLink>
         </nav>
 
-        <div className="relative ml-auto md:hidden">
+        <div className="relative ml-auto lg:hidden">
           <StickerButton
             tone="paper"
             tilt={-1}
