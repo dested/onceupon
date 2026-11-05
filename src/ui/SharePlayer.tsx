@@ -13,7 +13,6 @@ import tutorialRecord from '~/tutorial/tutorial-record.json'
 import { primeAudio, VoicePlayer } from '~/story/voice'
 import { BRAND } from '../../packages/shared/src/brand'
 import { IconButton, PaperCard, StickerButton } from './bits'
-import { VideoExportButton } from './VideoExport'
 import './share-player.css'
 
 const publicShareSchema = z.object({
@@ -246,10 +245,6 @@ export function SharePlayer({ shareId }: { shareId: string }) {
     window.location.href = BRAND.appStoreUrl || BRAND.origin
   }
 
-  const onDownloaded = (): void => {
-    if (shareId !== 'tutorial') void fetch(`${API_ORIGIN}/api/share/${shareId}/download`, { method: 'POST', keepalive: true })
-  }
-
   if (state.k === 'loading')
     return (
       <div className="story-studio grid !grid-rows-1 place-items-center">
@@ -316,7 +311,7 @@ export function SharePlayer({ shareId }: { shareId: string }) {
           {atEnd ? (
             <div className="share-again-over">
               <StickerButton tone="yellow" tilt={0} className="!text-lg" onClick={player.again}>
-                <RotateCcw size={18} strokeWidth={3} /> again
+                <RotateCcw size={18} strokeWidth={3} /> Watch it again
               </StickerButton>
             </div>
           ) : (
@@ -374,7 +369,7 @@ export function SharePlayer({ shareId }: { shareId: string }) {
         <div className="flex w-full flex-wrap items-center justify-center gap-4">
           {atEnd ? (
             <StickerButton tone="yellow" tilt={0} onClick={player.again} data-testid="share-again">
-              <RotateCcw size={22} strokeWidth={3} /> again
+              <RotateCcw size={22} strokeWidth={3} /> Watch it again
             </StickerButton>
           ) : (
             started && (
@@ -389,9 +384,6 @@ export function SharePlayer({ shareId }: { shareId: string }) {
                 )}
               </IconButton>
             )
-          )}
-          {record && (
-            <VideoExportButton variant="player" getRecord={() => record} onExported={onDownloaded} />
           )}
           <a
             href={BRAND.appStoreUrl || BRAND.origin}
