@@ -5,8 +5,9 @@ import {
   Mp4OutputFormat,
   Output,
 } from 'mediabunny'
-import { EXPORT_SAMPLE_RATE } from '~/engine/audio'
+import { EXPORT_SAMPLE_RATE, primePlayback } from '~/engine/audio'
 import type { VoiceTrack } from '~/export/mp4'
+import { APP_SHELL } from '~/backend/config'
 import { getVoiceClip } from '~/story/storage'
 import type { StoryRecord } from '~/story/storage'
 
@@ -103,6 +104,29 @@ export class VoiceRecorder {
 
   get recording(): boolean {
     return this.rec !== null || this.external !== null
+  }
+}
+
+/**
+ * Call synchronously inside the tap that starts a replay (before `Replayer.play()`): resumes (or
+ * creates) the playback AudioContext the voice and the crayon sounds share, so iOS lets them sound.
+ * Outside the app shell it also asks for the media audio session, so Web Audio is not muted by the
+ * iPhone's silent switch (an <audio> element ignores the switch; Web Audio does not, unless asked).
+ */
+export function primeAudio(): void {
+  if (!APP_SHELL) setPlaybackSession()
+  primePlayback()
+}
+
+/** `navigator.audioSession.type = 'playback'` (Safari 16.4+), where it exists. The shell sets its own session. */
+function setPlaybackSession(): void {
+  if (typeof navigator === 'undefined' || !('audioSession' in navigator)) return
+  const session: unknown = navigator.audioSession
+  if (typeof session !== 'object' || session === null || !('type' in session)) return
+  try {
+    if (session.type !== 'playback') Reflect.set(session, 'type', 'playback')
+  } catch {
+    // read-only or refused: the switch decides
   }
 }
 

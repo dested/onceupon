@@ -13,6 +13,42 @@ const FLIP_GAIN = 0.12
 /** Live play has no story at audio start; any fixed seed keeps the noise off Math.random. */
 const LIVE_SEED = 0x0ce0
 
+let playback: AudioContext | null = null
+
+/**
+ * The page's one AudioContext for sound you hear: the crayon scratch and page flips, and the child's
+ * voice in replay. One context means one tap (`primePlayback`) unlocks all of it on iOS, which also
+ * caps how many contexts a page may hold. Null where Web Audio is missing.
+ */
+export function playbackContext(): AudioContext | null {
+  if (playback && playback.state !== 'closed') return playback
+  if (typeof AudioContext === 'undefined') return null
+  try {
+    playback = new AudioContext()
+  } catch {
+    playback = null
+  }
+  return playback
+}
+
+/**
+ * Call synchronously inside a tap. Creates or resumes the playback context and starts one silent
+ * sample: iOS only lets a context sound once something was started inside a user gesture.
+ */
+export function primePlayback(): void {
+  const ctx = playbackContext()
+  if (!ctx) return
+  if (ctx.state !== 'running') void ctx.resume().catch(() => undefined)
+  try {
+    const src = ctx.createBufferSource()
+    src.buffer = ctx.createBuffer(1, 1, ctx.sampleRate)
+    src.connect(ctx.destination)
+    src.start()
+  } catch {
+    // a context that cannot start a source yet still got its resume()
+  }
+}
+
 /**
  * Synthesized wax-on-paper scratch and page flip. No assets. Noise is seeded, so the same seed
  * always makes the same sound. Live: `start()` from a user gesture. Video export: `attach()` to an
@@ -32,11 +68,13 @@ export class CrayonAudio implements StageAudio {
   async start(): Promise<void> {
     if (this.ctx) {
       if (this.ctx instanceof AudioContext && this.ctx.state === 'suspended')
-        await this.ctx.resume()
+        await this.ctx.resume().catch(() => undefined)
       return
     }
-    const ctx = new AudioContext()
+    const ctx = playbackContext()
+    if (!ctx) return
     this.attach(ctx, ctx.destination, () => ctx.currentTime)
+    if (ctx.state === 'suspended') await ctx.resume().catch(() => undefined)
   }
 
   /** Wire the scratch loop into `out` on `ctx`; `time` says "now" in the context's seconds. */
