@@ -1,6 +1,6 @@
 # MP4 export
 
-- **Status:** done (with the child's voice, in story time)
+- **Status:** not offered in 1.0 (Sal 2026-11-05: share the link instead; a long video failed to save and it took too long). The app has no Save video button; the exporter (`exportStoryVideo`, `VideoExport.tsx`, the bridge's `media.saveVideo`) stays in place for marketing videos. Works with the child's voice, in story time.
 - **Owner files:** `src/export/mp4.ts`, `src/export/aac.ts`, `src/export/watch.ts`, `src/export/frame.ts`, `src/ui/VideoExport.tsx`, `src/engine/clock.ts`, `src/engine/stage.ts` (`renderAt`, `settled`), `src/engine/audio.ts` (`AudioCues`, `renderAudioCues`), `src/story/replay.ts` (`replayPlan`, `replaySchedule`), `src/story/story-time.ts`, `src/story/voice.ts` (`makeVoiceTrack`, `renderVoiceFile`)
 
 ## What it is
@@ -12,7 +12,7 @@ nothing is uploaded.
 
 ## Behavior spec
 
-- The replay screen has a download icon in its top-right toolbar; the closing card after The End has a "Download video" button (the live story is saved first).
+- In 1.0 nothing in the app opens it: the closing card, the replay toolbar and the share card have no video button (removed 2026-11-05). Before that, the replay screen had a download icon in its top-right toolbar and the closing card after The End a "Download video" button (the live story is saved first). `VideoExportButton` still renders that UI wherever it is mounted.
 - Clicking it shows a paper card near the bottom of the screen, above the replay scrubber: "Making your video", a crayon-yellow progress bar with a percentage and the phase (drawing every page / adding the crayon sounds / wrapping it up), and "cancel". The UI stays responsive; the replay keeps playing.
 - Cancel works at every wait (frame loop, encoder backpressure, flush, audio render, AAC encode): the card closes and nothing downloads. An encoder that holds work but produces no output for 10 s fails the export with "Couldn't make the video. Try again later." and a Close button, never a frozen 0%.
 - In the app shell a grown-up passes the parental gate before the export starts (it ends in the system share sheet).

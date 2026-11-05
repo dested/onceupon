@@ -126,15 +126,15 @@ src/
     SettingsPanel.tsx      provider/model picker + API key
     DebugPanel.tsx         latency stats + raw DSL stream (backtick key) + voice lab (level meter, save clip, compare models, transcriber trace)
     Bookshelf.tsx          saved stories grid, play, two-tap delete
-    ReplayScreen.tsx       replay canvas + play again + download video
-    VideoExport.tsx        VideoExportButton (replay toolbar icon / closing-card button) + progress PaperCard with cancel; blob -> browser download
+    ReplayScreen.tsx       replay canvas + play again (no video button in 1.0)
+    VideoExport.tsx        VideoExportButton + progress PaperCard with cancel; blob -> browser download. Mounted nowhere in 1.0 (kept for marketing videos)
     bits.tsx               StickerButton, IconButton, PaperCard
     viewport.ts            safe-area + keyboard: visualViewport -> --kb/--vv-top/html.kb-open, reveals the focused field; dev __viewport.fakeKeyboard/fakeInsets
     SharePlayer.tsx        public player behind share links (`?player=<id>`; `&embed=1` = paper only, inside the website's book; `player=tutorial` = the bundled demo)
     ParentGate.tsx         grown-up gate (spoken-number sum) before purchases, link-outs, first mic use
     ParentArea.tsx         balance, buy, restore, gift redeem, family code, share-with-voice consent, shares list, tutorial, links
     Paywall.tsx            sleepy-crayon paywall / rebuy screen (owl pair free vs with minutes from src/assets/paywall/, packs, restore, Privacy/Terms behind the gate; redeem on web only)
-    ShareCard.tsx          after The End: name, include voice, make link, share sheet, download video
+    ShareCard.tsx          after The End: name, include voice, make link, share sheet
     MinutesChip.tsx        remaining minutes tag in the header (coral when sleepy)
     Offline.tsx            offline note/banner
   proto/                   dialect bench harness (plans/2026-09-28-dsl-rethink.md): registry.ts (id -> factory), stories.ts (bench set: quick/full/tail), bench-types.ts, render.ts (window.__proto.render/live)
@@ -279,5 +279,5 @@ scripts/                   one-off dev scripts (author-intro.ts: intro page draw
 - Earlier experiment: JSON ops dialect on Haiku 4.5, same opening sentence: first token ~500ms either way; JSON call 1116 output tokens / 6.5s / $0.008 vs lines ~200 tokens / ~2.5s / ~$0.002.
 - Done: DSL, renderer, effects, audio, speech intake, director, providers, settings, subtitles (three-state), filmstrip, bookshelf, replay with narration captions, kid-safety (`skip` + masker), per-call usage + cost + estimated ears cost (Anthropic from stream usage; OpenRouter reports cost; OpenAI priced only if added to PRICING). Typed-input path verified end to end on Haiku 4.5 (first token 0.6 to 1.1s).
 - OpenAI Realtime transcription verified from a script with synthesized speech (GA endpoint `?intent=transcription`, `session.update` with `type: transcription`, subprotocol auth). Live mic on it not yet confirmed by a human. OpenRouter/OpenAI LLM providers still unverified.
-- MP4 export (`features/mp4-export.md`): download video from replay and the closing card, storybook frame, crayon audio, captions, corner logo, end card; deterministic. The child's voice track is a seam only.
+- MP4 export (`features/mp4-export.md`): not offered in the app in 1.0 (Sal 2026-11-05: share the link instead); the exporter stays for marketing videos. Storybook frame, the child's voice in story time, crayon audio, captions, corner logo, end card; deterministic.
 - Ideas not built: story summary compaction for very long stories, per-model prompt variants.

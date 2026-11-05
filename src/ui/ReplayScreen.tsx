@@ -6,7 +6,6 @@ import { deleteStory, getStory, listStories } from '~/story/storage'
 import { IconButton, StickerButton } from './bits'
 import { Subtitles } from './Subtitles'
 import { Filmstrip } from './Filmstrip'
-import { VideoExportButton } from './VideoExport'
 import { gate } from './hosted'
 import { openShareCard } from './ShareCard'
 
@@ -99,7 +98,6 @@ export function ReplayScreen({ storyId }: { storyId: string }) {
               <Share2 size={22} strokeWidth={2.5} />
             </IconButton>
           )}
-          <VideoExportButton variant="icon" getRecord={() => getStory(storyId)} />
         </div>
       </header>
 

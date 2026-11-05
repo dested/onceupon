@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { LiveSession } from '~/story/session'
 import { appStore, persistSettings, useApp } from '~/story/store'
-import { getStory, listStories } from '~/story/storage'
+import { listStories } from '~/story/storage'
 import { primeAudio } from '~/story/voice'
 import { ensureConsent } from '~/backend/consent'
 import { Subtitles } from './Subtitles'
@@ -32,7 +32,6 @@ import { KeyGate } from './KeyGate'
 import { DebugPanel } from './DebugPanel'
 import { SpendChip } from './SpendChip'
 import { StoryWelcome } from './StoryWelcome'
-import { VideoExportButton } from './VideoExport'
 import { MinutesChip } from './MinutesChip'
 import {
   formatMinutes,
@@ -466,17 +465,6 @@ export function StoryScreen() {
                     <Share2 size={21} />
                     Send to grandma
                   </button>
-                )}
-                {drawn && (
-                  <VideoExportButton
-                    variant="studio"
-                    getRecord={() => {
-                      const s = sessionRef.current
-                      if (!s) return null
-                      s.save()
-                      return getStory(s.storyId)
-                    }}
-                  />
                 )}
                 <button
                   className="studio-button"

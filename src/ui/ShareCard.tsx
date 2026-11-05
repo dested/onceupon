@@ -5,7 +5,6 @@ import { createShare, shareLink } from '~/backend/share'
 import { ApiError } from '~/backend/api'
 import { getStory } from '~/story/storage'
 import { IconButton, PaperCard, StickerButton } from './bits'
-import { VideoExportButton } from './VideoExport'
 
 /**
  * "Send this story": turns a finished, saved story into a public link (and optionally includes the
@@ -89,7 +88,6 @@ export function ShareCard() {
               <StickerButton tone="yellow" tilt={-2} onClick={() => doShare(phase.url)} data-testid="share-send">
                 <Share2 size={20} strokeWidth={2.5} /> {shareLabel}
               </StickerButton>
-              <VideoExportButton variant="studio" getRecord={() => (storyId ? getStory(storyId) : null)} />
               <button type="button" className="studio-button" onClick={close}>
                 Done
               </button>
