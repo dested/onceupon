@@ -35,3 +35,4 @@
 **Report** (≤ 10 lines): `ready share <step> <sha>`, absolute shot paths, doubts.
 
 ## Standing answers
+- (2026-11-05, lead) `primeAudio()` landed in ab32bb3 (src/story/voice.ts). It unlocks the one shared playback AudioContext in src/engine/audio.ts (`playbackContext()`), which `CrayonAudio.start()` now uses too, so a CrayonAudio on the share Stage sounds after the same tap. Applies to: share.

@@ -102,16 +102,19 @@ src/
     apple.ts               on-device iPad ears over the bridge (`speech.available/start/stop`, events result/level/ready/end/error): SpeechAnalyzer (iPadOS 26), on-device SFSpeechRecognizer, or Whistle when the ears setting asks (`appleEars()` lists the shell's engines); the shell records the span, `takeClip()` feeds VoiceRecorder.startExternal
     beat-rules.ts          when a thought becomes a beat: trackerOptionsFor(settings) + the mic-energy hold constants (VOICE_LEVEL, VOICE_HOLD_MS)
   export/
-    mp4.ts                 exportStoryVideo(): record -> VirtualClock replay -> 1280x800@30 H.264 (WebCodecs) + AAC -> Mediabunny mp4; VoiceTrack seam
+    mp4.ts                 exportStoryVideo(): record -> VirtualClock replay on replayPlan() (story time when voiced) -> 1280x800@30 H.264 (WebCodecs) + AAC (aac.ts) -> Mediabunny mp4; VoiceTrack { speech, mix }
+    aac.ts                 encodeAac(): AudioBuffer -> AAC packets via Mediabunny AudioSampleSource (repairs WebKit's AAC description); wasm @mediabunny/aac-encoder imported only when native AAC is missing
+    watch.ts               EncoderWatch (no output for 10 s -> ExportStalledError), yieldToUi, throwIfAborted
     frame.ts               BookFrame: the home screen's storybook drawn on canvas around the stage, caption pill, tags, corner logo, end card
   story/
     store.ts               app state (useSyncExternalStore), settings load/persist, env keys via zod; hosted fields (balance, remaining, paying, config, endReason, paywall/parent/share/tutorial open)
     storage.ts             StoryRecord zod schema (+ voice clips), cache-backed list/get/save/delete, voice clip blobs, kv
     storage-backend.ts     LocalBackend (localStorage + IndexedDB) / BridgeBackend (native files via the bridge)
     idb.ts                 tiny IndexedDB blob store
-    voice.ts               VoiceRecorder (MediaRecorder per listening span), VoicePlayer (in step with replay), makeVoiceTrack (mp4), renderVoiceFile (share)
+    voice.ts               VoiceRecorder (MediaRecorder per listening span), primeAudio(), VoicePlayer (Web Audio: clips decoded once, story-time pieces scheduled), makeVoiceTrack (mp4), renderVoiceFile (share)
     the-end.ts             THE_END phrase regex + splitTheEnd(): the child saying "The End" ends the story (client-side, before the model)
-    replay.ts              Replayer: plays a StoryRecord through a Director with gaps capped (replaySchedule(), shared with export); seek()/position for the scrubber
+    replay.ts              Replayer: plays a StoryRecord through a Director on replayPlan() (story time when voiced, capped gaps otherwise; shared with export); seek()/position for the scrubber
+    story-time.ts          story time for voiced stories (pure, unit-tested): findSpeech, pulledTimes, storyTime (kept spans + event times), toStoryMs, voicePieces
     session.ts             LiveSession (mic + director + stage + autosave) and ReplaySession
     debug-report.ts        buildDebugReport(): the pasteable text dump behind the debug panel's "copy report" (one clock, merged timeline)
   ui/
