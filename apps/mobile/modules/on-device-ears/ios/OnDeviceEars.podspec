@@ -4,7 +4,7 @@ Pod::Spec.new do |s|
   s.summary        = 'On-device speech recognition (SpeechAnalyzer) for the native shell'
   s.description    = 'Streams SpeechTranscriber results and records the span for the WebView bridge.'
   s.author         = 'QuickGame'
-  s.homepage       = 'https://onceupon.dested.com'
+  s.homepage       = 'https://squiggletale.com'
   s.license        = { :type => 'MIT' }
   s.platforms      = { :ios => '15.1' }
   s.source         = { :git => '' }

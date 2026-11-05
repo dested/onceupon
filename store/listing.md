@@ -39,8 +39,8 @@ MADE FOR CHILDREN, SET UP BY GROWN-UPS
 
 Works on iPhone and iPad.
 
-Privacy Policy: https://onceupon.dested.com/privacy
-Terms of Use: https://onceupon.dested.com/terms
+Privacy Policy: https://squiggletale.com/privacy
+Terms of Use: https://squiggletale.com/terms
 
 ## Keywords (≤ 100, comma-separated, no spaces after commas)
 
@@ -50,9 +50,9 @@ storytelling,bedtime story,drawing,crayon,picture book,storybook,draw,imaginatio
 
 | Field | Value |
 | --- | --- |
-| Support URL | https://onceupon.dested.com/support |
-| Marketing URL | https://onceupon.dested.com/ |
-| Privacy Policy URL | https://onceupon.dested.com/privacy |
+| Support URL | https://squiggletale.com/support |
+| Marketing URL | https://squiggletale.com/ |
+| Privacy Policy URL | https://squiggletale.com/privacy |
 
 ## In-app purchases (en-US)
 

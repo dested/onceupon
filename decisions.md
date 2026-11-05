@@ -238,3 +238,8 @@ Primary Education, secondary Entertainment, Made for Kids 6–8 (`kidsAgeBand` o
 
 The app and the three packs ship in 165 territories: Store Brand Puzzles' 175 minus China mainland (ICP filing; Apple pulls AI apps there without a generative-AI licence) and the territories missing from Anthropic's supported regions (HKG, MAC, AFG, BLR, MMR, RUS, VEN, XKS, YEM). List and reasons: `store/asc/territories.json`; `bun store/asc/apply.ts territories` re-applies it.
 **Why:** every story is drawn through that API, so a territory it doesn't serve can't be sold the product.
+
+## 2026-11-05 — Everything on squiggletale.com; onceupon.dested.com retired
+
+The site, the API, the hosted studio (`/app/`) and share links (`/s/<id>`) live on `https://squiggletale.com` (and www). `BRAND.origin` and the shell's mirror point there, and so do the production `PUBLIC_ORIGIN` and `BETTER_AUTH_URL` and the App Store Connect URLs. onceupon.dested.com serves nothing, not even a redirect, so links shared before this and TestFlight builds 1–3 stop working; build 4 is the first binary on the new origin. DNS stays at Namecheap (A records to the Drydock box) so support@ keeps its email forwarding; the Route53 squiggletale.com zone Drydock made is a shadow nobody queries.
+**Why:** Sal: "put everything on squiggletale. no more onceupon.dested.com its gone forever".

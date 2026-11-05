@@ -1,15 +1,15 @@
 /**
  * Everything that changes with the app's name. The name is Squiggletale (locked 2026-09-22, see
- * plans/2026-09-22-app-name.md and decisions.md). `origin`/`domain` still point at the Drydock
- * deploy until squiggletale.app is bought and pointed; flip them here only.
+ * plans/2026-09-22-app-name.md and decisions.md). `origin`/`domain` are squiggletale.com since
+ * 2026-11-05 (onceupon.dested.com is retired, decisions.md); flip them here only.
  */
 export const BRAND = {
   name: 'Squiggletale',
   tagline: 'Say a story, the crayon draws',
   /** The website and API origin; the studio is served at `${origin}/app/`. */
-  origin: 'https://onceupon.dested.com',
-  domain: 'onceupon.dested.com',
-  /** The public domain (Sal's, registered 2026-09-23); `origin`/`domain` flip to it with the domain move. */
+  origin: 'https://squiggletale.com',
+  domain: 'squiggletale.com',
+  /** The public domain (Sal's, registered 2026-09-23); `origin`/`domain` moved to it on 2026-11-05. */
   publicDomain: 'squiggletale.com',
   company: 'QuickGame',
   /** The operator named in the privacy policy (COPPA notice: name, postal address, phone, email). */

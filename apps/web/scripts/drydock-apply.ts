@@ -58,8 +58,8 @@ const config = {
     'cd ../.. && bun install --frozen-lockfile && bun run build:hosted && cd apps/web && bun run build',
   startCommand: 'bun run start',
   outputDir: 'dist',
-  domains: ['onceupon.dested.com'],
-  dnsZone: '',
+  domains: ['squiggletale.com'],
+  dnsZone: 'squiggletale.com',
   // No --accept-data-loss: a destructive schema diff must fail the deploy, not delete ledger or purchase rows.
   predeployCommand: 'bunx prisma db push',
   port: 3000,
@@ -92,8 +92,8 @@ if (mode === 'config') {
 } else if (mode === 'env') {
   const env = await readEnv()
   const vars: Record<string, string | undefined> = {
-    BETTER_AUTH_URL: 'https://onceupon.dested.com',
-    PUBLIC_ORIGIN: 'https://onceupon.dested.com',
+    BETTER_AUTH_URL: 'https://squiggletale.com',
+    PUBLIC_ORIGIN: 'https://squiggletale.com',
     ADMIN_EMAILS: 'dested@gmail.com,sal@quickga.me',
     APPLE_ENVIRONMENT: 'Production',
     APPLE_APP_APPLE_ID: '6815029998',

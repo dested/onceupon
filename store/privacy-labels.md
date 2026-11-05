@@ -7,7 +7,7 @@ and the privacy page `apps/web/src/app/privacy.tsx` (updated 2026-11-04).
 
 ## The click list
 
-1. **Privacy Policy URL**: `https://onceupon.dested.com/privacy` (the store lane sets it through the API; check it shows).
+1. **Privacy Policy URL**: `https://squiggletale.com/privacy` (the store lane sets it through the API; check it shows).
 2. **Data Collection** → "Do you or your third-party partners collect data from this app?" → **Yes**.
 3. Tick exactly these five data types, then Save:
    - Identifiers → **Device ID**

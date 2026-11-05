@@ -6,8 +6,8 @@ import { type ConfigPlugin, withAppDelegate, withInfoPlist } from 'expo/config-p
 // brand values are mirrored here. SOURCE OF TRUTH: packages/shared/src/brand.ts — keep in sync.
 const BRAND = {
   name: 'Squiggletale',
-  origin: 'https://onceupon.dested.com',
-  domain: 'onceupon.dested.com',
+  origin: 'https://squiggletale.com',
+  domain: 'squiggletale.com',
   bundleId: 'com.quickgame.squiggletale',
   scheme: 'squiggletale',
 } as const

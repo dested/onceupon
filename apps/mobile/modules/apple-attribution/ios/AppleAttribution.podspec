@@ -4,7 +4,7 @@ Pod::Spec.new do |s|
   s.summary        = 'Apple AdServices attribution token for the native shell'
   s.description    = 'Exposes AAAttribution.attributionToken() to the WebView bridge.'
   s.author         = 'QuickGame'
-  s.homepage       = 'https://onceupon.dested.com'
+  s.homepage       = 'https://squiggletale.com'
   s.license        = { :type => 'MIT' }
   s.platforms      = { :ios => '15.1' }
   s.source         = { :git => '' }

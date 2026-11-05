@@ -4,7 +4,7 @@ Pod::Spec.new do |s|
   s.summary        = 'On-device speech recognition (Cactus Whistle) for the native shell'
   s.description    = 'Runs the Whistle speech model on the needle engine over a rolling mic window and records the span for the WebView bridge.'
   s.author         = 'QuickGame'
-  s.homepage       = 'https://onceupon.dested.com'
+  s.homepage       = 'https://squiggletale.com'
   s.license        = { :type => 'MIT' }
   s.platforms      = { :ios => '15.1' }
   s.source         = { :git => '' }

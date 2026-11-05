@@ -23,7 +23,7 @@ ssh mini 'zsh ~/code/squiggletale/apps/mobile/scripts/mini/sim-run.sh --shutdown
   `~/scratch/squiggletale/xcodebuild.log`.
 - `sim-run.sh` boots the named iOS 27.0 simulators, installs and launches the app, and opens Device Hub.
   `--fresh` uninstalls first and resets the mic, speech and Photos grants so the prompts show again.
-- The shell loads the live studio, `https://onceupon.dested.com/app/?shell=native`; the bundled copy is only
+- The shell loads the live studio, `https://squiggletale.com/app/?shell=native`; the bundled copy is only
   the offline fallback. Studio changes need a web deploy, not a rebuild.
 - Drive the UI with `axe` (`axe describe-ui --udid <udid>`, `axe tap -x <x> -y <y> --udid <udid>`); Maestro's
   iOS driver doesn't start on Xcode 27 here.
