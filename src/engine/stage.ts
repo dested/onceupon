@@ -16,6 +16,7 @@ import { CRAYONS, darken, hexToRgb } from './colors'
 import type { StageAudio } from './audio'
 import { realClock, type Clock } from './clock'
 import { faceExtras, faceInfo, isOutlineOf, luminance, popShapeToStrokes, type FaceInfo } from './pop'
+import { placeFinale, TITLE_ADVANCE, type Occluder } from './finale-place'
 
 /** How the page looks: classic crayon, or pop (engine/pop.ts: opaque waxy fills, light, faces, grounding). */
 export type StageStyle = 'classic' | 'pop'
@@ -62,6 +63,8 @@ interface ObjView {
   noLife: boolean
   /** Pop style: every shape drawn so far (face extras and blinks read it). */
   popShapes: Shape[]
+  /** Every shape drawn so far, either style (the finale keeps clear of them). */
+  drawn: Shape[]
   /** Pop style: cached eyes for blinking (undefined = recompute). */
   face: FaceInfo | null | undefined
 }
@@ -193,6 +196,8 @@ export class Stage {
   private sky: string | null = null
   /** The finale title is light lettering with a dark outline (the page is dark). */
   private finaleOutlined = false
+  /** The finale title's centre, where its sparkle burst goes. */
+  private finaleAt: Vec = { x: WORLD_W / 2, y: WORLD_H * 0.24 }
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -324,6 +329,7 @@ export class Stage {
       z: this.zCounter++,
       noLife: false,
       popShapes: [],
+      drawn: [],
       face: undefined,
     }
     this.views.set(id, v)
@@ -363,6 +369,7 @@ export class Stage {
         v.layerBounds = null
         v.contentBounds = null
         v.popShapes = ev.shapes.slice(0, keep)
+        v.drawn = ev.shapes.slice(0, keep)
         v.face = undefined
         for (const s of ev.shapes.slice(0, keep))
           v.contentBounds = unionBounds(v.contentBounds, shapeBounds(s))
@@ -487,6 +494,7 @@ export class Stage {
     opts: { speedMul?: number; wobbleAmp?: number; background?: boolean }
   ): void {
     for (const s of shapes) v.contentBounds = unionBounds(v.contentBounds, shapeBounds(s))
+    v.drawn.push(...shapes)
     if (v.contentBounds) this.ensureLayer(v, v.contentBounds)
     if (this.style === 'pop') {
       this.addPopShapes(v, shapes, opts)
@@ -1227,9 +1235,10 @@ export class Stage {
     }
     const size = 16
     const text = 'The End'
-    const width = size * 0.55 * text.length
-    const x = WORLD_W / 2 - width / 2
-    const y = WORLD_H * 0.28
+    // The spot that covers the least of the drawing, from the shapes at rest: the same in studio,
+    // replay and export whatever frame the idle motion is on.
+    const { x, y } = placeFinale(this.occluders(), size, text)
+    this.finaleAt = { x: x + size * TITLE_ADVANCE * text.length * 0.5, y: y - size * 0.4 }
     const v = this.newView(FINALE_ID, 0, 0)
     v.z = 2e9
     v.noLife = true
@@ -1237,6 +1246,11 @@ export class Stage {
     this.finaleOutlined = darkSky(this.sky)
     const shape: Shape = { k: 'text', x, y, size, color: this.finaleOutlined ? FINALE_INK_LIGHT : FINALE_INK, text }
     this.addShapes(v, [shape], {})
+    // The scrawl hand runs wider than the generic text estimate, and the dark outline wider still:
+    // size the layer for the real lettering so no spot clips the last letter.
+    const ink = { minX: x - 3, minY: y - size - 3, maxX: x + size * TITLE_ADVANCE * text.length + 3, maxY: y + size * 0.4 + 3 }
+    v.contentBounds = v.contentBounds ? unionBounds(v.contentBounds, ink) : ink
+    this.ensureLayer(v, v.contentBounds)
     return new Promise<void>((resolve) => {
       this.finaleState = { id: FINALE_ID, seed, resolve, done: false }
     })
@@ -1247,7 +1261,18 @@ export class Stage {
     // Stars across the upper half, sparkles around the title: three fixed-from-seed bursts.
     this.fx.spawn('stars', WORLD_W * (0.24 + rng() * 0.1), WORLD_H * (0.14 + rng() * 0.08), 9, now)
     this.fx.spawn('stars', WORLD_W * (0.64 + rng() * 0.1), WORLD_H * (0.12 + rng() * 0.08), 9, now)
-    this.fx.spawn('sparkle', WORLD_W / 2 + (rng() - 0.5) * 12, WORLD_H * 0.24, 8, now)
+    this.fx.spawn('sparkle', this.finaleAt.x + (rng() - 0.5) * 12, this.finaleAt.y, 8, now)
+  }
+
+  /** Every live object's shapes at their resting pose (target position, scale and facing; no idle motion). */
+  private occluders(): Occluder[] {
+    const out: Occluder[] = []
+    for (const v of this.views.values()) {
+      if (v.id === BG_ID || v.id === FINALE_ID || v.dying) continue
+      const layer = Math.floor(v.z / LAYER_STRIDE)
+      for (const shape of v.drawn) out.push({ shape, x: v.x, y: v.y, scale: v.scale, flipped: v.flipped, layer })
+    }
+    return out
   }
 
   /** Reset everything (new story). */

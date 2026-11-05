@@ -459,8 +459,13 @@ export function popShapeToStrokes(shape: Shape, rng: Rng, ctx: PopContext): Stro
     }
   }
   // 5. the edge: in the fill's own deeper ink, unless an explicit outline follows
+  // A near-white fill-only shape (snowflakes, snow caps, highlights) keeps its whiteness: deepen()
+  // turns white into a mid grey, which on a small shape is all you see. Small ones get no edge, the
+  // rest a pale cool-grey one.
+  const nearWhite = role === undefined && luminance(color) > 0.9
+  if (nearWhite && small) return out
   if (!isOutlineOf(ctx.next, shape)) {
-    const edgeColor = role === 'eyeWhite' ? '#5b4a40' : deepen(color, 0.8)
+    const edgeColor = role === 'eyeWhite' ? '#5b4a40' : nearWhite ? mixHex(color, '#7f93ad', 0.45) : deepen(color, 0.8)
     const edgeCtx: PopContext = { ...ctx, pairedFill: null, next: undefined }
     const edgeShape: Shape = { ...shape, color: edgeColor, fill: false }
     out.push(...popShapeToStrokes(edgeShape, rng, edgeCtx))
