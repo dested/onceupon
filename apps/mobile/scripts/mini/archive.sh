@@ -41,8 +41,10 @@ npx expo prebuild --platform ios --clean
 rm -f $OUT/.prebuild-fp
 NAME=Squiggletale
 WS=ios/$NAME.xcworkspace
-# eas build sets these two: the channel updates are fetched from (eas.json production), and the build number.
-plutil -replace EXUpdatesRequestHeaders -json '{"expo-channel-name":"production"}' "ios/$NAME/Supporting/Expo.plist"
+# eas build sets these two: the update channel (eas.json production; only while EAS Update is on), and the build number.
+if [[ $(plutil -extract EXUpdatesEnabled raw "ios/$NAME/Supporting/Expo.plist" 2>/dev/null) == true ]]; then
+  plutil -replace EXUpdatesRequestHeaders -json '{"expo-channel-name":"production"}' "ios/$NAME/Supporting/Expo.plist"
+fi
 plutil -replace CFBundleVersion -string "$BUILD" "ios/$NAME/Info.plist"
 
 rm -rf "$ARCHIVE"
@@ -54,8 +56,15 @@ grep -q '\*\* ARCHIVE SUCCEEDED' $OUT/archive.log || { echo "ARCHIVE_FAILED see 
 APP="$ARCHIVE/Products/Applications/$NAME.app"
 plist() { plutil -extract "$1" raw "$2" 2>/dev/null || echo none; }
 echo "CHECK app $NAME version $(plist CFBundleShortVersionString $APP/Info.plist) build $(plist CFBundleVersion $APP/Info.plist) id $(plist CFBundleIdentifier $APP/Info.plist)"
-echo "CHECK updates channel $(plutil -extract EXUpdatesRequestHeaders json -o - "$APP/Expo.plist") runtime $(plist EXUpdatesRuntimeVersion $APP/Expo.plist) url $(plist EXUpdatesURL $APP/Expo.plist)"
+echo "CHECK updates enabled $(plist EXUpdatesEnabled $APP/Expo.plist) check $(plist EXUpdatesCheckOnLaunch $APP/Expo.plist) channel $(plutil -extract EXUpdatesRequestHeaders json -o - "$APP/Expo.plist" 2>/dev/null || echo none) runtime $(plist EXUpdatesRuntimeVersion $APP/Expo.plist) url $(plist EXUpdatesURL $APP/Expo.plist)"
 echo "CHECK orientations iphone $(plutil -extract UISupportedInterfaceOrientations json -o - $APP/Info.plist) ipad $(plutil -extract 'UISupportedInterfaceOrientations~ipad' json -o - $APP/Info.plist | tr -d '\n')"
+# App Store processing fails (ITMS-90683) when linked code references an API whose purpose string is missing,
+# even if the app never calls it (expo-media-library needs NSPhotoLibraryUsageDescription).
+for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription NSPhotoLibraryUsageDescription NSPhotoLibraryAddUsageDescription; do
+  plutil -extract $k raw $APP/Info.plist >/dev/null 2>&1 && echo "CHECK purpose $k ok" || echo "CHECK purpose $k MISSING"
+done
+plutil -extract NSPhotoLibraryUsageDescription raw $APP/Info.plist >/dev/null 2>&1 \
+  || { echo "ARCHIVE_UNFIT NSPhotoLibraryUsageDescription missing: App Store processing rejects it (ITMS-90683); set expo-media-library photosPermission"; exit 1; }
 echo "CHECK frameworks $(ls $APP/Frameworks 2>/dev/null | tr '\n' ' ')"
 echo "CHECK whistle/needle in binary: $(ls $APP/Frameworks 2>/dev/null | grep -ci needle || true) frameworks, $(grep -a -c -i 'whistle' "$APP/$NAME" || true) symbol hits"
 echo "CHECK webview debug flag in bundle: $(grep -a -c 'EXPO_PUBLIC_WEBVIEW_DEBUG' "$APP/main.jsbundle" || true)"
