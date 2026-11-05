@@ -1,10 +1,11 @@
 import { BufferTarget, EncodedAudioPacketSource, Mp4OutputFormat, Output } from 'mediabunny'
-import { EXPORT_SAMPLE_RATE, primePlayback } from '~/engine/audio'
+import { EXPORT_SAMPLE_RATE, playbackContext, primePlayback } from '~/engine/audio'
 import { encodeAac } from '~/export/aac'
 import type { VoiceTrack } from '~/export/mp4'
 import { APP_SHELL } from '~/backend/config'
 import { getVoiceClip } from '~/story/storage'
 import type { StoryRecord } from '~/story/storage'
+import { findSpeech, voicePieces, type KeptSpan, type Span, type VoicePiece } from './story-time'
 
 /**
  * The child is the narrator. While the mic is open the studio records one clip per listening span;
@@ -125,177 +126,243 @@ function setPlaybackSession(): void {
   }
 }
 
-interface LoadedClip {
+/** A decoded clip on the record clock. `ms` is the decoded length (the file can differ from the span). */
+interface DecodedClip {
   t: number
   ms: number
-  el: HTMLAudioElement
-  url: string
-  /** A seek asked for before the element had metadata: the clip offset (s) and when it was asked. */
-  pending: { want: number; at: number } | null
-  /** A play() promise is in flight (don't stack them; WebKit aborts the earlier one). */
-  starting: boolean
+  buffer: AudioBuffer
 }
 
-/** How long load() waits for a clip's metadata before handing the player over anyway. */
-const METADATA_WAIT_MS = 3000
-/** Drift (s) that re-seeks a paused clip before play, and a clip that is already playing. */
-const SEEK_WHEN_PAUSED = 0.25
-const SEEK_WHEN_PLAYING = 0.75
+/** Fade (s) at both ends of every voice piece, so a squeezed quiet stretch never clicks. */
+const PIECE_FADE_S = 0.008
 
-function makeClip(t: number, ms: number, url: string): LoadedClip {
-  const el = new Audio()
-  el.preload = 'auto'
-  const clip: LoadedClip = { t, ms, el, url, pending: null, starting: false }
-  // A seek asked for too early is applied once the element can seek (WebKit drops or mangles seeks
-  // on an element with no metadata, and iOS ignores preload so nothing loads until asked).
-  el.addEventListener('loadedmetadata', () => {
-    const p = clip.pending
-    if (!p) return
-    clip.pending = null
-    const want = p.want + (el.paused ? 0 : (performance.now() - p.at) / 1000)
-    if (want > 0.05) {
-      try {
-        el.currentTime = want
-      } catch {
-        // still not seekable; the next sync will try again
-      }
+/**
+ * Start `pieces` of `clips` on `ctx`: story ms `fromStoryMs` plays at context time `whenS`. Pieces
+ * already over are skipped, one already under way starts part-way. Shared by replay (live context)
+ * and the mp4 (offline), so both place the voice the same way.
+ */
+function startPieces(
+  ctx: BaseAudioContext,
+  out: AudioNode,
+  clips: readonly DecodedClip[],
+  pieces: readonly VoicePiece[],
+  fromStoryMs: number,
+  whenS: number
+): AudioBufferSourceNode[] {
+  const started: AudioBufferSourceNode[] = []
+  for (const p of pieces) {
+    const clip = clips[p.clip]
+    if (!clip) continue
+    const skip = Math.max(0, fromStoryMs - p.atMs)
+    const durS = (p.durMs - skip) / 1000
+    if (durS <= 0.005) continue
+    const at = whenS + Math.max(0, p.atMs - fromStoryMs) / 1000
+    const src = ctx.createBufferSource()
+    src.buffer = clip.buffer
+    const gain = ctx.createGain()
+    const fade = Math.min(PIECE_FADE_S, durS / 2)
+    gain.gain.setValueAtTime(0, at)
+    gain.gain.linearRampToValueAtTime(1, at + fade)
+    gain.gain.setValueAtTime(1, at + durS - fade)
+    gain.gain.linearRampToValueAtTime(0, at + durS)
+    src.connect(gain).connect(out)
+    src.start(at, (p.offsetMs + skip) / 1000, durS)
+    started.push(src)
+  }
+  return started
+}
+
+/** Speech in every clip, on the record clock. */
+function speechOf(clips: readonly DecodedClip[]): Span[] {
+  const spans: Span[] = []
+  for (const c of clips) {
+    const channels: Float32Array[] = []
+    for (let ch = 0; ch < c.buffer.numberOfChannels; ch++) channels.push(c.buffer.getChannelData(ch))
+    spans.push(...findSpeech(channels, c.buffer.sampleRate, c.t))
+  }
+  return spans.sort((a, b) => a.from - b.from)
+}
+
+/** Decode compressed clips on `ctx`; an undecodable one is dropped rather than failing the whole voice. */
+async function decodeClips(
+  ctx: BaseAudioContext,
+  sources: readonly { t: number; bytes: ArrayBuffer | null }[]
+): Promise<DecodedClip[]> {
+  const out: DecodedClip[] = []
+  for (const s of sources) {
+    if (!s.bytes) continue
+    try {
+      const buffer = await ctx.decodeAudioData(s.bytes)
+      out.push({ t: s.t, ms: buffer.duration * 1000, buffer })
+    } catch {
+      // not decodable here (e.g. a webm clip in an old WebKit): skip it
     }
-  })
-  el.src = url
-  el.load()
-  return clip
+  }
+  return out
 }
 
-/** Resolve when the element has metadata (or failed, or after a timeout), so the first sync can seek. */
-function whenLoaded(el: HTMLAudioElement): Promise<void> {
-  if (el.readyState >= HTMLMediaElement.HAVE_METADATA) return Promise.resolve()
-  return new Promise((resolve) => {
-    const done = (): void => {
-      window.clearTimeout(timer)
-      el.removeEventListener('loadedmetadata', done)
-      el.removeEventListener('error', done)
-      resolve()
-    }
-    const timer = window.setTimeout(done, METADATA_WAIT_MS)
-    el.addEventListener('loadedmetadata', done)
-    el.addEventListener('error', done)
-  })
+/** What a VoicePlayer is playing: from which story ms, since which performance.now(), which spans. */
+interface Playing {
+  fromStoryMs: number
+  since: number
+  spans: readonly KeptSpan[]
 }
 
-/** Plays a record's voice clips in step with replay. The Replayer drives `sync` on every step and every 200 ms. */
+/**
+ * The child's voice in replay, through Web Audio: clips are fetched and decoded once (from the start,
+ * `ready` settles when done), the speech in them is found, and `play()` schedules exactly the story-
+ * time pieces from a story position on the shared playback context. No element seeking: that is what
+ * lost clips in WKWebView. If the context starts or resumes late (iOS, a call), the pieces are placed
+ * again from wherever the story clock is by then.
+ */
 export class VoicePlayer {
-  private constructor(private clips: LoadedClip[]) {}
+  /** Settles (never rejects) once every clip is decoded or dropped. */
+  readonly ready: Promise<void>
+  private clips: DecodedClip[] = []
+  private speechSpans: Span[] = []
+  private playing: Playing | null = null
+  private sources: AudioBufferSourceNode[] = []
+  private listening: AudioContext | null = null
+  private disposed = false
+  /** A blob: URL handed to fromUrl, revoked with the player. */
+  private ownedUrl: string | null = null
+  private readonly onState = (): void => this.place()
 
+  private constructor(fetchAll: () => Promise<{ t: number; bytes: ArrayBuffer | null }[]>) {
+    this.ready = (async () => {
+      const ctx = playbackContext()
+      if (!ctx) return
+      try {
+        const clips = await decodeClips(ctx, await fetchAll())
+        if (this.disposed) return
+        this.clips = clips
+        this.speechSpans = speechOf(clips)
+      } catch (e) {
+        console.warn('voice: could not load the recording', e)
+      }
+    })()
+  }
+
+  /** The record's own clips (local storage). Null when it has none that decode. */
   static async load(record: StoryRecord): Promise<VoicePlayer | null> {
-    const voice = record.voice
-    if (!voice || voice.clips.length === 0) return null
-    const loaded: LoadedClip[] = []
-    for (const clip of voice.clips) {
-      const blob = await getVoiceClip(clip.file)
-      if (!blob) continue
-      loaded.push(makeClip(clip.t, clip.ms, URL.createObjectURL(blob)))
-    }
-    if (loaded.length === 0) return null
-    // Load every element up front: WKWebView ignores preload, and a play()/seek on an element with no
-    // metadata at replay start is exactly what lost the first clip.
-    await Promise.all(loaded.map((c) => whenLoaded(c.el)))
-    return new VoicePlayer(loaded)
+    const clips = record.voice?.clips ?? []
+    if (clips.length === 0) return null
+    const player = new VoicePlayer(() =>
+      Promise.all(
+        clips.map(async (c) => {
+          const blob = await getVoiceClip(c.file)
+          return { t: c.t, bytes: blob ? await blob.arrayBuffer() : null }
+        })
+      )
+    )
+    await player.ready
+    return player.hasAudio ? player : null
   }
 
   /** One file that starts at record t = 0 (share pages serve the whole timeline as one clip). */
   static fromUrl(url: string, mime: string, totalMs: number): VoicePlayer {
-    // The mime is advisory; the server sends the real content type. Kept for a caller that needs it.
+    // The mime is advisory (the server sends the real content type) and the length comes from the
+    // decoded file; both are kept for callers that pass them.
     void mime
-    return new VoicePlayer([makeClip(0, totalMs, url)])
+    void totalMs
+    const player = new VoicePlayer(async () => {
+      const res = await fetch(url)
+      return res.ok ? [{ t: 0, bytes: await res.arrayBuffer() }] : []
+    })
+    if (url.startsWith('blob:')) player.ownedUrl = url
+    return player
   }
 
-  sync(recordMs: number, playing: boolean): void {
-    for (const clip of this.clips) {
-      const within = playing && recordMs >= clip.t && recordMs < clip.t + clip.ms
-      const el = clip.el
-      if (!within) {
-        clip.pending = null
-        if (!el.paused) el.pause()
-        continue
-      }
-      const want = (recordMs - clip.t) / 1000
-      // The file can be a little shorter than the span's measured ms; past its end, never restart it.
-      if (Number.isFinite(el.duration) && want >= el.duration - 0.05) continue
-      if (el.readyState < HTMLMediaElement.HAVE_METADATA) {
-        clip.pending = { want, at: performance.now() }
-      } else if (!el.seeking) {
-        const tolerance = el.paused ? SEEK_WHEN_PAUSED : SEEK_WHEN_PLAYING
-        if (Math.abs(el.currentTime - want) > tolerance) {
-          try {
-            el.currentTime = want
-          } catch {
-            // not seekable yet; the next sync will catch it
-          }
-        }
-      }
-      // An ended element that was not sought back stays ended (play() would restart it from 0).
-      if (el.paused && !clip.starting && !(el.ended && !el.seeking)) {
-        clip.starting = true
-        el.play()
-          .catch(() => undefined)
-          .finally(() => {
-            clip.starting = false
-          })
-      }
+  /** Something decoded and can play. */
+  get hasAudio(): boolean {
+    return this.clips.length > 0
+  }
+
+  /** Where the child is talking, on the record clock (empty until `ready`). */
+  get speech(): readonly Span[] {
+    return this.speechSpans
+  }
+
+  /** Play the kept `spans` from story ms `fromStoryMs`, now. Replaces whatever was playing. */
+  play(fromStoryMs: number, spans: readonly KeptSpan[]): void {
+    this.playing = { fromStoryMs, since: performance.now(), spans }
+    const ctx = playbackContext()
+    if (!ctx || this.disposed) return
+    if (this.listening !== ctx) {
+      this.listening?.removeEventListener('statechange', this.onState)
+      ctx.addEventListener('statechange', this.onState)
+      this.listening = ctx
     }
+    // Inside the shell (no gesture needed) this starts it; on a web page primeAudio() did, in the tap.
+    if (ctx.state !== 'running') void ctx.resume().catch(() => undefined)
+    this.place()
+  }
+
+  stop(): void {
+    this.playing = null
+    this.silence()
   }
 
   dispose(): void {
-    for (const clip of this.clips) {
-      clip.el.pause()
-      clip.el.removeAttribute('src')
-      URL.revokeObjectURL(clip.url)
-    }
+    this.disposed = true
+    this.stop()
+    this.listening?.removeEventListener('statechange', this.onState)
+    this.listening = null
     this.clips = []
+    if (this.ownedUrl) URL.revokeObjectURL(this.ownedUrl)
+    this.ownedUrl = null
+  }
+
+  /** (Re)schedule from the story clock's position now; only while the context runs. */
+  private place(): void {
+    this.silence()
+    const p = this.playing
+    const ctx = playbackContext()
+    if (!p || !ctx || ctx.state !== 'running' || this.clips.length === 0) return
+    // A few ms ahead, so the first piece is not scheduled in the past.
+    const LEAD_MS = 30
+    const fromStoryMs = p.fromStoryMs + (performance.now() - p.since) + LEAD_MS
+    const pieces = voicePieces(this.clips, p.spans)
+    this.sources = startPieces(ctx, ctx.destination, this.clips, pieces, fromStoryMs, ctx.currentTime + LEAD_MS / 1000)
+  }
+
+  private silence(): void {
+    for (const s of this.sources) {
+      try {
+        s.stop()
+      } catch {
+        // never started or already stopped
+      }
+      s.disconnect()
+    }
+    this.sources = []
   }
 }
 
 /**
- * Decode a record's clips to AudioBuffers, once, so the exporter can drop each on the OfflineAudioContext
- * at its record time. Decoding at the export sample rate avoids a resample. Deterministic: decoding the
- * same compressed file on the same machine yields the same samples.
+ * The voice for the mp4: every clip decoded once at the export sample rate (no resample in the mix),
+ * the speech found in it, and `mix` placing the story-time pieces exactly as replay does. Decoding is
+ * offline (no audio hardware) and deterministic: the same file decodes to the same samples.
  */
 export async function makeVoiceTrack(record: StoryRecord): Promise<VoiceTrack | null> {
   const voice = record.voice
   if (!voice || voice.clips.length === 0) return null
-  if (typeof AudioContext === 'undefined') return null
-  const decoded: { t: number; buffer: AudioBuffer }[] = []
-  let tmp: AudioContext
-  try {
-    tmp = new AudioContext({ sampleRate: EXPORT_SAMPLE_RATE })
-  } catch {
-    tmp = new AudioContext()
-  }
-  try {
-    for (const clip of voice.clips) {
-      const blob = await getVoiceClip(clip.file)
-      if (!blob) continue
-      const bytes = await blob.arrayBuffer()
-      try {
-        decoded.push({ t: clip.t, buffer: await tmp.decodeAudioData(bytes) })
-      } catch {
-        // an undecodable clip is dropped rather than failing the whole export
-      }
-    }
-  } finally {
-    void tmp.close()
-  }
-  if (decoded.length === 0) return null
+  if (typeof OfflineAudioContext === 'undefined') return null
+  const decoder = new OfflineAudioContext(1, 1, EXPORT_SAMPLE_RATE)
+  const clips = await decodeClips(
+    decoder,
+    await Promise.all(
+      voice.clips.map(async (c) => {
+        const blob = await getVoiceClip(c.file)
+        return { t: c.t, bytes: blob ? await blob.arrayBuffer() : null }
+      })
+    )
+  )
+  if (clips.length === 0) return null
   return {
-    mix(ctx, videoSecondsOf) {
-      for (const d of decoded) {
-        const src = ctx.createBufferSource()
-        src.buffer = d.buffer
-        const gain = ctx.createGain()
-        gain.gain.value = 1
-        src.connect(gain).connect(ctx.destination)
-        src.start(Math.max(0, videoSecondsOf(d.t)))
-      }
+    speech: speechOf(clips),
+    mix(ctx, spans) {
+      startPieces(ctx, ctx.destination, clips, voicePieces(clips, spans), 0, 0)
     },
   }
 }
@@ -320,7 +387,9 @@ export async function renderVoiceFile(
   const lastEnd = voice.clips.reduce((m, c) => Math.max(m, c.t + c.ms), 0)
   const totalSec = Math.max(1, Math.ceil(lastEnd / 1000))
   const ctx = new OfflineAudioContext(1, totalSec * EXPORT_SAMPLE_RATE, EXPORT_SAMPLE_RATE)
-  track.mix(ctx, (recordMs) => recordMs / 1000)
+  // The whole record timeline as recorded (one span, story time = record time): the share page
+  // finds the speech in it and plays it in story time itself.
+  track.mix(ctx, [{ from: 0, to: totalSec * 1000, at: 0 }])
   const rendered = await ctx.startRendering()
 
   const aac = await encodeAac(rendered, { bitrate: VOICE_BITRATE })

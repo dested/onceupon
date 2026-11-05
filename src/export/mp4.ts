@@ -12,8 +12,9 @@ import { Scene } from '~/engine/scene'
 import { Stage } from '~/engine/stage'
 import { Director } from '~/llm/director'
 import { isDialectId, makeDialect } from '~/llm/dialect'
-import { recordClockOffset, replaySchedule, voiceLeadMs } from '~/story/replay'
+import { replayPlan } from '~/story/replay'
 import type { StoryRecord } from '~/story/storage'
+import type { KeptSpan, Span } from '~/story/story-time'
 import { makeVoiceTrack } from '~/story/voice'
 import { encodeAac } from './aac'
 import { BookFrame, CPU, loadVideoAssets, PAPER, VIDEO_H, VIDEO_W } from './frame'
@@ -47,11 +48,14 @@ const CURSOR_REST = { x: 124, y: 94 }
 const SLICE_MS = 12
 
 /**
- * The seam for the child's recorded voice (built separately). `videoSecondsOf` maps a time on the
- * record's clock (event `t`, ms) to seconds in the video, which squeezes dead air out like replay.
+ * The child's recorded voice (src/story/voice.ts `makeVoiceTrack`). A voiced story plays in story
+ * time (src/story/story-time.ts): `speech` feeds the timeline, and `mix` places the voice's kept
+ * record spans at their story times, which are the video's times.
  */
 export interface VoiceTrack {
-  mix(ctx: OfflineAudioContext, videoSecondsOf: (recordMs: number) => number): void
+  /** Where the child talks, on the record clock. */
+  readonly speech: readonly Span[]
+  mix(ctx: OfflineAudioContext, spans: readonly KeptSpan[]): void
 }
 
 export interface ExportProgress {
@@ -145,8 +149,8 @@ export async function exportStoryVideo(
   throwIfAborted(signal)
 
   // The child's voice. `opts.voice === undefined` means "figure it out"; an explicit null skips it.
-  // With voice the replay runs in real time (no squeezed gaps), so voice and drawing stay aligned;
-  // voice decode is deterministic for the same file, so the export stays deterministic.
+  // With voice the video is in story time, like replay: the drawing under the words, dead air
+  // squeezed. Voice decode is deterministic for the same file, so the export stays deterministic.
   const hasVoice = record.voice !== undefined && record.voice.clips.length > 0
   let voice = opts.voice
   if (voice === undefined && hasVoice) voice = await makeVoiceTrack(record)
@@ -175,7 +179,8 @@ export async function exportStoryVideo(
   })
 
   const events = record.events
-  const times = replaySchedule(events, { realTime: hasVoice, leadMs: voiceLeadMs(record) })
+  const plan = replayPlan(events, voice ? voice.speech : null)
+  const times = plan.eventAt
   let caption = ''
   events.forEach((ev, i) => {
     clock.at(times[i] ?? 0, () => {
@@ -188,7 +193,8 @@ export async function exportStoryVideo(
       else director.execute(ev.line)
     })
   })
-  const lastEventMs = times[times.length - 1] ?? 0
+  // The page settles and holds after the last event and after the voice's last words.
+  const lastEventMs = Math.max(times[times.length - 1] ?? 0, plan.lengthMs)
 
   const packets: Packet<EncodedVideoChunkMetadata>[] = []
   let encodeError: unknown = null
@@ -262,27 +268,15 @@ export async function exportStoryVideo(
 
     const seconds = frames / FPS
     report('audio', 0.92, true)
-    // Record time -> video time. With voice the timeline is real time (t - offset), so the mapping is
-    // exact; without it, follow the squeezed schedule (last event at/before recordMs, clamped to the next).
-    const offset = recordClockOffset(record)
-    const videoSecondsOf = (recordMs: number): number => {
-      if (hasVoice) return Math.max(0, recordMs - offset) / 1000
-      let i = 0
-      while (i + 1 < events.length && (events[i + 1]?.t ?? Infinity) <= recordMs) i++
-      const ev = events[i]
-      if (!ev) return 0
-      const next = times[i + 1]
-      const base = times[i] ?? 0
-      const into = Math.max(0, recordMs - ev.t)
-      return (next === undefined ? base + into : Math.min(base + into, next)) / 1000
-    }
+    // Story time is video time: the voice's kept spans go in at their story starts.
+    const spans = plan.spans
     // Offline rendering has no output to watch; the race only keeps Cancel live while it runs.
     const audio = await new EncoderWatch(signal, 'audio render').race(
       renderAudioCues(
         cues.cues,
         seconds,
         record.seed,
-        voice ? (ctx) => voice.mix(ctx, videoSecondsOf) : undefined
+        voice && spans ? (ctx) => voice.mix(ctx, spans) : undefined
       )
     )
     throwIfAborted(signal)

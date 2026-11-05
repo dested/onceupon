@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { replayPlan, replaySchedule } from './replay'
 import type { StoryEvent } from './storage'
 import {
   DRAW_ACTIVE_MS,
@@ -209,5 +210,26 @@ describe('toStoryMs and voicePieces', () => {
 
   test('clips outside the kept spans are not played', () => {
     expect(voicePieces([{ t: 4_000, ms: 2_000 }], spans)).toEqual([])
+  })
+})
+
+describe('replayPlan', () => {
+  const events = [words(1_000), cmd(5_000), cmd(5_100), words(20_000), end(20_000)]
+
+  test('without voice: the capped gaps, unchanged', () => {
+    const plan = replayPlan(events, null)
+    expect(plan.eventAt).toEqual([0, 1400, 1500, 2900, 2930])
+    expect(plan.eventAt).toEqual(replaySchedule(events))
+    expect(plan.spans).toBe(null)
+  })
+
+  test('with voice: story time, and the length covers the last words', () => {
+    const speech = [{ from: 19_000, to: 21_000 }]
+    const plan = replayPlan(events, speech)
+    expect(plan.eventAt).toEqual(storyTime(events, speech).eventAt)
+    expect((plan.spans?.length ?? 0) > 0).toBe(true)
+    const last = plan.spans?.[plan.spans.length - 1]
+    expect(plan.lengthMs).toBe((last?.at ?? 0) + (last?.to ?? 0) - (last?.from ?? 0))
+    expect(plan.lengthMs < 20_000).toBe(true)
   })
 })
