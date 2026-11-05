@@ -1,0 +1,10 @@
+/*
+ * The share card's layer (ShareCard.tsx). It floats over the finished picture (the closing card or a
+ * replay) on a light dim, so the story being sent stays in view. Layout (fixed, safe-area and keyboard
+ * padding, centring) comes from the shared .modal-overlay rule in app.css. It used to borrow the
+ * paywall's opaque tabletop overlay, which blanked the page behind it.
+ */
+.share-card-overlay {
+  z-index: 45;
+  background: #4434264d;
+}
