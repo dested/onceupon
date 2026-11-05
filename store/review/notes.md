@@ -10,7 +10,7 @@ Purchases:
 - "Restore purchases" is on the paywall and in Grown-ups.
 
 Main review flow:
-1. Open the app. A short picture-book intro plays. Tap "Skip" to go straight to the storybook.
+1. Open the app. A short picture-book intro plays. Tap "Next" to page through it, or the X at the top right to skip to the storybook.
 2. Tap the big yellow microphone button.
 3. Answer the grown-up question, then read the "Before the first story" card and tap "I agree".
 4. Allow the Microphone and Speech Recognition prompts.
