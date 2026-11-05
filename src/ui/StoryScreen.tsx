@@ -23,6 +23,7 @@ import {
 import { LiveSession } from '~/story/session'
 import { appStore, persistSettings, useApp } from '~/story/store'
 import { getStory, listStories } from '~/story/storage'
+import { primeAudio } from '~/story/voice'
 import { ensureConsent } from '~/backend/consent'
 import { Subtitles } from './Subtitles'
 import { Filmstrip } from './Filmstrip'
@@ -183,6 +184,8 @@ export function StoryScreen() {
   const playAgain = () => {
     const session = sessionRef.current
     if (!session) return
+    // In the tap: unlock the shared playback context so the replay's voice and crayon sounds play.
+    primeAudio()
     session.save()
     appStore.set({ screen: 'replay', replayId: session.storyId })
   }

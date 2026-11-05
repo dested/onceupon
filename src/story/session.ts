@@ -43,7 +43,7 @@ import { ApiError } from '~/backend/api'
 import { consentRequired } from '~/backend/consent'
 import { openPaywall } from '~/ui/hosted'
 import { StoryMeter, type MeterHandlers } from '~/backend/meter'
-import { VoicePlayer, VoiceRecorder } from '~/story/voice'
+import { primeAudio, VoicePlayer, VoiceRecorder } from '~/story/voice'
 import { playCoachLine } from '~/tutorial/coach'
 import { SLEEPY_AT_SEC } from '../../packages/shared/src/packs'
 import type { EarsToken, EarsVendor, EndReason, SessionStart } from '../../packages/shared/src/api'
@@ -1087,6 +1087,8 @@ export class ReplaySession {
   private director: Director
   private replayer: Replayer | null = null
   private record: StoryRecord | null
+  /** The crayon scratch and page flips, on the shared playback context like live play and the share page. */
+  private readonly audio = new CrayonAudio()
   /** The child's recorded voice for this story, loaded once; null when there is none. */
   private voice: Promise<VoicePlayer | null>
   private voicePlayer: VoicePlayer | null = null
@@ -1097,7 +1099,8 @@ export class ReplaySession {
   constructor(canvas: HTMLCanvasElement, storyId: string) {
     this.record = getStory(storyId)
     const seed = this.record?.seed ?? 1
-    this.stage = new Stage(canvas, { seed, audio: null })
+    this.stage = new Stage(canvas, { seed, audio: this.audio })
+    this.audio.setEnabled(appStore.get().settings.sound)
     this.director = this.freshDirector()
     this.voice = this.record ? VoicePlayer.load(this.record) : Promise.resolve(null)
     void this.voice.then((v) => {
@@ -1148,9 +1151,19 @@ export class ReplaySession {
     )
   }
 
+  /**
+   * Call synchronously in the tap that starts or continues a replay: unlocks the shared playback
+   * context (iOS lets sound start only from a tap) and hangs the crayon sounds on it.
+   */
+  private unlockSound(): void {
+    primeAudio()
+    void this.audio.start()
+  }
+
   play(): void {
     if (!this.record) return
     const record = this.record
+    this.unlockSound()
     const token = ++this.playToken
     this.replayer?.stop()
     appStore.set({ replayPlaying: true })
@@ -1171,6 +1184,7 @@ export class ReplaySession {
 
   resume(): void {
     if (!this.record) return
+    this.unlockSound()
     this.playToken++
     if (!this.replayer) this.replayer = this.makeReplayer(this.record)
     if (this.replayer.position >= this.replayer.length) this.seek(0)
@@ -1186,8 +1200,11 @@ export class ReplaySession {
     if (!this.record) return
     this.playToken++
     const playing = appStore.get().replayPlaying
+    if (playing) this.unlockSound()
     this.replayer?.stop()
     this.director.stop()
+    // The rebuild turns every page up to i at once: no burst of page flips.
+    this.audio.setEnabled(false)
     this.stage.clear()
     appStore.set({ pages: [] })
     this.director = this.freshDirector()
@@ -1204,6 +1221,7 @@ export class ReplaySession {
     }
     this.stage.settle()
     this.stage.setInstant(false)
+    this.audio.setEnabled(appStore.get().settings.sound)
     appStore.set({
       transcriptFinal: words.join(' '),
       replayCaption: words[words.length - 1] ?? '',
@@ -1224,6 +1242,7 @@ export class ReplaySession {
     this.playToken++
     this.replayer?.stop()
     this.stage.stop()
+    this.audio.dispose()
     void this.voice.then((v) => v?.dispose())
     appStore.set({ replayPlaying: false })
   }

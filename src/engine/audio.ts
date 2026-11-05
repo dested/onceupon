@@ -58,6 +58,7 @@ export class CrayonAudio implements StageAudio {
   private ctx: BaseAudioContext | null = null
   private out: AudioNode | null = null
   private gain: GainNode | null = null
+  private loop: AudioBufferSourceNode | null = null
   private time: () => number = () => 0
   private enabled = true
   private target = 0
@@ -106,7 +107,25 @@ export class CrayonAudio implements StageAudio {
     this.ctx = ctx
     this.out = out
     this.gain = gain
+    this.loop = src
     this.time = time
+  }
+
+  /**
+   * Stop the scratch loop and let go of the context. The shared playback context outlives every
+   * screen, so a screen that is done with its CrayonAudio must dispose it or its loop runs on.
+   */
+  dispose(): void {
+    try {
+      this.loop?.stop()
+    } catch {
+      // never started
+    }
+    this.gain?.disconnect()
+    this.loop = null
+    this.gain = null
+    this.out = null
+    this.ctx = null
   }
 
   setEnabled(on: boolean): void {
