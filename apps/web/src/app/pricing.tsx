@@ -6,7 +6,7 @@ import { PackCards, Section } from './site-parts'
 const MINI_FAQ: { q: string; a: string }[] = [
   {
     q: 'Do minutes expire?',
-    a: 'Never. A pack you buy is yours until it is used, even across a new iPad.',
+    a: 'Never. A pack you buy is yours until it is used, even across a new iPhone or iPad.',
   },
   {
     q: 'What counts as a minute?',

@@ -32,7 +32,7 @@ export function HomePage() {
             Tell a story, watch it draw
           </Scrawl>
           <p className="mt-5 font-hand text-2xl text-ink">
-            The iPad listens while your child tells a story, and a crayon draws every word as they
+            The iPhone or iPad listens while your child tells a story, and a crayon draws every word as they
             say it. Say “The End” and send the picture book to grandma.
           </p>
           <div className="mt-7 flex flex-wrap gap-4">
@@ -142,7 +142,7 @@ export function HomePage() {
               Coming to the App Store
             </span>
           )}
-          <p className="font-hand text-lg text-ink-soft">Works on iPad</p>
+          <p className="font-hand text-lg text-ink-soft">Works on iPhone and iPad</p>
         </div>
       </Section>
     </>

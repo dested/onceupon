@@ -22,8 +22,8 @@ export const BRAND = {
   bundleId: 'com.quickgame.squiggletale',
   /** Deep-link scheme of the native shell. */
   scheme: 'squiggletale',
-  /** Filled in once the App Store listing exists. */
-  appStoreUrl: '',
+  /** The App Store listing (app 6815029998); 404s until 1.0 is live. */
+  appStoreUrl: 'https://apps.apple.com/app/id6815029998',
   /** The end card of every exported video and the share page footer. */
   madeWith: 'Made with Squiggletale',
 } as const

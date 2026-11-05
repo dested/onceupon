@@ -45,10 +45,10 @@ export function RedeemPage() {
         <Section>
           <PaperCard tilt={-1} className="mx-auto max-w-xl text-center">
             <Scrawl as="h1" className="text-4xl text-ink">
-              {minutes} minutes added to the family iPad
+              {minutes} minutes added to the app
             </Scrawl>
             <p className="mt-4 font-hand text-xl text-ink">
-              Open the app on the iPad and the new minutes are ready under Grown-ups.
+              Open the app and the new minutes are ready under Grown-ups.
             </p>
           </PaperCard>
         </Section>

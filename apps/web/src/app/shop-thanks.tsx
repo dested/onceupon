@@ -44,7 +44,7 @@ export function ShopThanksPage() {
                 Minutes added
               </Scrawl>
               <p className="mt-4 font-hand text-xl text-ink">
-                Open {BRAND.name} on the iPad. The new minutes are waiting under Grown-ups.
+                Open {BRAND.name}. The new minutes are waiting under Grown-ups.
               </p>
               <div className="mt-6 flex justify-center">
                 <StickerLink to="/" tone="yellow" tilt={-1}>
@@ -58,7 +58,7 @@ export function ShopThanksPage() {
                 Almost there
               </Scrawl>
               <p className="mt-4 font-hand text-xl text-ink">
-                The minutes will show up on the iPad shortly. If they don’t, write to us at{' '}
+                The minutes will show up in the app shortly. If they don’t, write to us at{' '}
                 <a href={`mailto:${BRAND.supportEmail}`} className="text-purple underline">
                   {BRAND.supportEmail}
                 </a>{' '}

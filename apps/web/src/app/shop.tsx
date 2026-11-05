@@ -87,7 +87,7 @@ export function ShopPage() {
               {checkout.isPending ? 'Opening checkout…' : 'Checkout with Stripe'}
             </StickerButton>
             <p className="font-hand text-lg text-ink-soft">
-              Minutes land on the iPad within a minute of paying.
+              Minutes land in the app within a minute of paying.
             </p>
           </form>
         </PaperCard>

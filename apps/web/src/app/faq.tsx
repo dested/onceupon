@@ -5,7 +5,7 @@ import { Section } from './site-parts'
 const FAQ: { q: string; a: string }[] = [
   {
     q: `What is ${BRAND.name}?`,
-    a: 'An iPad app where your child tells a story out loud and a crayon draws it on the screen as they talk. When they say “The End”, the story is saved as a little picture book you can replay, download or share.',
+    a: 'An iPhone and iPad app where your child tells a story out loud and a crayon draws it on the screen as they talk. When they say “The End”, the story is saved as a little picture book you can replay, download or share.',
   },
   {
     q: 'What ages is it for?',
@@ -21,7 +21,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'Do the minutes expire?',
-    a: 'No. Minutes you buy are yours until they are used, and they carry across to a new iPad through Restore Purchases.',
+    a: 'No. Minutes you buy are yours until they are used, and they carry across to a new iPhone or iPad through Restore Purchases.',
   },
   {
     q: 'What counts as a minute?',
@@ -41,7 +41,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'What happens to my child’s voice?',
-    a: 'The audio streams to our transcription partner to turn speech into words in real time, and is not stored by us. The voice recording stays on the iPad unless a parent chooses to share a story with voice.',
+    a: 'Speech is turned into words on the device by Apple’s on-device speech recognition. The recording stays on the device with the story so it can play back, and leaves it only if a grown-up shares that story with voice.',
   },
 ]
 

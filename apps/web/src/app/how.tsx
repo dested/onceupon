@@ -7,7 +7,7 @@ const STEPS = [
   {
     n: 1,
     title: 'Tell your story',
-    body: 'Tap the crayon and start talking. “Once there was a dragon…” The iPad listens; there are no buttons to hunt for and nothing to read.',
+    body: 'Tap the crayon and start talking. “Once there was a dragon…” The app listens; there are no buttons to hunt for and nothing to read.',
     tilt: -1.5,
   },
   {
