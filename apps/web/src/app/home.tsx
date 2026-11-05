@@ -50,6 +50,18 @@ export function HomePage() {
         </div>
       </section>
 
+      {/* The hero ad (store/marketing/hero-1080p.mp4, re-encoded for the web) */}
+      <Section title="Watch a story come to life">
+        <video
+          className="aspect-video w-full rounded-[28px] border-[3px] border-ink bg-paper shadow-[6px_6px_0_rgba(68,52,38,0.25)]"
+          src="/media/squiggletale-hero.mp4"
+          poster="/media/squiggletale-hero.jpg"
+          controls
+          playsInline
+          preload="metadata"
+        />
+      </Section>
+
       {/* How it works strip */}
       <Section title="How it works">
         <div className="grid gap-6 sm:grid-cols-3">
