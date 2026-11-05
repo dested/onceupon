@@ -1,0 +1,189 @@
+{
+  "voice": {
+    "name": "Teddy",
+    "id": "XjGYkUkzth8BPs29fmcV",
+    "model": "eleven_v4"
+  },
+  "theme": "bedtime",
+  "title": "The sleepy owl",
+  "lines": [
+    {
+      "text": "Once upon a time a sleepy owl lived in a tree.",
+      "file": "bedtime-1.mp3",
+      "dur": 4,
+      "words": [
+        {
+          "w": "Once",
+          "start": 0,
+          "end": 0.32
+        },
+        {
+          "w": "upon",
+          "start": 0.48,
+          "end": 0.64
+        },
+        {
+          "w": "a",
+          "start": 0.68,
+          "end": 0.72
+        },
+        {
+          "w": "time",
+          "start": 0.8,
+          "end": 1.28
+        },
+        {
+          "w": "a",
+          "start": 1.44,
+          "end": 1.52
+        },
+        {
+          "w": "sleepy",
+          "start": 1.68,
+          "end": 2.08
+        },
+        {
+          "w": "owl",
+          "start": 2.24,
+          "end": 2.64
+        },
+        {
+          "w": "lived",
+          "start": 2.72,
+          "end": 3.04
+        },
+        {
+          "w": "in",
+          "start": 3.08,
+          "end": 3.12
+        },
+        {
+          "w": "a",
+          "start": 3.2,
+          "end": 3.28
+        },
+        {
+          "w": "tree.",
+          "start": 3.36,
+          "end": 4
+        }
+      ]
+    },
+    {
+      "text": "At night the moon came out and the stars were twinkling.",
+      "file": "bedtime-2.mp3",
+      "dur": 4,
+      "words": [
+        {
+          "w": "At",
+          "start": 0,
+          "end": 0.16
+        },
+        {
+          "w": "night",
+          "start": 0.24,
+          "end": 0.64
+        },
+        {
+          "w": "the",
+          "start": 0.88,
+          "end": 0.96
+        },
+        {
+          "w": "moon",
+          "start": 1.04,
+          "end": 1.28
+        },
+        {
+          "w": "came",
+          "start": 1.36,
+          "end": 1.6
+        },
+        {
+          "w": "out",
+          "start": 1.68,
+          "end": 1.92
+        },
+        {
+          "w": "and",
+          "start": 2,
+          "end": 2.08
+        },
+        {
+          "w": "the",
+          "start": 2.16,
+          "end": 2.24
+        },
+        {
+          "w": "stars",
+          "start": 2.32,
+          "end": 2.8
+        },
+        {
+          "w": "were",
+          "start": 2.92,
+          "end": 3.04
+        },
+        {
+          "w": "twinkling.",
+          "start": 3.12,
+          "end": 4
+        }
+      ]
+    },
+    {
+      "text": "Then the owl went to sleep.",
+      "file": "bedtime-3.mp3",
+      "dur": 2.08,
+      "words": [
+        {
+          "w": "Then",
+          "start": 0,
+          "end": 0.32
+        },
+        {
+          "w": "the",
+          "start": 0.4,
+          "end": 0.56
+        },
+        {
+          "w": "owl",
+          "start": 0.64,
+          "end": 0.96
+        },
+        {
+          "w": "went",
+          "start": 1.04,
+          "end": 1.2
+        },
+        {
+          "w": "to",
+          "start": 1.28,
+          "end": 1.36
+        },
+        {
+          "w": "sleep.",
+          "start": 1.44,
+          "end": 2.08
+        }
+      ]
+    },
+    {
+      "text": "The End!",
+      "file": "bedtime-4.mp3",
+      "dur": 1.28,
+      "words": [
+        {
+          "w": "The",
+          "start": 0,
+          "end": 0.32
+        },
+        {
+          "w": "End!",
+          "start": 0.56,
+          "end": 1.28
+        }
+      ]
+    }
+  ]
+}

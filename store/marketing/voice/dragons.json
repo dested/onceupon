@@ -1,0 +1,162 @@
+{
+  "voice": {
+    "name": "Teddy",
+    "id": "XjGYkUkzth8BPs29fmcV",
+    "model": "eleven_v4"
+  },
+  "theme": "dragons",
+  "title": "The purple dragon",
+  "lines": [
+    {
+      "text": "Once upon a time a purple dragon lived in a big castle.",
+      "file": "dragons-1.mp3",
+      "dur": 4.72,
+      "words": [
+        {
+          "w": "Once",
+          "start": 0,
+          "end": 0.32
+        },
+        {
+          "w": "upon",
+          "start": 0.48,
+          "end": 0.64
+        },
+        {
+          "w": "a",
+          "start": 0.68,
+          "end": 0.72
+        },
+        {
+          "w": "time",
+          "start": 0.8,
+          "end": 1.2
+        },
+        {
+          "w": "a",
+          "start": 1.52,
+          "end": 1.68
+        },
+        {
+          "w": "purple",
+          "start": 1.76,
+          "end": 2.08
+        },
+        {
+          "w": "dragon",
+          "start": 2.16,
+          "end": 2.64
+        },
+        {
+          "w": "lived",
+          "start": 2.72,
+          "end": 2.96
+        },
+        {
+          "w": "in",
+          "start": 3.04,
+          "end": 3.12
+        },
+        {
+          "w": "a",
+          "start": 3.24,
+          "end": 3.36
+        },
+        {
+          "w": "big",
+          "start": 3.44,
+          "end": 3.76
+        },
+        {
+          "w": "castle.",
+          "start": 3.84,
+          "end": 4.72
+        }
+      ]
+    },
+    {
+      "text": "One day he flew up into the sky and found a rainbow.",
+      "file": "dragons-2.mp3",
+      "dur": 4,
+      "words": [
+        {
+          "w": "One",
+          "start": 0,
+          "end": 0.24
+        },
+        {
+          "w": "day",
+          "start": 0.32,
+          "end": 0.56
+        },
+        {
+          "w": "he",
+          "start": 0.8,
+          "end": 0.96
+        },
+        {
+          "w": "flew",
+          "start": 1.04,
+          "end": 1.28
+        },
+        {
+          "w": "up",
+          "start": 1.36,
+          "end": 1.44
+        },
+        {
+          "w": "into",
+          "start": 1.56,
+          "end": 1.68
+        },
+        {
+          "w": "the",
+          "start": 1.72,
+          "end": 1.76
+        },
+        {
+          "w": "sky",
+          "start": 1.84,
+          "end": 2.32
+        },
+        {
+          "w": "and",
+          "start": 2.4,
+          "end": 2.56
+        },
+        {
+          "w": "found",
+          "start": 2.64,
+          "end": 2.88
+        },
+        {
+          "w": "a",
+          "start": 2.96,
+          "end": 3.04
+        },
+        {
+          "w": "rainbow.",
+          "start": 3.2,
+          "end": 4
+        }
+      ]
+    },
+    {
+      "text": "The End!",
+      "file": "dragons-3.mp3",
+      "dur": 1.36,
+      "words": [
+        {
+          "w": "The",
+          "start": 0,
+          "end": 0.4
+        },
+        {
+          "w": "End!",
+          "start": 0.64,
+          "end": 1.36
+        }
+      ]
+    }
+  ]
+}

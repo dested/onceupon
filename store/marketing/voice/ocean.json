@@ -1,0 +1,167 @@
+{
+  "voice": {
+    "name": "Teddy",
+    "id": "XjGYkUkzth8BPs29fmcV",
+    "model": "eleven_v4"
+  },
+  "theme": "ocean",
+  "title": "The little turtle",
+  "lines": [
+    {
+      "text": "Once upon a time a little green turtle lived in the sea.",
+      "file": "ocean-1.mp3",
+      "dur": 4.16,
+      "words": [
+        {
+          "w": "Once",
+          "start": 0,
+          "end": 0.32
+        },
+        {
+          "w": "upon",
+          "start": 0.48,
+          "end": 0.64
+        },
+        {
+          "w": "a",
+          "start": 0.68,
+          "end": 0.72
+        },
+        {
+          "w": "time",
+          "start": 0.8,
+          "end": 1.2
+        },
+        {
+          "w": "a",
+          "start": 1.52,
+          "end": 1.68
+        },
+        {
+          "w": "little",
+          "start": 1.76,
+          "end": 2
+        },
+        {
+          "w": "green",
+          "start": 2.08,
+          "end": 2.32
+        },
+        {
+          "w": "turtle",
+          "start": 2.48,
+          "end": 2.88
+        },
+        {
+          "w": "lived",
+          "start": 2.96,
+          "end": 3.2
+        },
+        {
+          "w": "in",
+          "start": 3.28,
+          "end": 3.36
+        },
+        {
+          "w": "the",
+          "start": 3.4,
+          "end": 3.44
+        },
+        {
+          "w": "sea.",
+          "start": 3.6,
+          "end": 4.16
+        }
+      ]
+    },
+    {
+      "text": "She swam with a happy pink fish and they found a treasure chest.",
+      "file": "ocean-2.mp3",
+      "dur": 4.32,
+      "words": [
+        {
+          "w": "She",
+          "start": 0,
+          "end": 0.16
+        },
+        {
+          "w": "swam",
+          "start": 0.24,
+          "end": 0.56
+        },
+        {
+          "w": "with",
+          "start": 0.64,
+          "end": 0.72
+        },
+        {
+          "w": "a",
+          "start": 0.76,
+          "end": 0.8
+        },
+        {
+          "w": "happy",
+          "start": 0.96,
+          "end": 1.28
+        },
+        {
+          "w": "pink",
+          "start": 1.36,
+          "end": 1.6
+        },
+        {
+          "w": "fish",
+          "start": 1.76,
+          "end": 2.08
+        },
+        {
+          "w": "and",
+          "start": 2.4,
+          "end": 2.48
+        },
+        {
+          "w": "they",
+          "start": 2.56,
+          "end": 2.72
+        },
+        {
+          "w": "found",
+          "start": 2.84,
+          "end": 2.96
+        },
+        {
+          "w": "a",
+          "start": 3.04,
+          "end": 3.12
+        },
+        {
+          "w": "treasure",
+          "start": 3.2,
+          "end": 3.52
+        },
+        {
+          "w": "chest.",
+          "start": 3.6,
+          "end": 4.32
+        }
+      ]
+    },
+    {
+      "text": "The End!",
+      "file": "ocean-3.mp3",
+      "dur": 1.28,
+      "words": [
+        {
+          "w": "The",
+          "start": 0,
+          "end": 0.32
+        },
+        {
+          "w": "End!",
+          "start": 0.56,
+          "end": 1.28
+        }
+      ]
+    }
+  ]
+}

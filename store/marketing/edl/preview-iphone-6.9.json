@@ -1,0 +1,66 @@
+{
+  "out": "store/marketing/preview-iphone-6.9.mp4",
+  "work": "/w/junk/onceupon-f/assets/edit-iphone",
+  "size": [
+    886,
+    1920
+  ],
+  "xfade": 0.15,
+  "statusbar": "store/screenshots/iphone-6.9/01-story-drawing.png",
+  "statusbarCrop": 186,
+  "segments": [
+    {
+      "take": "/w/junk/onceupon-f/assets/e-dragons",
+      "from": 1.0,
+      "to": 19.6,
+      "audio": [
+        {
+          "src": "voice"
+        },
+        {
+          "src": "ctx",
+          "gainDb": 2
+        }
+      ]
+    },
+    {
+      "take": "/w/junk/onceupon-f/assets/e-dragons",
+      "from": 27.5,
+      "to": 35.0,
+      "audio": [
+        {
+          "src": "media"
+        }
+      ]
+    },
+    {
+      "take": "/w/junk/onceupon-f/assets/shelf2",
+      "from": 0.8,
+      "to": 4.4,
+      "audio": []
+    }
+  ],
+  "overlays": [
+    {
+      "text": "Tell a story aloud",
+      "at": 0.6,
+      "to": 6.6,
+      "y": 520,
+      "tilt": -2
+    },
+    {
+      "text": "The crayon draws it",
+      "at": 7.6,
+      "to": 13.6,
+      "y": 520,
+      "tilt": 2
+    },
+    {
+      "text": "Watch it again",
+      "at": 18.6,
+      "to": 25.6,
+      "y": 530,
+      "tilt": -2
+    }
+  ]
+}
