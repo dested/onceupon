@@ -23,7 +23,7 @@ type Candidate = keyof typeof CANDIDATES
 const CANDIDATE_NAMES: readonly Candidate[] = ['veda', 'emma', 'nathaniel']
 
 /** The narrator for the shipped mp3s; set from Sal's pick. */
-const NARRATOR: Candidate = 'veda'
+const NARRATOR: Candidate = 'emma'
 
 const COACH_LINES: readonly string[] = [
   "Tell your story out loud, like you're telling a friend.",

@@ -204,3 +204,23 @@ A device that has never had the weekly top-up counts from its registration (`app
 When the on-device engine the shell picked fails to start or breaks (not a permission, interruption or model problem), the studio drops it for the story and asks for the next engine the shell offered, by name. Only when every offered engine has failed does the child see "The crayon can't hear you yet".
 **Why:** the simulator offers sfspeech, which fails at once ("Failed to initialize recognizer"), and the studio had no way back since the Grown-ups ears picker was removed; a real device could hit the same with a broken engine.
 
+## 2026-11-04 — 1.0 ads: Apple Ads to parents, no attribution code
+
+Sal: "probably parents right idk? you tell me". Paid ads go to parents through Apple Ads (Search Ads), which counts installs in its own dashboard with no code in the app. The studio no longer sends the AdServices token at launch and the server flag `attributionOn` defaults to false; the `apple-attribution` module stays linked but unused.
+**Why:** Kids Category app and a first submission (app-review: nothing clever around money or data in 1.0); a token sent to our server would need a privacy-policy line and an App Privacy label. Turn it on in 1.1 with both.
+**Rejected:** third-party ad networks or SDKs (1.3), ATT.
+
+## 2026-11-04 — Whistle stays out of the 1.0 binary
+
+`apps/mobile/package.json` excludes `whistle-ears` from autolinking, so 1.0 ships Apple's on-device ears only (SpeechAnalyzer, then SFSpeechRecognizer). The studio's engine fallback still covers Whistle in a later build.
+**Why:** the settled rule (no Whistle without a bake-off win over SpeechAnalyzer; there is none, SpeechAnalyzer doesn't run on the simulator) and its needle engine has telemetry, which a Kids app can't carry.
+
+## 2026-11-04 — Kids Category age band 6–8; narrator Emma
+
+The App Store listing uses the Kids 6–8 band (children who tell a story in several sentences; the speech engines are steadier on them). The coach and intro voice is ElevenLabs Emma on eleven_v4 (Sal: "emma").
+
+## 2026-11-04 — The meter starts when the child is first heard
+
+Amends "Minutes are talking time": opening the mic no longer starts the meter. It counts from the first words, interim words or voice-level sound, and stops 8 s after the last.
+**Why:** sim-verify measured about 9 s charged per mic tap before any speech.
+

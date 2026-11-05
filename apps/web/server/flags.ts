@@ -19,7 +19,8 @@ export const FLAG_DEFAULTS = {
   relayPaused: false,
   readOnly: false,
   shareLifetimeDays: 90,
-  attributionOn: true,
+  /** Off for 1.0: the app sends no AdServices token (decisions.md 2026-11-04). */
+  attributionOn: false,
   dailyDeviceCostCapCents: 300,
   dailySpendAlertCents: 10000,
   /** Above today's (UTC) model spend the relay refuses non-paying, non-comped devices (503 paused). 0 = off. */

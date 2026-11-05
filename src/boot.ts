@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { bridgeCall, installBridge, onBridgeEvent } from '~/backend/bridge'
 import { HOSTED, NATIVE } from '~/backend/config'
-import { initDevice, sendAttributionOnce } from '~/backend/device'
+import { initDevice } from '~/backend/device'
 import { loadConsent } from '~/backend/consent'
 import { initStorage } from '~/story/storage'
 import { appStore } from '~/story/store'
@@ -47,7 +47,7 @@ export async function boot(): Promise<void> {
   if (NATIVE) {
     requestAnimationFrame(() => {
       void bridgeCall('ready', {})
-      void sendAttributionOnce()
+      // Apple Ads attribution waits for 1.1 (decisions.md 2026-11-04: 1.0 sends no AdServices token).
     })
   }
 }

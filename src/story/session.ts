@@ -235,6 +235,8 @@ export class LiveSession {
   private lastWordsAt = performance.now()
   /** When the interim transcript last changed (the child is mid-sentence); keeps the meter counting. */
   private lastHeardAt = 0
+  /** When the child's words last arrived (not reset when the ears come up): the meter counts from here, not from the mic tap. */
+  private lastSpokeAt = 0
   private lastInterim = ''
   private nudged = false
   private endReason: EndReason = 'the-end'
@@ -434,6 +436,7 @@ export class LiveSession {
     const { before, ended } = splitTheEnd(cleanText(raw))
     if (before) {
       this.lastWordsAt = performance.now()
+      this.lastSpokeAt = this.lastWordsAt
       this.record({ k: 'words', t: this.now(), text: before })
       appStore.set((s) => ({
         transcriptFinal: s.transcriptFinal ? `${s.transcriptFinal} ${before}` : before,
@@ -605,7 +608,8 @@ export class LiveSession {
         this.appleRestarting = false
         this.clearReadyTimers()
         if (this.wantListening) appStore.set({ listening: true, micStarting: false, micProblem: null })
-        this.meter?.setListening(true)
+        // Minutes are talking time: the meter starts when the child is first heard (tick), not at the tap.
+        this.meter?.setListening(false)
         if (this.appleRec) this.voice.startExternal(this.appleRec, this.now())
         else {
           const stream = currentMicStream()
@@ -1035,7 +1039,7 @@ export class LiveSession {
       this.lastInterim = interim
       if (interim) this.lastHeardAt = now
     }
-    const heard = Math.max(this.lastWordsAt, this.lastHeardAt, this.lastLoudAt)
+    const heard = Math.max(this.lastSpokeAt, this.lastHeardAt, this.lastLoudAt)
     this.meter?.setListening(now - heard < METER_QUIET_MS)
     if (!this.nudged && silent > nudgeMs) {
       this.nudged = true
