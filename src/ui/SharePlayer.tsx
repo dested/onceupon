@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw } from 'lucide-react'
 import { z } from 'zod'
 import { API_ORIGIN } from '~/backend/config'
+import { CrayonAudio } from '~/engine/audio'
 import { Scene } from '~/engine/scene'
 import { Stage } from '~/engine/stage'
 import { Director } from '~/llm/director'
@@ -9,7 +10,7 @@ import { isDialectId, makeDialect } from '~/llm/dialect'
 import { Replayer } from '~/story/replay'
 import { parseStoryRecord, type StoryRecord } from '~/story/storage'
 import tutorialRecord from '~/tutorial/tutorial-record.json'
-import { VoicePlayer } from '~/story/voice'
+import { primeAudio, VoicePlayer } from '~/story/voice'
 import { BRAND } from '../../packages/shared/src/brand'
 import { IconButton, PaperCard, StickerButton } from './bits'
 import { VideoExportButton } from './VideoExport'
@@ -32,12 +33,29 @@ interface Ready {
   childName: string | null
   record: StoryRecord
   hasVoice: boolean
-  voiceUrl: string | null
+  /** A blob: URL of the whole voice track (see loadVoice), or null without voice. */
+  voiceSrc: string | null
   voiceMime: string | null
   totalMs: number
 }
 
 type LoadState = { k: 'loading' } | { k: 'gone' } | { k: 'ready'; data: Ready }
+
+/**
+ * Fetch the share's voice into a blob: URL before Play shows. The voice route answers without byte
+ * ranges, so an <audio> pointed at it can't seek (pause/resume and every resync snapped the voice back
+ * to 0), and iOS Safari wants ranges for media at all; a blob is always seekable. Null on failure: the
+ * story still plays, silent but for the crayon.
+ */
+async function loadVoice(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    return URL.createObjectURL(await res.blob())
+  } catch {
+    return null
+  }
+}
 
 function voiceTotalMs(record: StoryRecord): number {
   return record.voice ? record.voice.clips.reduce((m, c) => Math.max(m, c.t + c.ms), 0) : 0
@@ -48,6 +66,10 @@ function useRecordPlayer(record: StoryRecord | null, voice: VoicePlayer | null) 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<{ stage: Stage; director: Director } | null>(null)
   const replayerRef = useRef<Replayer | null>(null)
+  // The crayon scratch and page flips, as in the app. Silent until a tap unlocks the playback context.
+  const audioRef = useRef<CrayonAudio | null>(null)
+  audioRef.current ??= new CrayonAudio()
+  const audio = audioRef.current
   const [playing, setPlaying] = useState(false)
   const [caption, setCaption] = useState('')
   const [pos, setPos] = useState(0)
@@ -71,7 +93,7 @@ function useRecordPlayer(record: StoryRecord | null, voice: VoicePlayer | null) 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !record) return
-    const stage = new Stage(canvas, { seed: record.seed, audio: null })
+    const stage = new Stage(canvas, { seed: record.seed, audio })
     const director = newDirector(stage)
     stage.start()
     engineRef.current = { stage, director }
@@ -85,8 +107,18 @@ function useRecordPlayer(record: StoryRecord | null, voice: VoicePlayer | null) 
       voice?.dispose()
       engineRef.current = null
     }
-    // A new record or voice rebuilds the whole player; newDirector is stable enough for that.
+    // A new record or voice rebuilds the whole player; newDirector and audio are stable enough for that.
   }, [record, voice])
+
+  /**
+   * Call synchronously inside the tap that starts or resumes playback: iOS Safari only lets sound start
+   * from a tap. primeAudio unlocks the shared playback context (and asks for the playback audio
+   * session so the silent switch can't mute it); start() hangs the crayon scratch on it.
+   */
+  const unlockSound = (): void => {
+    primeAudio()
+    void audio.start()
+  }
 
   const makeReplayer = (eng: { stage: Stage; director: Director }): Replayer => {
     if (!record) throw new Error('no record')
@@ -106,6 +138,7 @@ function useRecordPlayer(record: StoryRecord | null, voice: VoicePlayer | null) 
   const play = (): void => {
     const eng = engineRef.current
     if (!eng || !record) return
+    unlockSound()
     replayerRef.current?.stop()
     const r = makeReplayer(eng)
     replayerRef.current = r
@@ -121,6 +154,7 @@ function useRecordPlayer(record: StoryRecord | null, voice: VoicePlayer | null) 
       again()
       return
     }
+    unlockSound()
     setPlaying(true)
     r.play()
   }
@@ -134,6 +168,7 @@ function useRecordPlayer(record: StoryRecord | null, voice: VoicePlayer | null) 
   const again = (): void => {
     const eng = engineRef.current
     if (!eng || !record) return
+    unlockSound()
     replayerRef.current?.stop()
     eng.director.stop()
     eng.stage.clear()
@@ -166,7 +201,7 @@ export function SharePlayer({ shareId }: { shareId: string }) {
         record
           ? {
               k: 'ready',
-              data: { childName: null, record, hasVoice: false, voiceUrl: null, voiceMime: null, totalMs: 0 },
+              data: { childName: null, record, hasVoice: false, voiceSrc: null, voiceMime: null, totalMs: 0 },
             }
           : { k: 'gone' }
       )
@@ -177,11 +212,17 @@ export function SharePlayer({ shareId }: { shareId: string }) {
         if (!res.ok) throw new Error(`share ${res.status}`)
         return publicShareSchema.parse(await res.json())
       })
-      .then((share) => {
+      .then(async (share) => {
         if (cancelled) return
         const record = parseStoryRecord(share.record)
         if (!record) {
           setState({ k: 'gone' })
+          return
+        }
+        const voiceSrc =
+          share.hasVoice && share.voiceUrl ? await loadVoice(API_ORIGIN + share.voiceUrl) : null
+        if (cancelled) {
+          if (voiceSrc) URL.revokeObjectURL(voiceSrc)
           return
         }
         setState({
@@ -189,8 +230,8 @@ export function SharePlayer({ shareId }: { shareId: string }) {
           data: {
             childName: share.childName,
             record,
-            hasVoice: share.hasVoice,
-            voiceUrl: share.voiceUrl,
+            hasVoice: voiceSrc !== null,
+            voiceSrc,
             voiceMime: share.voiceMime,
             totalMs: voiceTotalMs(record),
           },
@@ -208,8 +249,9 @@ export function SharePlayer({ shareId }: { shareId: string }) {
   const record = ready?.record ?? null
 
   const voice = useMemo(() => {
-    if (!ready || !ready.hasVoice || !ready.voiceUrl || !ready.voiceMime) return null
-    return VoicePlayer.fromUrl(API_ORIGIN + ready.voiceUrl, ready.voiceMime, ready.totalMs)
+    if (!ready || !ready.hasVoice || !ready.voiceSrc || !ready.voiceMime) return null
+    // dispose() revokes the blob URL with the player.
+    return VoicePlayer.fromUrl(ready.voiceSrc, ready.voiceMime, ready.totalMs)
   }, [ready])
 
   const player = useRecordPlayer(record, voice)
