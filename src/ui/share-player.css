@@ -1,0 +1,85 @@
+/*
+ * The public share player (SharePlayer.tsx). Only the player uses these rules.
+ *
+ * Embed mode (`?embed=1`, inside the website's iframe) switches on the shape of its own frame:
+ * - a 16:10 frame (the landing hero, the share page on wide screens): the picture fills it, the
+ *   subtitles float over the drawing and the controls sit in its corner;
+ * - a taller frame (the share page on a portrait phone, see StudioFrame `bareOnPhone`): the picture
+ *   spans the width at 16:10 and the subtitles, then "Watch it again", go on a line under it, on the
+ *   website's own tabletop (the frame is transparent).
+ */
+
+.share-embed {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  background: var(--color-paper);
+}
+
+.share-play {
+  font-size: 24px;
+  padding: 16px 28px;
+}
+
+.share-under {
+  display: none;
+}
+
+@media (max-aspect-ratio: 7 / 5) {
+  html:has(.share-embed),
+  html:has(.share-embed) body,
+  html:has(.share-embed) #app {
+    background: transparent;
+  }
+
+  .share-embed {
+    flex-direction: column;
+    background: transparent;
+  }
+
+  .share-embed > .story-paper {
+    flex: none;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    box-shadow:
+      inset 8px 0 10px #694d2c0b,
+      0 4px 0 #d9ccba;
+  }
+
+  .share-embed .share-caption-over,
+  .share-embed .share-again-over {
+    display: none;
+  }
+
+  .share-under {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 14px 2px 0;
+  }
+
+  .share-under-caption {
+    margin: 0;
+    font-family: var(--font-hand);
+    font-size: 21px;
+    line-height: 1.22;
+    text-align: center;
+    color: var(--color-ink);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+
+  .share-embed .share-play {
+    font-size: 30px;
+    padding: 18px 36px;
+  }
+  .share-embed .share-play svg {
+    width: 34px;
+    height: 34px;
+  }
+}

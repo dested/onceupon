@@ -13,6 +13,7 @@ import { VoicePlayer } from '~/story/voice'
 import { BRAND } from '../../packages/shared/src/brand'
 import { IconButton, PaperCard, StickerButton } from './bits'
 import { VideoExportButton } from './VideoExport'
+import './share-player.css'
 
 const publicShareSchema = z.object({
   id: z.string(),
@@ -261,16 +262,18 @@ export function SharePlayer({ shareId }: { shareId: string }) {
   // The website draws its own storybook around the iframe: embed mode is just the paper and the controls.
   const embed = new URLSearchParams(window.location.search).get('embed') === '1'
 
+  const caption = started ? player.caption : ''
+
   const paper = (
     <div className="story-paper">
       <canvas ref={player.canvasRef} className="story-canvas" data-testid="share-stage" />
 
-      {started && player.caption && (
-        <div className="pointer-events-none absolute top-6 right-0 left-0 flex flex-col items-center gap-2 px-6">
+      {caption && (
+        <div className="share-caption-over pointer-events-none absolute top-6 right-0 left-0 flex flex-col items-center gap-2 px-6">
           <p
-            key={player.caption}
+            key={caption}
             className="max-w-2xl rounded-2xl bg-paper/90 px-5 py-2 text-center font-scrawl text-2xl leading-snug text-ink shadow-[3px_4px_0_0_rgba(59,47,47,0.25)]">
-            {player.caption}
+            {caption}
           </p>
         </div>
       )}
@@ -280,7 +283,7 @@ export function SharePlayer({ shareId }: { shareId: string }) {
           <StickerButton
             tone="yellow"
             tilt={-2}
-            className="!px-7 !py-4 !text-2xl"
+            className="share-play"
             onClick={onFirstPlay}
             data-testid="share-play">
             <Play size={28} strokeWidth={3} fill="currentColor" /> Play
@@ -291,9 +294,11 @@ export function SharePlayer({ shareId }: { shareId: string }) {
       {embed && started && (
         <div className="absolute right-4 bottom-4">
           {atEnd ? (
-            <StickerButton tone="yellow" tilt={0} className="!text-lg" onClick={player.again}>
-              <RotateCcw size={18} strokeWidth={3} /> again
-            </StickerButton>
+            <div className="share-again-over">
+              <StickerButton tone="yellow" tilt={0} className="!text-lg" onClick={player.again}>
+                <RotateCcw size={18} strokeWidth={3} /> again
+              </StickerButton>
+            </div>
           ) : (
             <IconButton
               label={player.playing ? 'Pause' : 'Play'}
@@ -309,8 +314,20 @@ export function SharePlayer({ shareId }: { shareId: string }) {
 
   if (embed)
     return (
-      <div className="flex h-full w-full bg-paper" data-testid="share-player-embed">
+      <div className="share-embed" data-testid="share-player-embed">
         {paper}
+        {/* Shown only when the frame is taller than the picture (a portrait phone): share-player.css. */}
+        <div className="share-under" aria-live="polite">
+          {started && atEnd ? (
+            <StickerButton tone="yellow" tilt={-1} onClick={player.again} data-testid="share-again">
+              <RotateCcw size={22} strokeWidth={3} /> Watch it again
+            </StickerButton>
+          ) : caption ? (
+            <p key={caption} className="share-under-caption">
+              {caption}
+            </p>
+          ) : null}
+        </div>
       </div>
     )
 

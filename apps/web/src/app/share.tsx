@@ -79,14 +79,19 @@ export function SharePage() {
         description="Told out loud and drawn by a crayon"
         image={meta.coverUrl ? `${BRAND.origin}${meta.coverUrl}` : undefined}
       />
-      <Section className="py-8">
-        <Scrawl as="h1" className="mb-6 text-center text-4xl text-ink md:text-5xl">
+      {/* Phones and short landscape screens: a 28 px heading and tight padding, so heading, picture and
+          play are on the first screen. */}
+      <Section className="py-3 [@media(min-width:40rem)_and_(min-height:33rem)]:py-8">
+        <Scrawl
+          as="h1"
+          className="mb-3 line-clamp-2 text-center text-[28px] leading-tight text-ink [@media(min-width:40rem)_and_(min-height:33rem)]:mb-6 [@media(min-width:40rem)_and_(min-height:33rem)]:text-4xl [@media(min-width:48rem)_and_(min-height:33rem)]:text-5xl">
           {heading}
         </Scrawl>
-        <div className="mx-auto max-w-4xl">
-          <StudioFrame src={`/app/?player=${id}&embed=1`} title={heading} />
+        {/* Phones: 16 px gutters (the layout pads 24). Short landscape screens: the whole book fits the height. */}
+        <div className="-mx-2 sm:mx-auto sm:max-w-[min(56rem,calc((100svh-40px)*1.6))]">
+          <StudioFrame src={`/app/?player=${id}&embed=1`} title={heading} bareOnPhone />
         </div>
-        <div className="mx-auto mt-8 flex max-w-4xl flex-col items-center gap-3 text-center">
+        <div className="mx-auto mt-1 flex max-w-4xl flex-col items-center gap-3 text-center sm:mt-8">
           <p className="font-hand text-xl text-ink">
             Made with {BRAND.name}. Your kid’s turn:
           </p>

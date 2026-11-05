@@ -55,11 +55,19 @@ export function StudioFrame({
   src,
   title,
   className = '',
+  bareOnPhone = false,
 }: {
   src: string
   title: string
   className?: string
+  /**
+   * Portrait phones (under `sm`) get no cover or spine: the picture spans the width, and the frame is
+   * taller than 16:10 so the player stacks its subtitles under the picture (it switches on its own
+   * frame's shape, root src/ui/share-player.css). The share page uses this; the landing hero does not.
+   */
+  bareOnPhone?: boolean
 }) {
+  if (bareOnPhone) return <BareOnPhoneFrame src={src} title={title} className={className} />
   return (
     <div
       className={className}
@@ -125,6 +133,47 @@ export function StudioFrame({
             border: 0,
             display: 'block',
           }}
+        />
+      </div>
+    </div>
+  )
+}
+
+/** StudioFrame with `bareOnPhone`: the same book from `sm` up (classes mirror the inline styles above). */
+function BareOnPhoneFrame({ src, title, className }: { src: string; title: string; className: string }) {
+  return (
+    <div
+      className={`@container relative flex sm:rounded-[17px_23px_23px_17px] sm:border-2 sm:border-[#876351] sm:bg-[#d9937e] sm:p-[7px_7px_9px_0] sm:shadow-[2px_5px_0_#c4b59e,3px_8px_0_#d9ccba] ${className}`}>
+      <div
+        aria-hidden
+        className="hidden w-[29px] flex-[0_0_29px] flex-col items-center justify-around py-[22px] sm:flex"
+        style={{
+          backgroundImage:
+            'repeating-linear-gradient(0deg, transparent 0 3px, #995c4312 3px 4px)',
+        }}>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <span
+            key={i}
+            style={{
+              width: 12,
+              height: 28,
+              borderLeft: '2px solid #f9dbbf',
+              borderRight: '2px solid #a66c55',
+              borderRadius: '50%',
+              transform: 'rotate(-7deg)',
+            }}
+          />
+        ))}
+      </div>
+      {/* Phone: the picture (62.5cqw tall at 16:10) plus a band for the subtitles under it. */}
+      <div className="relative h-[calc(62.5cqw+96px)] min-w-0 flex-1 overflow-hidden sm:aspect-[16/10] sm:h-auto sm:rounded-[7px_16px_15px_6px] sm:border sm:border-[#cbbb9f] sm:bg-[#fbf6ea] sm:shadow-[inset_8px_0_10px_#694d2c0b]">
+        <iframe
+          src={src}
+          title={title}
+          loading="lazy"
+          allow="autoplay"
+          sandbox="allow-scripts allow-same-origin"
+          className="absolute inset-0 block h-full w-full border-0 bg-transparent"
         />
       </div>
     </div>
