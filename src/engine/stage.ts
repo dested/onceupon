@@ -289,6 +289,9 @@ export class Stage {
   stop(): void {
     if (this.raf) cancelAnimationFrame(this.raf)
     this.raf = 0
+    // The frame loop sets the scratch loudness; stopped mid-stroke, it would hold the last level (the
+    // crayon kept scratching through replay and the shelf after "Play it again" during The End).
+    this.audio?.setIntensity(0)
   }
 
   private worldXform(): LayerXform {
