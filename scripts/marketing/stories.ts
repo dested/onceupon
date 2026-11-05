@@ -16,7 +16,7 @@ export const STORIES: MarketingStory[] = [
     theme: 'dragons',
     title: 'The purple dragon',
     lines: [
-      'Once upon a time a purple dragon lived in a big castle.',
+      'Once upon a time a purple dragon lived in a big castle on a hill.',
       'One day he flew up into the sky and found a rainbow.',
       'The End!',
     ],
@@ -27,7 +27,7 @@ export const STORIES: MarketingStory[] = [
     lines: [
       'Once upon a time a sleepy owl lived in a tree.',
       'At night the moon came out and the stars were twinkling.',
-      'Then the owl went to sleep.',
+      'The owl said goodnight and went to sleep.',
       'The End!',
     ],
   },

@@ -4,7 +4,7 @@ Every frame is the real studio (hosted mode, fake native shell, local API with a
 
 | File | Spec | Source |
 | --- | --- | --- |
-| `preview-iphone-6.9.mp4` | App Store app preview, iPhone 6.9": 886x1920 portrait, 29.4 s, H.264 High@4.0 30 fps ~11 Mbps CBR, AAC-LC 48 kHz stereo 256k target, -16 LUFS | dragons take `W:\junk\onceupon-f\assets\e-dragons` + shelf `W:\junk\onceupon-f\assets\shelf2`; cut by `edl/preview-iphone-6.9.json` |
+| `preview-iphone-6.9.mp4` | App Store app preview, iPhone 6.9": 886x1920 portrait, 29.7 s, H.264 High@4.0 30 fps ~11 Mbps CBR, AAC-LC 48 kHz stereo 256k target, -16 LUFS | dragons take `W:\junk\onceupon-f\assets\n-dragons` + shelf `W:\junk\onceupon-f\assets\n-shelf`; cut by `edl/preview-iphone-6.9.json` |
 | `preview-iphone-6.9-sheet.png` | 3x3 contact sheet of the preview | `scripts/marketing/edit.mjs` |
 | `stories.md` | the three theme stories, voice, takes | `scripts/marketing/stories.ts` |
 | `voice/<theme>-<n>.mp3`, `voice/<theme>.json` | kid voice lines (Teddy, eleven_v4) + word timings | `scripts/marketing/voice.ts` |
@@ -16,9 +16,9 @@ Apple's preview spec (checked 2026-11-04, App Store Connect help "App preview sp
 
 | Time | Scene | Overlay | Sound |
 | --- | --- | --- | --- |
-| 0–18.6 | live: mic tap, the child tells the dragon story, words appear, the crayon draws, "The End", closing card | "Tell a story aloud" 0.6–6.6, "The crayon draws it" 7.6–13.6 | child's voice, crayon scratch, page flip |
-| 18.5–26 | Replay "in their own voice": the dragon, castle and rainbow redraw | "Watch it again" | the replay playing the child's recording |
-| 25.8–29.4 | My stories shelf (owl, dragon, turtle) | none | none |
+| 0–18.9 | live: mic tap, the child tells the dragon story, words appear, the crayon draws, "The End", closing card | "Tell a story aloud" 0.6–7.4, "The crayon draws it" 8.3–14.3 | child's voice, crayon scratch, page flip |
+| 18.75–26.25 | Replay "in their own voice": the dragon, castle and rainbow redraw | "Watch it again" | the replay playing the child's recording |
+| 26.1–29.7 | My stories shelf (dragon, owl, turtle) | none | none |
 
 ## Pipeline (`scripts/marketing/`)
 

@@ -8,9 +8,9 @@
   "title": "The purple dragon",
   "lines": [
     {
-      "text": "Once upon a time a purple dragon lived in a big castle.",
+      "text": "Once upon a time a purple dragon lived in a big castle on a hill.",
       "file": "dragons-1.mp3",
-      "dur": 4.72,
+      "dur": 5.28,
       "words": [
         {
           "w": "Once",
@@ -68,9 +68,24 @@
           "end": 3.76
         },
         {
-          "w": "castle.",
+          "w": "castle",
           "start": 3.84,
-          "end": 4.72
+          "end": 4.32
+        },
+        {
+          "w": "on",
+          "start": 4.4,
+          "end": 4.48
+        },
+        {
+          "w": "a",
+          "start": 4.56,
+          "end": 4.6
+        },
+        {
+          "w": "hill.",
+          "start": 4.64,
+          "end": 5.28
         }
       ]
     },
@@ -91,42 +106,42 @@
         },
         {
           "w": "he",
-          "start": 0.8,
+          "start": 0.72,
           "end": 0.96
         },
         {
           "w": "flew",
-          "start": 1.04,
-          "end": 1.28
+          "start": 1,
+          "end": 1.2
         },
         {
           "w": "up",
-          "start": 1.36,
-          "end": 1.44
+          "start": 1.28,
+          "end": 1.36
         },
         {
           "w": "into",
-          "start": 1.56,
-          "end": 1.68
+          "start": 1.48,
+          "end": 1.6
         },
         {
           "w": "the",
-          "start": 1.72,
-          "end": 1.76
+          "start": 1.64,
+          "end": 1.68
         },
         {
           "w": "sky",
-          "start": 1.84,
-          "end": 2.32
+          "start": 1.76,
+          "end": 2.24
         },
         {
           "w": "and",
-          "start": 2.4,
-          "end": 2.56
+          "start": 2.48,
+          "end": 2.64
         },
         {
           "w": "found",
-          "start": 2.64,
+          "start": 2.76,
           "end": 2.88
         },
         {
@@ -136,7 +151,7 @@
         },
         {
           "w": "rainbow.",
-          "start": 3.2,
+          "start": 3.12,
           "end": 4
         }
       ]
@@ -149,11 +164,11 @@
         {
           "w": "The",
           "start": 0,
-          "end": 0.4
+          "end": 0.32
         },
         {
           "w": "End!",
-          "start": 0.64,
+          "start": 0.56,
           "end": 1.36
         }
       ]
