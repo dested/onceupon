@@ -7,7 +7,8 @@ import type { StoryEvent } from './storage'
  * the drawing. Story time keeps what the child said and what the crayon drew and squeezes the rest:
  * 1. Speech is found in the decoded voice (`findSpeech`).
  * 2. The drawing is pulled under the words that asked for it: the draw events after a `words` event
- *    start PULL_TO_MS after it, keeping their spacing and order.
+ *    start PULL_TO_MS after it (after its recognition, the end of the words), keeping spacing and order.
+ *    The words themselves (the caption) show when the child started saying them (`saidTimes`).
  * 3. Activity = speech ∪ [t, t + DRAW_ACTIVE_MS] per draw event ∪ [t, t + MARK_ACTIVE_MS] per words /
  *    end event. Every stretch with no activity longer than MAX_QUIET_MS plays as MAX_QUIET_MS (half
  *    kept after the activity, half before the next), and the story starts START_LEAD_MS before the
@@ -60,6 +61,12 @@ const MIN_SPREAD_DB = 12
 const LEVEL_FRACTION = 0.3
 
 export const PULL_TO_MS = 300
+/** Speech with gaps up to this is one stretch of telling: a caption starts at the stretch's first word. */
+export const TELLING_GAP_MS = 2000
+/** A speech span still running this long after the previous words were recognised is these words' start. */
+export const RUN_ON_MS = 300
+/** Speech that ended longer than this before a words event's `t` did not say it (typed words). */
+export const MAX_RECOGNITION_LAG_MS = 3000
 export const DRAW_ACTIVE_MS = 1000
 export const MARK_ACTIVE_MS = 300
 export const MAX_QUIET_MS = 500
@@ -159,6 +166,34 @@ export function pulledTimes(events: readonly StoryEvent[]): number[] {
   return t
 }
 
+/**
+ * Record time each event plays at in story time: a `words` event (a caption) at the start of the speech
+ * that said it, everything else at its `pulledTimes` time. A words event's `t` is when recognition
+ * finished, after the words were spoken; its speech is the stretch (gaps up to TELLING_GAP_MS) running
+ * up to `t` that the previous words did not have: speech starting after the previous words' `t`, or,
+ * when none did (one breath recognised as two pieces), the part of a span still running then
+ * (RUN_ON_MS or more), from the previous words' `t`. Words with no such speech keep `t`.
+ */
+export function saidTimes(events: readonly StoryEvent[], speech: readonly Span[]): number[] {
+  const out = pulledTimes(events)
+  const sorted = [...speech].sort((a, b) => a.from - b.from)
+  let prevT = -Infinity
+  events.forEach((e, i) => {
+    if (e.k !== 'words') return
+    const t = e.t
+    const after = prevT
+    prevT = t
+    const mine = sorted.filter((s) => s.from < t && s.to >= after + RUN_ON_MS)
+    const last = mine[mine.length - 1]
+    if (!last || last.to < t - MAX_RECOGNITION_LAG_MS) return
+    let first = mine.length - 1
+    while (first > 0 && (mine[first]?.from ?? 0) - (mine[first - 1]?.to ?? 0) <= TELLING_GAP_MS) first--
+    const fresh = mine.slice(first).find((s) => s.from >= after)
+    out[i] = fresh ? fresh.from : after
+  })
+  return out
+}
+
 /** Story ms for a record time on a timeline. A time inside a squeezed stretch maps to its far edge. */
 export function toStoryMs(spans: readonly KeptSpan[], recordMs: number): number {
   let lo = 0
@@ -217,8 +252,11 @@ export function storyTime(events: readonly StoryEvent[], speech: readonly Span[]
     at += s.to - s.from
   }
 
+  // Captions move to when their words were said; the kept spans stay as the activity made them (speech is
+  // activity, so a caption always lands in kept time). Events still fire in record order: a caption
+  // waits for drawing recorded before it.
   let prev = 0
-  const eventAt = pulled.map((r) => {
+  const eventAt = saidTimes(events, speech).map((r) => {
     prev = Math.max(prev, toStoryMs(spans, r))
     return prev
   })

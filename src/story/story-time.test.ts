@@ -8,6 +8,7 @@ import {
   MAX_QUIET_MS,
   pulledTimes,
   PULL_TO_MS,
+  saidTimes,
   SPEECH_PAD_MS,
   START_LEAD_MS,
   storyTime,
@@ -127,7 +128,9 @@ describe('storyTime', () => {
   test('starts START_LEAD_MS before the first activity (no 8 s voice lead)', () => {
     const tl = storyTime([words(11_000), cmd(11_300)], [{ from: 6_000, to: 10_900 }])
     expect(tl.spans[0]?.from).toBe(6_000 - START_LEAD_MS)
-    expect(tl.eventAt[0]).toBe(11_000 - (6_000 - START_LEAD_MS))
+    // The caption shows as the words start; the drawing comes PULL_TO_MS after they were recognised.
+    expect(tl.eventAt[0]).toBe(START_LEAD_MS)
+    expect(tl.eventAt[1]).toBe(11_300 - (6_000 - START_LEAD_MS))
   })
 
   test('quiet longer than MAX_QUIET_MS plays as MAX_QUIET_MS', () => {
@@ -174,11 +177,76 @@ describe('storyTime', () => {
     ]
     const tl = storyTime(events, speech)
     const at = (i: number): number => tl.eventAt[i] ?? 0
-    expect(at(1) - at(0)).toBe(PULL_TO_MS)
+    // The caption shows from the first word (5 s); the drawing lands PULL_TO_MS after recognition.
+    expect(at(1) - at(0)).toBe(9_600 + PULL_TO_MS - 5_000)
     expect(at(2) - at(1)).toBe(100)
     expect(tl.lengthMs < 26_300 - 4_700 - 3_000).toBe(true)
     // Every event sits inside a kept span.
     for (const r of pulledTimes(events)) expect(tl.spans.some((s) => s.from <= r && r <= s.to)).toBe(true)
+  })
+
+  test('captions show as the words are said, the drawing stays after them (the dragon story)', () => {
+    // The record of "A purple dragon lived" (assets' x-dragons): the first sentence is recognised in two
+    // pieces from one breath, the second sentence starts 1.3 s after the first ends, then "The End".
+    const events = [
+      words(11_127, 'Once upon a time a purple dragon lived in a big castle on'),
+      words(11_877, 'a hill.'),
+      cmd(13_430),
+      cmd(13_445),
+      words(17_128, 'One day he flew up into the sky and found a rainbow.'),
+      cmd(18_585),
+      cmd(18_592),
+      words(21_874, 'The End'),
+      end(21_874),
+    ]
+    const speech = [
+      { from: 6_752, to: 8_232 },
+      { from: 8_252, to: 12_032 },
+      { from: 13_292, to: 17_372 },
+      { from: 20_712, to: 22_052 },
+    ]
+    expect(saidTimes(events, speech)).toEqual([
+      6_752, // the first word
+      11_127, // the rest of the breath, from where the first piece was recognised
+      11_877 + PULL_TO_MS,
+      11_877 + PULL_TO_MS + 15,
+      13_292, // "One day", not 17.1 s
+      17_128 + PULL_TO_MS,
+      17_128 + PULL_TO_MS + 7,
+      20_712,
+      21_874,
+    ])
+    const tl = storyTime(events, speech)
+    const story = (r: number): number => toStoryMs(tl.spans, r)
+    // Each caption is up while its sentence is heard: from its speech start, before its speech ends.
+    expect(tl.eventAt[0]).toBe(START_LEAD_MS)
+    expect(tl.eventAt[4]).toBe(story(13_292))
+    expect((tl.eventAt[4] ?? 0) < story(17_372)).toBe(true)
+    expect(tl.eventAt[7]).toBe(story(20_712))
+    // The drawing, the finale and the timeline are what they were: draw events PULL_TO_MS after the words' end.
+    expect(tl.eventAt[2]).toBe(story(11_877 + PULL_TO_MS))
+    expect(tl.eventAt[5]).toBe(story(17_128 + PULL_TO_MS))
+    expect(tl.eventAt[8]).toBe(story(21_874))
+    for (let i = 1; i < tl.eventAt.length; i++) expect((tl.eventAt[i] ?? 0) >= (tl.eventAt[i - 1] ?? 0)).toBe(true)
+  })
+
+  test('a span that runs just past recognition does not take the next sentence, and typed words keep t', () => {
+    const events = [words(16_197), cmd(16_500), words(19_196), words(40_000, 'typed')]
+    // The first span ends 333 ms after its words (padding); the second sentence starts fresh at 17.85 s.
+    const speech = [
+      { from: 12_470, to: 16_530 },
+      { from: 17_850, to: 20_690 },
+    ]
+    const said = saidTimes(events, speech)
+    expect(said[0]).toBe(12_470)
+    expect(said[2]).toBe(17_850)
+    expect(said[3]).toBe(40_000)
+    // A caption waits for drawing recorded before it, never jumping ahead of the record's order.
+    const tl = storyTime([words(10_000), cmd(10_200), cmd(12_000), words(13_000)], [
+      { from: 6_000, to: 9_800 },
+      { from: 11_000, to: 12_900 },
+    ])
+    expect(tl.eventAt[3]).toBe(tl.eventAt[2])
   })
 
   test('no events and no speech', () => {
