@@ -128,11 +128,13 @@ export default ({ config }: ConfigContext): ExpoConfig =>
       // Stays up until the studio's `ready` (StudioWebView has a 20 s backstop).
       ['expo-splash-screen', { image: './assets/splash.png', backgroundColor: SPLASH_PAPER, imageWidth: 220 }],
       'expo-dev-client',
-      // Add-only Photos access for saving exported videos; never the full-library read permission.
+      // Add-only Photos access for saving exported videos; the app never asks for the full-library read
+      // permission. NSPhotoLibraryUsageDescription still has to exist: expo-media-library links the full
+      // photo-library API, and App Store Connect rejects a build without the key (ITMS-90683, build 1).
       [
         'expo-media-library',
         {
-          photosPermission: false,
+          photosPermission: PHOTOS_ADD_USAGE,
           savePhotosPermission: PHOTOS_ADD_USAGE,
           granularPermissions: ['video'],
         },
