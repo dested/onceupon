@@ -1,0 +1,35 @@
+{
+  "subtitle": "Tell a story, see it drawn",
+  "promotionalText": "Your child tells a story out loud and a crayon draws it as they talk. The first story is free, and there's a free 3-minute story every Saturday.",
+  "description": "Your child tells a story out loud, and the crayon draws what your child says. The dragon, the castle, the cookie the dragon was after: each one appears on the page as the words come. Say \"The End\" and the story is saved as a little book you can play back, in your child's own voice.\n\nHOW IT WORKS\n• Tap the microphone and tell a story. The crayon draws along.\n• Finished stories go to My stories. Play one back, page by page, with the voice that told it.\n• Save a story as a video to Photos, or make a link to send to family.\n• No reading needed. Stories can be typed too.\n\nFREE TO START\n• The first story is free: 5 minutes of story time.\n• Every Saturday there's a free 3-minute story.\n• For more, a grown-up can buy a minute pack: 40, 120 or 400 minutes.\n• No subscription, no ads and no account.\n\nMADE FOR CHILDREN, SET UP BY GROWN-UPS\n• Speech turns into words on the iPhone or iPad. The recording of your child's voice stays on the device unless a grown-up shares a story with voice.\n• Before the first story, a grown-up agrees to send the story's words, as text, to our server, which asks an AI service what to draw. A grown-up can turn this off at any time in Grown-ups.\n• Purchases, links and settings sit behind a grown-up question.\n• The crayon skips anything that doesn't belong in a picture book.\n\nWorks on iPhone and iPad.\n\nPrivacy Policy: https://onceupon.dested.com/privacy\nTerms of Use: https://onceupon.dested.com/terms",
+  "keywords": "storytelling,bedtime story,drawing,crayon,picture book,storybook,draw,imagination,tell a story,voice",
+  "supportUrl": "https://onceupon.dested.com/support",
+  "marketingUrl": "https://onceupon.dested.com/",
+  "privacyPolicyUrl": "https://onceupon.dested.com/privacy",
+  "iaps": [
+    {
+      "productId": "com.quickgame.squiggletale.pack40",
+      "id": "6815030317",
+      "name": "Story pack, 40 minutes",
+      "description": "40 minutes of story time, about 8 stories",
+      "usd": "9.99",
+      "reviewNote": "Consumable: adds 40 minutes of story time to this device; shown on the paywall in Grown-ups → Buy minutes"
+    },
+    {
+      "productId": "com.quickgame.squiggletale.pack120",
+      "id": "6815031238",
+      "name": "Big pack, 120 minutes",
+      "description": "120 minutes of story time, about 24 stories",
+      "usd": "19.99",
+      "reviewNote": "Consumable: adds 120 minutes of story time to this device; shown on the paywall in Grown-ups → Buy minutes"
+    },
+    {
+      "productId": "com.quickgame.squiggletale.pack400",
+      "id": "6815032143",
+      "name": "Family pack, 400 minutes",
+      "description": "400 minutes of story time for the family",
+      "usd": "39.99",
+      "reviewNote": "Consumable: adds 400 minutes of story time to this device; shown on the paywall in Grown-ups → Buy minutes"
+    }
+  ]
+}
