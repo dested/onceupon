@@ -14,4 +14,5 @@ database: true      # provision Postgres + DATABASE_URL
 prisma: true        # prisma generate on build, db push predeploy
 predeploy: bunx prisma db push --accept-data-loss
 domains:
-  - onceupon.dested.com
+  - squiggletale.com
+dnsZone: squiggletale.com
