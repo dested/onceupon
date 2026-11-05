@@ -65,14 +65,15 @@ plist() { plutil -extract "$1" raw "$2" 2>/dev/null || echo none; }
 echo "CHECK app $NAME version $(plist CFBundleShortVersionString $APP/Info.plist) build $(plist CFBundleVersion $APP/Info.plist) id $(plist CFBundleIdentifier $APP/Info.plist)"
 echo "CHECK updates enabled $(plist EXUpdatesEnabled $APP/Expo.plist) check $(plist EXUpdatesCheckOnLaunch $APP/Expo.plist) channel $(plutil -extract EXUpdatesRequestHeaders json -o - "$APP/Expo.plist" 2>/dev/null || echo none) runtime $(plist EXUpdatesRuntimeVersion $APP/Expo.plist) url $(plist EXUpdatesURL $APP/Expo.plist)"
 echo "CHECK orientations iphone $(plutil -extract UISupportedInterfaceOrientations json -o - $APP/Info.plist) ipad $(plutil -extract 'UISupportedInterfaceOrientations~ipad' json -o - $APP/Info.plist | tr -d '\n')"
-# Purpose strings: mic + speech must be there; Photos must not (Save video left 1.0, so no
-# expo-media-library; a photo key without the API reads as an unused permission in review). If a linked
-# module ever needs one back, App Store processing says so (ITMS-90683, builds 1 and 2).
-for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription; do
+# Purpose strings. Mic + speech are what the app asks for. NSPhotoLibraryUsageDescription must be there although
+# the app never asks: ExpoFileSystem links PHPhotoLibrary/PHAsset, and App Store processing rejects the binary
+# without it (ITMS-90683: builds 1 and 2 via expo-media-library, build 4 via ExpoFileSystem alone).
+# NSPhotoLibraryAddUsageDescription must not be: Save video left 1.0, so nothing saves to Photos.
+for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription NSPhotoLibraryUsageDescription; do
   plutil -extract $k raw $APP/Info.plist >/dev/null 2>&1 && echo "CHECK purpose $k ok" \
-    || { echo "ARCHIVE_UNFIT $k missing from Info.plist"; exit 1; }
+    || { echo "ARCHIVE_UNFIT $k missing from Info.plist (ITMS-90683 at App Store processing)"; exit 1; }
 done
-for k in NSPhotoLibraryUsageDescription NSPhotoLibraryAddUsageDescription; do
+for k in NSPhotoLibraryAddUsageDescription; do
   plutil -extract $k raw $APP/Info.plist >/dev/null 2>&1 \
     && { echo "ARCHIVE_UNFIT $k is in Info.plist: Photos is not in 1.0 (drop the plugin that adds it)"; exit 1; } \
     || echo "CHECK purpose $k absent (ok)"

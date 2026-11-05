@@ -19,7 +19,8 @@ const PAPER = '#fbf6ea'
 
 // Info.plist usage strings (parents read these in the iOS permission prompts).
 const MIC_USAGE = `${BRAND.name} listens while your child tells a story so the crayon can draw it. Speech is turned into words on this device, and the recording stays on this device unless a grown-up shares the story.`
-const SPEECH_USAGE = `${BRAND.name} turns your child's spoken story into words on this device so the crayon can draw it.`
+const PHOTOS_USAGE = `${BRAND.name} never opens your photo library.`
+const SPEECH_USAGE =`${BRAND.name} turns your child's spoken story into words on this device so the crayon can draw it.`
 // The splash image's paper tone (sampled from the generated icon) so the letterbox matches the art.
 const SPLASH_PAPER = '#f9f0d0'
 
@@ -95,6 +96,10 @@ export default ({ config }: ConfigContext): ExpoConfig =>
       buildNumber: '1',
       infoPlist: {
         NSMicrophoneUsageDescription: MIC_USAGE,
+        // The app never asks for Photos, but ExpoFileSystem links PHPhotoLibrary/PHAsset, and App Store
+        // processing rejects a binary that references them without this key (ITMS-90683, builds 1, 2 and 4).
+        // The add-only key stays out: nothing saves to Photos in 1.0.
+        NSPhotoLibraryUsageDescription: PHOTOS_USAGE,
         // No WKAppBoundDomains: with that key present WebKit disables user scripts, script message
         // handlers and evaluateJavaScript on any navigation it does not treat as app-bound (file:// never
         // is), which silently removed window.ReactNativeWebView and broke the whole bridge.
@@ -127,8 +132,8 @@ export default ({ config }: ConfigContext): ExpoConfig =>
       // Stays up until the studio's `ready` (StudioWebView has a 20 s backstop).
       ['expo-splash-screen', { image: './assets/splash.png', backgroundColor: SPLASH_PAPER, imageWidth: 220 }],
       'expo-dev-client',
-      // No Photos: Save video left 1.0 (d78bc47), so no expo-media-library and no photo-library purpose
-      // strings (archive.sh fails the archive if either NSPhotoLibrary key reappears).
+      // No Photos plugin: Save video left 1.0 (d78bc47), so no expo-media-library (the read key above is
+      // only for ExpoFileSystem's linked symbols; archive.sh fails if the add-only key reappears).
       // Audio session control only; the WebView records, so no background audio modes.
       [
         'expo-audio',
