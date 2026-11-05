@@ -86,18 +86,53 @@ function cloudEarsAllowed(device: Device, flags: Flags): boolean {
 
 // ---------------------------------------------------------------- draw outcomes (no charge for failed drawing)
 
-/** One relay call in flight per device (the studio never has two). */
-const inFlight = new Map<string, { sessionId: string; startedAt: number }>()
+/** One relay call in flight per device (V-07). */
+interface DrawSlot {
+  sessionId: string
+  startedAt: number
+  /** Stops this call's upstream stream. */
+  abort: () => void
+  /** Resolves when the call has ended and released the slot. */
+  done: Promise<void>
+  release: () => void
+}
+const inFlight = new Map<string, DrawSlot>()
 
-/** Claim the device's draw slot; false when a call is already in flight. */
-export function beginDraw(deviceId: string, sessionId: string): boolean {
-  if (inFlight.has(deviceId)) return false
-  inFlight.set(deviceId, { sessionId, startedAt: Date.now() })
-  return true
+/** How long a new call waits for the call it replaces to wind down. */
+const REPLACE_WAIT_MS = 3000
+
+/**
+ * Claim the device's draw slot. The studio aborts a call before it starts the next one, but the server
+ * hears that abort late: a new call therefore replaces the one in flight (stops it, waits for it to
+ * end) instead of being refused. Still one call at a time. Null when the old call won't end in time,
+ * or another new call took the slot first.
+ */
+export async function beginDraw(deviceId: string, sessionId: string, abort: () => void): Promise<DrawSlot | null> {
+  const current = inFlight.get(deviceId)
+  if (current) {
+    current.abort()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const ended = await Promise.race([
+      current.done.then(() => true),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), REPLACE_WAIT_MS)
+      }),
+    ])
+    clearTimeout(timer)
+    if (!ended || inFlight.has(deviceId)) return null
+  }
+  let release = (): void => undefined
+  const done = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const slot: DrawSlot = { sessionId, startedAt: Date.now(), abort, done, release }
+  inFlight.set(deviceId, slot)
+  return slot
 }
 
-export function endDraw(deviceId: string): void {
-  inFlight.delete(deviceId)
+export function endDraw(deviceId: string, slot: DrawSlot): void {
+  if (inFlight.get(deviceId) === slot) inFlight.delete(deviceId)
+  slot.release()
 }
 
 /** Draws in flight across every device (tests wait for 0 between cases). */

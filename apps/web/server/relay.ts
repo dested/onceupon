@@ -29,7 +29,9 @@ const MAX_TOKENS = 1600
 const FIRST_TOKEN_DEADLINE_MS = 8_000
 /** Calls a session may make per charged minute, plus a grace for the start of a story (V-01). */
 const CALLS_PER_CHARGED_MINUTE = 12
-const CALL_GRACE = 3
+// The first charged beat lands 15 s after the child is first heard; a quick teller (and the studio's
+// restarts, which count as aborted calls) needs more than 3 calls before it.
+const CALL_GRACE = 8
 /** The day's total spend is re-read at most this often for the global stop (V-08). */
 const SPEND_CACHE_MS = 60_000
 
@@ -197,19 +199,20 @@ async function checkAndStream(res: Response, device: Device, rawBody: unknown): 
   const apiKey = env.ANTHROPIC_API_KEY
   if (!apiKey) throw new ApiError(503, 'upstream', 'drawing is unavailable right now')
 
-  // One call in flight per device (V-07; the studio never has two).
-  if (!sessions.beginDraw(device.id, session.id)) {
-    throw new ApiError(429, 'cap', 'a drawing is already in progress')
-  }
+  // One call in flight per device (V-07): a new call replaces the one in flight.
+  const controller = new AbortController()
+  const slot = await sessions.beginDraw(device.id, session.id, () => controller.abort())
+  if (!slot) throw new ApiError(429, 'cap', 'a drawing is already in progress')
   try {
-    await streamDraw(res, device, session.id, body, dialect, model, apiKey)
+    await streamDraw(res, controller, device, session.id, body, dialect, model, apiKey)
   } finally {
-    sessions.endDraw(device.id)
+    sessions.endDraw(device.id, slot)
   }
 }
 
 async function streamDraw(
   res: Response,
+  controller: AbortController,
   device: Device,
   sessionId: string,
   body: DrawBody,
@@ -217,7 +220,6 @@ async function streamDraw(
   model: string,
   apiKey: string
 ): Promise<void> {
-  const controller = new AbortController()
   let clientGone = false
   let slow = false
   // `res` closes when the client goes away (or after we end it): abort the upstream only in the first

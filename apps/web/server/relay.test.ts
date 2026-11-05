@@ -118,17 +118,36 @@ describe('relay limits', () => {
     expect(tooManyTokens.status).toBe(400)
   })
 
-  test('one draw in flight per device', async () => {
+  test('one draw in flight per device: a new draw replaces the one in flight', async () => {
+    const d = await newDevice({ consent: true })
+    const sessionId = await startStory(d.token)
+    fake.mode = 'drip'
+    const first = draw(d.token, sessionId).catch(() => null)
+    await sleep(300)
+    expect(drawsInFlight()).toBe(1)
+    // The drip runs for 10 s; the second call stops it and takes the slot instead of a 429.
+    fake.mode = 'ok'
+    const t0 = Date.now()
+    const second = await draw(d.token, sessionId)
+    expect(second.status).toBe(200)
+    expect(Date.now() - t0).toBeLessThan(4000)
+    await first
+    const logs = await prisma.callLog.findMany({ where: { sessionId }, orderBy: { createdAt: 'asc' } })
+    expect(logs.map((l) => l.error)).toEqual(['aborted', null])
+    expect(drawsInFlight()).toBe(0)
+  })
+
+  test('the studio restart: abort, then draw again at once, is not refused', async () => {
     const d = await newDevice({ consent: true })
     const sessionId = await startStory(d.token)
     fake.mode = 'drip'
     const ctl = new AbortController()
     const first = draw(d.token, sessionId, {}, ctl.signal).catch(() => null)
     await sleep(300)
-    const second = await draw(d.token, sessionId)
-    expect(second.status).toBe(429)
-    expect(errCode(second.error)).toBe('cap')
     ctl.abort()
+    fake.mode = 'ok'
+    const again = await draw(d.token, sessionId)
+    expect(again.status).toBe(200)
     await first
   })
 
@@ -165,10 +184,10 @@ describe('relay limits', () => {
     expect(err).toEqual({ k: 'error', code: 'upstream', message: 'slow' })
   }, 15_000)
 
-  test('calls are tied to charged time: 3 grace calls, then cap', async () => {
+  test('calls are tied to charged time: 8 grace calls, then cap', async () => {
     const d = await newDevice({ consent: true })
     const sessionId = await startStory(d.token)
-    for (let i = 0; i < 3; i++) expect((await draw(d.token, sessionId)).status).toBe(200)
+    for (let i = 0; i < 8; i++) expect((await draw(d.token, sessionId)).status).toBe(200)
     const fourth = await draw(d.token, sessionId)
     expect(fourth.status).toBe(429)
     // 15 s of mic time buys 3 more (12 per charged minute).
