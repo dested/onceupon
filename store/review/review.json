@@ -1,0 +1,13 @@
+{
+  "app": "apps/mobile",
+  "name": "Squiggletale",
+  "bundleId": "com.quickgame.squiggletale",
+  "sources": ["src"],
+  "privacyUrl": "https://onceupon.dested.com/privacy",
+  "termsUrl": "https://onceupon.dested.com/terms",
+  "supportUrl": "https://onceupon.dested.com/support",
+  "ugc": false,
+  "kids": true,
+  "accounts": false,
+  "purchases": "one-time"
+}
