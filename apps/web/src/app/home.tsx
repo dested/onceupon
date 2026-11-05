@@ -19,8 +19,6 @@ const SAFE = [
 ]
 
 export function HomePage() {
-  const hasStore = BRAND.appStoreUrl !== ''
-
   return (
     <>
       <Head title="Tell a story, watch it draw" />
@@ -36,11 +34,7 @@ export function HomePage() {
             say it. Say “The End” and send the picture book to grandma.
           </p>
           <div className="mt-7 flex flex-wrap gap-4">
-            <StickerLink
-              to={hasStore ? BRAND.appStoreUrl : '/#get-the-app'}
-              tone="yellow"
-              tilt={-2}
-              external={hasStore}>
+            <StickerLink to={BRAND.appStoreUrl} tone="yellow" tilt={-2} external>
               Get the app
             </StickerLink>
             <StickerLink to="/how-it-works" tone="paper" tilt={1}>
@@ -131,17 +125,9 @@ export function HomePage() {
       {/* Get the app */}
       <Section title="Get the app">
         <div id="get-the-app" className="flex flex-col items-start gap-4">
-          {hasStore ? (
-            <StickerLink to={BRAND.appStoreUrl} tone="yellow" tilt={-2} external>
-              Download on the App Store
-            </StickerLink>
-          ) : (
-            <span
-              className="inline-flex items-center rounded-2xl border-[3px] border-dashed border-ink/50 bg-paper px-5 py-2.5 font-hand text-xl text-ink-soft"
-              style={{ transform: 'rotate(-2deg)' }}>
-              Coming to the App Store
-            </span>
-          )}
+          <StickerLink to={BRAND.appStoreUrl} tone="yellow" tilt={-2} external>
+            Download on the App Store
+          </StickerLink>
           <p className="font-hand text-lg text-ink-soft">Works on iPhone and iPad</p>
         </div>
       </Section>

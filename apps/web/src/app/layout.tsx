@@ -11,7 +11,6 @@ const NAV: { label: string; to: string; tilt: number }[] = [
   { label: 'Support', to: '/support', tilt: 1 },
 ]
 
-const APP_STORE = BRAND.appStoreUrl || '/#get-the-app'
 
 /**
  * Pages the app opens in its in-app browser with `?app=1` (ClientConfig URLs): rendered with no site
@@ -52,7 +51,7 @@ export function Layout() {
               {n.label}
             </StickerLink>
           ))}
-          <StickerLink to={APP_STORE} tone="yellow" tilt={-1} external={BRAND.appStoreUrl !== ''}>
+          <StickerLink to={BRAND.appStoreUrl} tone="yellow" tilt={-1} external>
             Get the app
           </StickerLink>
         </nav>
@@ -79,23 +78,14 @@ export function Layout() {
                   </li>
                 ))}
                 <li>
-                  {BRAND.appStoreUrl ? (
-                    <a
-                      href={BRAND.appStoreUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={() => setMenuOpen(false)}
-                      className="block rounded-xl bg-crayon-yellow px-3 py-2 font-hand text-xl text-ink">
-                      Get the app
-                    </a>
-                  ) : (
-                    <Link
-                      to="/#get-the-app"
-                      onClick={() => setMenuOpen(false)}
-                      className="block rounded-xl bg-crayon-yellow px-3 py-2 font-hand text-xl text-ink">
-                      Get the app
-                    </Link>
-                  )}
+                  <a
+                    href={BRAND.appStoreUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => setMenuOpen(false)}
+                    className="block rounded-xl bg-crayon-yellow px-3 py-2 font-hand text-xl text-ink">
+                    Get the app
+                  </a>
                 </li>
               </ul>
             </div>
