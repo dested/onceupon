@@ -115,12 +115,10 @@ export default ({ config }: ConfigContext): ExpoConfig =>
       package: BRAND.bundleId,
       adaptiveIcon: { foregroundImage: './assets/icon.png', backgroundColor: PAPER },
     },
-    updates: {
-      url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
-      enabled: true,
-      checkAutomatically: 'ON_LOAD',
-      fallbackToCacheTimeout: 0,
-    },
+    // No OTA in 1.0: EAS Update sends a per-install client id to u.expo.dev on every launch, a third
+    // party the privacy page doesn't name (Kids 1.3). The studio is hosted, so only shell changes need
+    // a build. decisions.md 2026-11-04.
+    updates: { enabled: false, checkAutomatically: 'NEVER' },
     runtimeVersion: { policy: 'appVersion' },
     plugins: [
       'expo-iap',

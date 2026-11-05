@@ -224,3 +224,12 @@ The App Store listing uses the Kids 6–8 band (children who tell a story in sev
 Amends "Minutes are talking time": opening the mic no longer starts the meter. It counts from the first words, interim words or voice-level sound, and stops 8 s after the last.
 **Why:** sim-verify measured about 9 s charged per mic tap before any speech.
 
+
+## 2026-11-04 — No EAS Update in 1.0
+
+`updates.enabled: false` in `apps/mobile/app.config.ts`. Shell (Expo) changes ship as a new App Store build; studio changes still reach the app through the hosted studio deploy.
+**Why:** EAS Update sends a per-install `EAS-Client-ID` to u.expo.dev on every launch. That is device data going to a third party the privacy page doesn't name, in a Kids Category app (1.3, 5.1.4). Turning it back on means adding Expo to the privacy page and App Privacy labels first.
+
+## 2026-11-04 — Store categories
+
+Primary Education, secondary Entertainment, Made for Kids 6–8 (`kidsAgeBand` on the age rating). App Store Connect has no Kids primary category: the Kids section comes from the age band.
