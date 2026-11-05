@@ -124,20 +124,37 @@ export function setKv(key: string, value: string | null): Promise<void> {
 
 /** Words a title must not end on ("There was a purple dragon named"). */
 const DANGLING = new Set(
-  'a an the and or but of in on at to with from for by named called was were is are who that which his her their my our its'.split(' ')
+  'a an the and or but of in on at to with from for by named called was were is are who that which his her their my our its under over into onto near behind beside above below across through around up down off about after before like as so then when where very big little'.split(
+    ' '
+  )
 )
 
 /**
- * The shelf title: the story's first sentence when it is short (up to 8 words), else its first six
- * words, never ending on a dangling word. "Once upon a time" is dropped.
+ * The shelf title: the story's first sentence when it is short (up to 8 words), else the longest 5–8
+ * word start of it that ends on a real word, never ending on a dangling word. "Once upon a time" is dropped.
  */
 export function titleFromWords(text: string): string {
   const cleaned = text.replace(/^(once upon a time,?\s*)/i, '').trim() || text.trim()
   const firstSentence = cleaned.split(/[.!?]/, 1)[0] ?? ''
   const sentenceWords = firstSentence.split(/\s+/).filter(Boolean)
-  let words = sentenceWords.length > 0 && sentenceWords.length <= 8 ? sentenceWords : cleaned.split(/\s+/).filter(Boolean).slice(0, 6)
-  words = words.map((w) => w.replace(/[,;:]+$/, ''))
-  while (words.length > 1 && DANGLING.has((words[words.length - 1] ?? '').toLowerCase())) words = words.slice(0, -1)
+  const strip = (w: string): string => w.replace(/[,;:]+$/, '')
+  const dangling = (w: string | undefined): boolean => DANGLING.has((w ?? '').toLowerCase())
+  let words: string[]
+  if (sentenceWords.length > 0 && sentenceWords.length <= 8) {
+    words = sentenceWords.map(strip)
+  } else {
+    // A long sentence: the longest 5–8 word start that ends on a real word ("A purple dragon lived in
+    // a big castle", not "A purple dragon lived"); else the first six words.
+    const pool = (sentenceWords.length > 0 ? sentenceWords : cleaned.split(/\s+/).filter(Boolean)).map(strip)
+    words = pool.slice(0, 6)
+    for (let n = Math.min(8, pool.length); n >= 5; n--) {
+      if (!dangling(pool[n - 1])) {
+        words = pool.slice(0, n)
+        break
+      }
+    }
+  }
+  while (words.length > 1 && dangling(words[words.length - 1])) words = words.slice(0, -1)
   if (words.length === 0) return 'Untitled story'
   const t = words.join(' ')
   return t.charAt(0).toUpperCase() + t.slice(1)
