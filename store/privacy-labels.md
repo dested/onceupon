@@ -72,12 +72,7 @@ none.
   zero balance; purchases for accounting; shares 90 days; backups 30 days.
 - No accounts, no advertising, no third-party analytics.
 
-## Open point for the lead
+## Expo
 
-- **EAS Update (Expo).** `apps/mobile/app.config.ts` has `updates.enabled: true` with `checkAutomatically: ON_LOAD`.
-  On every launch expo-updates calls `u.expo.dev` with an `EAS-Client-ID` header, a random per-install UUID
-  (`node_modules/expo-updates/ios/EXUpdates/AppLoader/FileDownloader.swift:448`), plus platform and runtime
-  version. That is a device-level id going to a third party (Expo), which Kids guideline 1.3 frowns on ("may not
-  send ... device information to third parties"), and the privacy page doesn't list Expo. Either turn updates
-  off for the 1.0 binary, or add Expo to the privacy page's "Who helps us run it". The labels above don't change
-  either way: Device ID is already declared, App Functionality, not tracking.
+EAS Update is off from 8912f86 (build 2), so nothing goes to Expo at launch: no Expo line on the privacy page or
+in the labels (lead, 2026-11-04).

@@ -1,7 +1,6 @@
 # Squiggletale 1.0.0: App Store listing
 
-Status: draft for the lead's `pass listing` (store lane, 2026-11-04). Nothing below is written to App Store
-Connect until then. Machine copy of the same text: `store/asc/listing.json` (the write script reads that file;
+Status: passed by the lead and written to App Store Connect (store lane, 2026-11-04). Machine copy of the same text: `store/asc/listing.json` (the write script reads that file;
 keep the two identical). Lengths are checked by `bun store/asc/check-listing.ts`.
 
 ## Name (set, unchanged)
@@ -85,7 +84,7 @@ app. Family Sharing: off (consumables can't use it).
 App Store Connect has no `KIDS` app category (the API's iOS categories list it nowhere). An app joins the
 Kids Category by answering Made for Kids with an age band in the age rating declaration; the primary and
 secondary categories stay ordinary ones. So: primary EDUCATION, secondary ENTERTAINMENT, `kidsAgeBand`
-SIX_TO_EIGHT. Needs the lead's OK, since the brief said primary KIDS, secondary EDUCATION.
+SIX_TO_EIGHT. Lead OK, 2026-11-04.
 
 ## Age rating declaration (answers)
 
