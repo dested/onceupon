@@ -75,6 +75,7 @@ src/
     scene.ts               Scene model: objects, pages, apply(Command) -> SceneEvent[], summary() for the prompt
     stage.ts               Stage renderer: per-object layers, reveal queue, tweens, idle motion, bubbles, page turn, crayon cursor
     pop.ts                 the `pop` Stage style (opaque waxy fills, tinted outlines, light, face cheeks/catchlights/blink via Shape.role, contact shadows, washed sky/ground, stars); Stage `style: 'classic' | 'pop'`, classic byte-identical
+    finale-place.ts        where "The End" goes: the slid spot on four rows that covers the least of the drawing (characters/props 1, scenery 0.15, hills 0.05)
     fx.ts                  particle effects (explode, sparkle, hearts, rain, fire, smoke, stars, poof, scribble-out)
     face.ts                faceShapes(): eyes + mouth anchored to a head contour (json dialect's face op)
     audio.ts               synthesized crayon scratch + page flip (Web Audio, seeded noise); StageAudio, AudioCues + renderAudioCues() for offline export

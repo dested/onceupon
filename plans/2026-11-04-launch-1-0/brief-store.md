@@ -31,3 +31,4 @@
 ## Standing answers
 - (2026-11-04, lead) Notes ready: paste store/review/notes.md (fc67c70) verbatim into appStoreReviewDetail.notes. Upload the demo attachment only after `demo ready`. Applies to: store.
 - (2026-11-04, lead) `pass listing` (store/listing.md as drafted). Categories OK: primary EDUCATION, secondary ENTERTAINMENT, kidsAgeBand SIX_TO_EIGHT. EAS Update is off from 8912f86 (build 2); no Expo line needed on the privacy page or labels. Applies to: store.
+- (2026-11-04, lead) Territories: drop China mainland for 1.0 (ICP filing, plus China's generative-AI rules: Apple pulls AI apps without a licence). Then cross-check the rest against Anthropic's supported regions (https://www.anthropic.com/supported-countries, WebFetch) and drop any territory not on it, since every story is drawn by that API. Apply the same list to the three IAPs. Report the final count and every territory dropped. Applies to: store.
